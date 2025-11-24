@@ -1,4 +1,5 @@
 mod archive;
+mod editor;
 mod ui;
 
 use eframe::egui;

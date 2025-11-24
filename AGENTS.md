@@ -3,7 +3,8 @@
 ## Project Structure & Module Organization
 
 - Rust 2024 crate; entry point at `src/main.rs`, which initializes the eframe application.
-- UI implementation in `src/ui.rs`; all egui layout and interaction logic lives here.
+- UI shell in `src/ui.rs`; it wires the overall layout and delegates to components.
+- Markdown editor encapsulated in `src/editor.rs`; all toolbar, caret handling, and text editing live here.
 - Business logic in `src/archive.rs`; handles RO-Crate archive creation, file operations, and metadata generation.
 - Add new Rust modules under `src/` and integration tests under `tests/` to keep responsibilities clear.
 - No build script needed; egui compiles directly with the Rust code.
@@ -34,7 +35,8 @@
 ## Module Responsibilities
 
 - **`src/main.rs`**: Application entry point; sets up eframe and launches the UI.
-- **`src/ui.rs`**: All egui UI code, event handling, and user interaction logic. Calls into `archive` module for business operations.
+- **`src/ui.rs`**: UI composition and screens; delegates text editing to `editor` and calls `archive` for business operations.
+- **`src/editor.rs`**: Markdown editor component (toolbar, cursor-aware insertions, text area).
 - **`src/archive.rs`**: Pure business logic for archive creation, file handling, name sanitization, and RO-Crate metadata generation. No UI dependencies.
 
 ## Testing Guidelines

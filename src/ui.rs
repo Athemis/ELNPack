@@ -3,16 +3,14 @@ use std::path::{Path, PathBuf};
 
 use chrono::{Datelike, NaiveDate, Utc};
 use eframe::egui;
-use egui::RichText;
 use egui::SizeHint;
-use egui::text::{CCursor, CCursorRange};
-use egui::text_edit::TextEditState;
 use egui_extras::DatePickerButton;
 use egui_extras::image::load_svg_bytes_with_size;
 use usvg::Options;
 use time::{Date, Month, OffsetDateTime, Time};
 
 use crate::archive::{build_and_write_archive, ensure_extension, suggested_archive_name};
+use crate::editor::MarkdownEditor;
 
 pub struct AttachmentItem {
     pub name: String,
@@ -58,7 +56,7 @@ fn format_two(n: i32) -> String {
 
 pub struct ElnPackApp {
     entry_title: String,
-    body_text: String,
+    markdown: MarkdownEditor,
     attachments: Vec<AttachmentItem>,
     status_text: String,
     performed_date: NaiveDate,
@@ -66,23 +64,6 @@ pub struct ElnPackApp {
     performed_minute: i32,
     thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
     thumbnail_failures: HashSet<PathBuf>,
-    heading_level: u8,
-    body_cursor: Option<CCursorRange>,
-    body_cursor_override: Option<CCursorRange>,
-    code_choice: CodeChoice,
-    list_choice: ListChoice,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum CodeChoice {
-    Inline,
-    Block,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum ListChoice {
-    Unordered,
-    Ordered,
 }
 
 impl Default for ElnPackApp {
@@ -97,7 +78,7 @@ impl Default for ElnPackApp {
 
         Self {
             entry_title: String::new(),
-            body_text: String::new(),
+            markdown: MarkdownEditor::default(),
             attachments: Vec::new(),
             status_text: String::new(),
             performed_date: today,
@@ -105,11 +86,6 @@ impl Default for ElnPackApp {
             performed_minute,
             thumbnail_cache: HashMap::new(),
             thumbnail_failures: HashSet::new(),
-            heading_level: 1,
-            body_cursor: None,
-            body_cursor_override: None,
-            code_choice: CodeChoice::Inline,
-            list_choice: ListChoice::Unordered,
         }
     }
 }
@@ -188,151 +164,13 @@ impl ElnPackApp {
         ui.text_edit_singleline(&mut self.entry_title);
     }
 
-    fn render_description_input(&mut self, ui: &mut egui::Ui) {
+        fn render_description_input(&mut self, ui: &mut egui::Ui) {
         ui.label("Main Text (Markdown)");
         ui.add_space(4.0);
-
-        ui.horizontal(|ui| {
-            ui.label("Heading");
-            egui::ComboBox::from_id_salt("heading_picker")
-                .selected_text(format!("H{}", self.heading_level))
-                .show_ui(ui, |ui| {
-                    for lvl in 1..=6u8 {
-                        if ui
-                            .selectable_value(&mut self.heading_level, lvl, format!("H{}", lvl))
-                            .clicked()
-                        {
-                            self.insert_heading_at_cursor(lvl);
-                        }
-                    }
-            });
-            ui.separator();
-            if ui.button("B").clicked() {
-                self.insert_snippet_at_cursor("**bold**");
-            }
-            if ui.button("I").clicked() {
-                self.insert_snippet_at_cursor("_italic_");
-            }
-            ui.label(format!("{} Code", egui_phosphor::regular::CODE_SIMPLE));
-            egui::ComboBox::from_id_salt("code_picker")
-                .selected_text(match self.code_choice {
-                    CodeChoice::Inline => RichText::new(format!(
-                        "{} Inline",
-                        egui_phosphor::regular::CODE_SIMPLE
-                    )),
-                    CodeChoice::Block => RichText::new(format!(
-                        "{} Block",
-                        egui_phosphor::regular::CODE_BLOCK
-                    )),
-                })
-                .show_ui(ui, |ui| {
-                    if ui
-                        .selectable_value(
-                            &mut self.code_choice,
-                            CodeChoice::Inline,
-                            RichText::new(format!(
-                                "{} Inline",
-                                egui_phosphor::regular::CODE_SIMPLE
-                            )),
-                        )
-                        .clicked()
-                    {
-                        self.insert_snippet_at_cursor("`code`");
-                    }
-                    if ui
-                        .selectable_value(
-                            &mut self.code_choice,
-                            CodeChoice::Block,
-                            RichText::new(format!(
-                                "{} Block",
-                                egui_phosphor::regular::CODE_BLOCK
-                            )),
-                        )
-                        .clicked()
-                    {
-                        self.insert_block_snippet_at_cursor("```\ncode\n```");
-                    }
-                });
-            if ui.button("Link").clicked() {
-                self.insert_snippet_at_cursor("[text](https://example.com)");
-            }
-            ui.label(format!("{} List", egui_phosphor::regular::LIST_DASHES));
-            egui::ComboBox::from_id_salt("list_picker")
-                .selected_text(match self.list_choice {
-                    ListChoice::Unordered => RichText::new(format!(
-                        "{} Bulleted",
-                        egui_phosphor::regular::LIST_DASHES
-                    )),
-                    ListChoice::Ordered => RichText::new(format!(
-                        "{} Numbered",
-                        egui_phosphor::regular::LIST_NUMBERS
-                    )),
-                })
-                .show_ui(ui, |ui| {
-                    if ui
-                        .selectable_value(
-                            &mut self.list_choice,
-                            ListChoice::Unordered,
-                            RichText::new(format!(
-                                "{} Bulleted",
-                                egui_phosphor::regular::LIST_DASHES
-                            )),
-                        )
-                        .clicked()
-                    {
-                        self.insert_block_snippet_at_cursor("\n- item");
-                    }
-                    if ui
-                        .selectable_value(
-                            &mut self.list_choice,
-                            ListChoice::Ordered,
-                            RichText::new(format!(
-                                "{} Numbered",
-                                egui_phosphor::regular::LIST_NUMBERS
-                            )),
-                        )
-                        .clicked()
-                    {
-                        self.insert_block_snippet_at_cursor("\n1. first");
-                    }
-                });
-            if ui.button("Quote").clicked() {
-                self.insert_block_snippet_at_cursor("\n> quote");
-            }
-            if ui.button("Image").clicked() {
-                self.insert_snippet_at_cursor("![alt text](path/to/image.png)");
-            }
-            if ui.button("Strike").clicked() {
-                self.insert_snippet_at_cursor("~~text~~");
-            }
-            if ui.button("Rule").clicked() {
-                self.insert_block_snippet_at_cursor("\n---\n");
-            }
-        });
-        ui.add_space(4.0);
-        let body_id = ui.id().with("body_text_edit");
-        if let Some(state) = TextEditState::load(ui.ctx(), body_id) {
-            self.body_cursor = state.cursor.char_range();
-        }
-        let mut output = egui::TextEdit::multiline(&mut self.body_text)
-            .id_source(body_id)
-            .desired_width(f32::INFINITY)
-            .desired_rows(8)
-            .show(ui);
-        if let Some(override_range) = self.body_cursor_override.take() {
-            output.state.cursor.set_char_range(Some(override_range.clone()));
-            self.body_cursor = Some(override_range);
-        } else {
-            self.body_cursor = output
-                .state
-                .cursor
-                .char_range()
-                .or_else(|| Some(CCursorRange::one(CCursor::new(self.body_text.chars().count()))));
-        }
-        output.state.store(ui.ctx(), body_id);
+        self.markdown.ui(ui);
     }
 
-    fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {
+fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {
         ui.label("Performed at (UTC)");
         ui.add_space(4.0);
 
@@ -523,7 +361,7 @@ impl ElnPackApp {
 
     fn save_archive(&mut self) {
         let title = self.entry_title.trim();
-        let body = self.body_text.trim();
+        let body = self.markdown.text().trim();
 
         let performed_at = match self.build_performed_at() {
             Ok(dt) => dt,
@@ -562,61 +400,4 @@ impl ElnPackApp {
             }
         }
     }
-
-    fn insert_snippet_at_cursor(&mut self, snippet: &str) {
-        self.insert_at_cursor(snippet, false);
-    }
-
-    fn insert_block_snippet_at_cursor(&mut self, snippet: &str) {
-        self.insert_at_cursor(snippet, true);
-    }
-
-    fn insert_heading_at_cursor(&mut self, level: u8) {
-        let level = level.clamp(1, 6);
-        let hashes = "#".repeat(level as usize);
-        let block = format!("{} Title\n", hashes);
-        self.insert_block_snippet_at_cursor(&block);
-    }
-
-    fn insert_at_cursor(&mut self, snippet: &str, ensure_newline: bool) {
-        let mut insertion = snippet.to_string();
-        if ensure_newline {
-            if !insertion.ends_with('\n') {
-                insertion.push('\n');
-            }
-            if !self.body_text.ends_with('\n') && !self.body_text.is_empty() {
-                insertion = format!("\n{insertion}");
-            }
-        } else if !self.body_text.is_empty() && !self.body_text.ends_with(char::is_whitespace) {
-            insertion.insert(0, ' ');
-        }
-
-        let (start_char, end_char) = if let Some(range) = &self.body_cursor {
-            let sorted = if range.is_sorted() { range.clone() } else { CCursorRange::two(range.secondary, range.primary) };
-            (sorted.primary.index, sorted.secondary.index)
-        } else {
-            let len = self.body_text.chars().count();
-            (len, len)
-        };
-
-        let start = char_to_byte(&self.body_text, start_char);
-        let end = char_to_byte(&self.body_text, end_char);
-
-        self.body_text.replace_range(start..end, &insertion);
-
-        let new_pos = start_char + insertion.chars().count();
-        let new_range = CCursorRange::one(CCursor::new(new_pos));
-        self.body_cursor = Some(new_range);
-        self.body_cursor_override = self.body_cursor.clone();
-    }
-}
-
-fn char_to_byte(text: &str, char_idx: usize) -> usize {
-    if char_idx == text.chars().count() {
-        return text.len();
-    }
-    text.char_indices()
-        .nth(char_idx)
-        .map(|(i, _)| i)
-        .unwrap_or_else(|| text.len())
 }
