@@ -269,16 +269,16 @@ impl ElnPackApp {
             });
         } else {
             ui.horizontal(|ui| {
-                egui::ComboBox::from_label("Heading")
+                ui.label("Heading");
+                egui::ComboBox::from_id_source("heading_picker")
                     .selected_text(format!("H{}", self.heading_level))
                     .show_ui(ui, |ui| {
-                        for lvl in 1..=3u8 {
+                        for lvl in 1..=6u8 {
                             if ui
                                 .selectable_value(&mut self.heading_level, lvl, format!("H{}", lvl))
                                 .clicked()
                             {
-                                let hashes = "#".repeat(self.heading_level as usize);
-                                self.insert_snippet(&format!("{}\u{00A0}Title", hashes));
+                                self.insert_heading(lvl);
                             }
                         }
                     });
@@ -529,5 +529,14 @@ impl ElnPackApp {
             self.body_text.push(' ');
         }
         self.body_text.push_str(snippet);
+    }
+
+    fn insert_heading(&mut self, level: u8) {
+        let level = level.clamp(1, 6);
+        let hashes = "#".repeat(level as usize);
+        if !self.body_text.ends_with('\n') && !self.body_text.is_empty() {
+            self.body_text.push('\n');
+        }
+        self.body_text.push_str(&format!("{} Title\n", hashes));
     }
 }
