@@ -17,6 +17,11 @@
 - `cargo test` — run the test suite (add tests as you extend logic).
 - `cargo build --release` — produce an optimized binary for distribution.
 
+## Documentation & Reference Lookup
+
+- Use the Context7 MCP when you need library or API documentation: resolve the library id, then fetch docs via the Context7 MCP get-library-docs endpoint.
+- Prefer official documentation domains returned by Context7; avoid ad-hoc web searches unless Context7 lacks coverage.
+
 ## Coding Style & Naming Conventions
 
 - Follow rustfmt defaults (4-space indent, trailing commas where appropriate); run `cargo fmt` before committing.
@@ -41,7 +46,7 @@
 
 ## Commit & Pull Request Guidelines
 
-- No existing history; use clear, present-tense commit messages (e.g., `Add submit handler validation`). Conventional Commits are welcome but not required.
+- No existing history; use clear, present-tense commit messages following the Conventional Commits spec (e.g., `feat: add submit handler validation`).
 - Keep commits scoped and reviewable; avoid bundling formatting-only changes with behavior changes.
 - Pull requests should describe the change, note any UI updates, and link related issues. Include screenshots or short screen recordings when modifying UI behavior.
 - Document manual test steps or limitations in the PR description so reviewers can reproduce quickly.
