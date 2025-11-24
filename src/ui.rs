@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
+use chrono::{Datelike, NaiveDate, Utc};
 use eframe::egui;
+use egui_extras::DatePickerButton;
+use time::{Date, Month, OffsetDateTime, Time};
 
 use crate::archive::{build_and_write_archive, ensure_extension, suggested_archive_name};
 
@@ -9,12 +12,36 @@ pub struct AttachmentItem {
     pub path: PathBuf,
 }
 
-#[derive(Default)]
 pub struct ElnPackApp {
     entry_title: String,
     body_text: String,
     attachments: Vec<AttachmentItem>,
     status_text: String,
+    performed_date: NaiveDate,
+    performed_hour: i32,
+    performed_minute: i32,
+}
+
+impl Default for ElnPackApp {
+    fn default() -> Self {
+        let now = Utc::now();
+        let today = now.date_naive();
+        let offset_now = OffsetDateTime::from_unix_timestamp(now.timestamp())
+            .expect("Unix timestamp conversion must succeed");
+
+        let performed_hour = offset_now.hour() as i32;
+        let performed_minute = offset_now.minute() as i32;
+
+        Self {
+            entry_title: String::new(),
+            body_text: String::new(),
+            attachments: Vec::new(),
+            status_text: String::new(),
+            performed_date: today,
+            performed_hour,
+            performed_minute,
+        }
+    }
 }
 
 impl eframe::App for ElnPackApp {
@@ -35,6 +62,9 @@ impl eframe::App for ElnPackApp {
                 self.render_description_input(ui);
                 ui.add_space(12.0);
 
+                self.render_performed_at_input(ui);
+                ui.add_space(12.0);
+
                 self.render_attachments_section(ui);
                 ui.add_space(12.0);
 
@@ -48,6 +78,30 @@ impl eframe::App for ElnPackApp {
 }
 
 impl ElnPackApp {
+    fn build_performed_at(&self) -> Result<OffsetDateTime, String> {
+        let month = Month::try_from(self.performed_date.month() as u8)
+            .map_err(|_| "Month must be 1-12".to_string())?;
+
+        let date = Date::from_calendar_date(
+            self.performed_date.year(),
+            month,
+            self.performed_date.day() as u8,
+        )
+        .map_err(|_| "Invalid calendar date".to_string())?;
+
+        if !(0..=23).contains(&self.performed_hour) {
+            return Err("Hour must be 0-23".into());
+        }
+        if !(0..=59).contains(&self.performed_minute) {
+            return Err("Minute must be 0-59".into());
+        }
+
+        let time = Time::from_hms(self.performed_hour as u8, self.performed_minute as u8, 0)
+            .map_err(|_| "Invalid time".to_string())?;
+
+        Ok(date.with_time(time).assume_utc())
+    }
+
     fn render_title_input(&mut self, ui: &mut egui::Ui) {
         ui.label("Title");
         ui.add_space(4.0);
@@ -61,6 +115,35 @@ impl ElnPackApp {
             egui::TextEdit::multiline(&mut self.body_text)
                 .desired_width(f32::INFINITY)
                 .desired_rows(8),
+        );
+    }
+
+    fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {
+        ui.label("Performed at (UTC)");
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.label("Date");
+            ui.add(DatePickerButton::new(&mut self.performed_date));
+
+            ui.label("Time");
+            ui.add(egui::DragValue::new(&mut self.performed_hour).range(0..=23));
+            ui.add(egui::DragValue::new(&mut self.performed_minute).range(0..=59));
+
+            if ui.button("Use current time").clicked() {
+                let now = Utc::now();
+                let offset_now = OffsetDateTime::from_unix_timestamp(now.timestamp())
+                    .expect("Unix timestamp conversion must succeed");
+                self.performed_date = now.date_naive();
+                self.performed_hour = offset_now.hour() as i32;
+                self.performed_minute = offset_now.minute() as i32;
+            }
+        });
+
+        ui.label(
+            egui::RichText::new("Example: 2025-11-24 14:05 (UTC)")
+                .small()
+                .color(egui::Color32::from_gray(120)),
         );
     }
 
@@ -168,6 +251,14 @@ impl ElnPackApp {
         let title = self.entry_title.trim();
         let body = self.body_text.trim();
 
+        let performed_at = match self.build_performed_at() {
+            Ok(dt) => dt,
+            Err(err) => {
+                self.status_text = format!("Invalid date/time: {}", err);
+                return;
+            }
+        };
+
         if title.is_empty() {
             self.status_text = "Please enter a title.".to_string();
             return;
@@ -188,7 +279,7 @@ impl ElnPackApp {
         let attachment_paths: Vec<PathBuf> =
             self.attachments.iter().map(|a| a.path.clone()).collect();
 
-        match build_and_write_archive(&output_path, title, body, &attachment_paths) {
+        match build_and_write_archive(&output_path, title, body, &attachment_paths, performed_at) {
             Ok(_) => {
                 self.status_text = format!("Archive saved: {}", output_path.display());
             }

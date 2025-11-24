@@ -45,6 +45,7 @@ pub fn build_and_write_archive(
     title: &str,
     body: &str,
     attachments: &[PathBuf],
+    performed_at: OffsetDateTime,
 ) -> Result<()> {
     if let Some(parent) = output.parent()
         && !parent.exists()
@@ -115,9 +116,9 @@ pub fn build_and_write_archive(
         }));
     }
 
-    let timestamp = OffsetDateTime::now_utc()
+    let timestamp = performed_at
         .format(&Rfc3339)
-        .unwrap_or_else(|_| "2024-01-01T00:00:00Z".into());
+        .map_err(|err| anyhow::anyhow!("Failed to format performed_at timestamp: {}", err))?;
     let org_id = "https://elnpack.app/#organization";
 
     let experiment_node = serde_json::json!({
