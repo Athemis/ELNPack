@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-- Rust 2024 crate; entry point at `src/main.rs`, which initializes the eframe application.
+- Rust 2024 crate; entry point at `src/main.rs`, which initializes the eframe application (ELNPack).
 - UI shell in `src/ui.rs`; it wires the overall layout and delegates to components.
 - Markdown editor encapsulated in `src/editor.rs`; all toolbar, caret handling, and text editing live here.
 - Business logic in `src/archive.rs`; handles RO-Crate archive creation, file operations, and metadata generation.

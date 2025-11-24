@@ -1087,7 +1087,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "elnpack-ui"
+name = "elnpack"
 version = "0.1.0"
 dependencies = [
  "anyhow",

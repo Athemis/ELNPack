@@ -131,7 +131,7 @@ impl eframe::App for ElnPackApp {
 impl ElnPackApp {
     fn render_theme_controls(&mut self, ui: &mut egui::Ui) {
         ui.add_space(2.0);
-        egui::widgets::global_dark_light_mode_switch(ui);
+        egui::widgets::global_theme_preference_switch(ui);
     }
 
     fn build_performed_at(&self) -> Result<OffsetDateTime, String> {
