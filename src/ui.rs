@@ -98,6 +98,10 @@ fn render_markdown_preview(ui: &mut egui::Ui, text: &str) {
     ui.label(job);
 }
 
+fn format_two(n: i32) -> String {
+    format!("{:02}", n.clamp(0, 99))
+}
+
 #[derive(Clone, Copy)]
 enum TextStyle {
     Heading,
@@ -310,12 +314,24 @@ impl ElnPackApp {
         ui.add_space(4.0);
 
         ui.horizontal(|ui| {
-            ui.label("Date");
-            ui.add(DatePickerButton::new(&mut self.performed_date));
+            ui.label("📅 Date");
+            ui.add(DatePickerButton::new(&mut self.performed_date).show_icon(false));
 
-            ui.label("Time");
-            ui.add(egui::DragValue::new(&mut self.performed_hour).range(0..=23));
-            ui.add(egui::DragValue::new(&mut self.performed_minute).range(0..=59));
+            ui.label("🕒 Time");
+            ui.add(
+                egui::DragValue::new(&mut self.performed_hour)
+                    .range(0..=23)
+                    .speed(0.1)
+                    .clamp_to_range(true)
+                    .custom_formatter(|v, _| format_two(v as i32)),
+            );
+            ui.add(
+                egui::DragValue::new(&mut self.performed_minute)
+                    .range(0..=59)
+                    .speed(0.1)
+                    .clamp_to_range(true)
+                    .custom_formatter(|v, _| format_two(v as i32)),
+            );
 
             if ui.button("Use current time").clicked() {
                 let now = Utc::now();
