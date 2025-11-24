@@ -15,4 +15,4 @@ sha2 = "0.10"
 mime_guess = "2"
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-image = { version = "0.24", default-features = false, features = ["png", "jpeg", "bmp", "tiff", "gif", "webp", "ico"] }
+image = { version = "0.24", default-features = false, features = ["png", "jpeg", "bmp", "tiff", "gif", "webp"] }
