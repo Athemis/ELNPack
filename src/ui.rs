@@ -269,6 +269,20 @@ impl ElnPackApp {
             });
         } else {
             ui.horizontal(|ui| {
+                egui::ComboBox::from_label("Heading")
+                    .selected_text(format!("H{}", self.heading_level))
+                    .show_ui(ui, |ui| {
+                        for lvl in 1..=3u8 {
+                            if ui
+                                .selectable_value(&mut self.heading_level, lvl, format!("H{}", lvl))
+                                .clicked()
+                            {
+                                let hashes = "#".repeat(self.heading_level as usize);
+                                self.insert_snippet(&format!("{}\u{00A0}Title", hashes));
+                            }
+                        }
+                    });
+                ui.separator();
                 if ui.button("B").clicked() {
                     self.insert_snippet("**bold**");
                 }
@@ -280,18 +294,6 @@ impl ElnPackApp {
                 }
                 if ui.button("List").clicked() {
                     self.insert_snippet("\n- item");
-                }
-                ui.separator();
-                egui::ComboBox::from_label("Heading")
-                    .selected_text(format!("H{}", self.heading_level))
-                    .show_ui(ui, |ui| {
-                        for lvl in 1..=3u8 {
-                            ui.selectable_value(&mut self.heading_level, lvl, format!("H{}", lvl));
-                        }
-                    });
-                if ui.button("Add heading").clicked() {
-                    let hashes = "#".repeat(self.heading_level as usize);
-                    self.insert_snippet(&format!("{}\u{00A0}Title", hashes));
                 }
             });
             ui.add_space(4.0);
