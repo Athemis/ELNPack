@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 
 use chrono::{Datelike, NaiveDate, Utc};
 use eframe::egui;
@@ -12,6 +13,24 @@ pub struct AttachmentItem {
     pub path: PathBuf,
 }
 
+fn is_image(path: &Path) -> bool {
+    matches!(path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase()),
+        Some(ext) if matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "bmp" | "tiff" | "gif" | "ico" | "webp")
+    )
+}
+
+fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, image::ImageError> {
+    const MAX: u32 = 256;
+    let dyn_img = image::open(path)?;
+    let resized = dyn_img.thumbnail(MAX, MAX).to_rgba8();
+    let size = [resized.width() as usize, resized.height() as usize];
+    let pixels = resized.into_raw();
+    Ok(egui::ColorImage::from_rgba_unmultiplied(size, &pixels))
+}
+
 pub struct ElnPackApp {
     entry_title: String,
     body_text: String,
@@ -20,6 +39,8 @@ pub struct ElnPackApp {
     performed_date: NaiveDate,
     performed_hour: i32,
     performed_minute: i32,
+    thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
+    thumbnail_failures: HashSet<PathBuf>,
 }
 
 impl Default for ElnPackApp {
@@ -40,6 +61,8 @@ impl Default for ElnPackApp {
             performed_date: today,
             performed_hour,
             performed_minute,
+            thumbnail_cache: HashMap::new(),
+            thumbnail_failures: HashSet::new(),
         }
     }
 }
@@ -176,20 +199,32 @@ impl ElnPackApp {
     fn render_attachment_list(&mut self, ui: &mut egui::Ui) {
         let mut to_remove = None;
 
-        for (index, attachment) in self.attachments.iter().enumerate() {
+        for index in 0..self.attachments.len() {
+            let (name, path) = {
+                let item = &self.attachments[index];
+                (item.name.clone(), item.path.clone())
+            };
             ui.horizontal(|ui| {
-                ui.label(&attachment.name);
+                if let Some(texture) = self.get_thumbnail(ui.ctx(), &path) {
+                    let size = texture.size_vec2();
+                    let max = 96.0;
+                    let scale = (max / size.x).min(max / size.y).min(1.0);
+                    ui.add(egui::Image::new((texture.id(), size * scale)));
+                }
+
+                ui.vertical(|ui| {
+                    ui.label(&name);
+                    ui.label(
+                        egui::RichText::new(path.to_string_lossy())
+                            .small()
+                            .color(egui::Color32::from_gray(102)),
+                    );
+                });
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button("Remove").clicked() {
                         to_remove = Some(index);
                     }
-
-                    ui.label(
-                        egui::RichText::new(attachment.path.to_string_lossy())
-                            .small()
-                            .color(egui::Color32::from_gray(102)),
-                    );
                 });
             });
 
@@ -199,6 +234,10 @@ impl ElnPackApp {
         }
 
         if let Some(index) = to_remove {
+            if let Some(removed) = self.attachments.get(index) {
+                self.thumbnail_cache.remove(&removed.path);
+                self.thumbnail_failures.remove(&removed.path);
+            }
             self.attachments.remove(index);
             self.status_text = "Attachment removed".to_string();
         }
@@ -245,6 +284,38 @@ impl ElnPackApp {
             }
             self.status_text = format!("Added {} attachment(s)", added);
         }
+    }
+
+    fn get_thumbnail(&mut self, ctx: &egui::Context, path: &Path) -> Option<egui::TextureHandle> {
+        if let Some(handle) = self.thumbnail_cache.get(path) {
+            return Some(handle.clone());
+        }
+
+        if self.thumbnail_failures.contains(path) {
+            return None;
+        }
+
+        if !is_image(path) {
+            self.thumbnail_failures.insert(path.to_path_buf());
+            return None;
+        }
+
+        let image = match load_image_thumbnail(path) {
+            Ok(img) => img,
+            Err(_) => {
+                self.thumbnail_failures.insert(path.to_path_buf());
+                return None;
+            }
+        };
+
+        let texture = ctx.load_texture(
+            format!("thumb-{}", path.display()),
+            image,
+            egui::TextureOptions::default(),
+        );
+        self.thumbnail_cache
+            .insert(path.to_path_buf(), texture.clone());
+        Some(texture)
     }
 
     fn save_archive(&mut self) {

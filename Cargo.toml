@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 eframe = "0.28"
 egui = "0.28"
-egui_extras = { version = "0.28", features = ["datepicker", "chrono"] }
+egui_extras = { version = "0.28", features = ["datepicker", "chrono", "image"] }
 rfd = "0.15"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 serde_json = "1"
@@ -15,3 +15,4 @@ sha2 = "0.10"
 mime_guess = "2"
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+image = { version = "0.24", default-features = false, features = ["png", "jpeg", "bmp", "tiff", "gif", "webp", "ico"] }
