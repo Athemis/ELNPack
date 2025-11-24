@@ -6,6 +6,7 @@ use eframe::egui;
 use egui::SizeHint;
 use egui_extras::DatePickerButton;
 use egui_extras::image::load_svg_bytes_with_size;
+use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use time::{Date, Month, OffsetDateTime, Time};
 
 use crate::archive::{build_and_write_archive, ensure_extension, suggested_archive_name};
@@ -43,6 +44,95 @@ fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, String> {
     Ok(egui::ColorImage::from_rgba_unmultiplied(size, &pixels))
 }
 
+fn render_markdown_preview(ui: &mut egui::Ui, text: &str) {
+    let mut job = egui::text::LayoutJob::default();
+    let mut stack: Vec<TextStyle> = vec![TextStyle::Body];
+
+    for event in Parser::new_ext(text, Options::all()) {
+        match event {
+            Event::Start(tag) => match tag {
+                Tag::Heading { level, .. } => {
+                    stack.push(match level {
+                        pulldown_cmark::HeadingLevel::H1 => TextStyle::Heading,
+                        pulldown_cmark::HeadingLevel::H2 => TextStyle::Heading,
+                        _ => TextStyle::Strong,
+                    });
+                }
+                Tag::Emphasis => stack.push(TextStyle::Italics),
+                Tag::Strong => stack.push(TextStyle::Strong),
+                Tag::CodeBlock(_) => stack.push(TextStyle::Monospace),
+                Tag::Item => {
+                    append_text(
+                        &mut job,
+                        "• ",
+                        stack.last().copied().unwrap_or(TextStyle::Body),
+                    );
+                }
+                _ => {}
+            },
+            Event::End(tag) => match tag {
+                TagEnd::Heading { .. } | TagEnd::Emphasis | TagEnd::Strong | TagEnd::CodeBlock => {
+                    stack.pop();
+                }
+                _ => {}
+            },
+            Event::Text(t) | Event::Code(t) => {
+                append_text(
+                    &mut job,
+                    &t,
+                    stack.last().copied().unwrap_or(TextStyle::Body),
+                );
+            }
+            Event::HardBreak => append_text(&mut job, "\n", TextStyle::Body),
+            Event::SoftBreak => append_text(&mut job, " ", TextStyle::Body),
+            _ => {}
+        }
+    }
+
+    ui.label(job);
+}
+
+#[derive(Clone, Copy)]
+enum TextStyle {
+    Heading,
+    Strong,
+    Body,
+    Italics,
+    Monospace,
+}
+
+fn append_text(job: &mut egui::text::LayoutJob, text: &str, style: TextStyle) {
+    use egui::text::TextFormat;
+    let (font_id, color) = match style {
+        TextStyle::Heading => (
+            egui::TextStyle::Heading.resolve(&egui::Style::default()),
+            None,
+        ),
+        TextStyle::Strong => (
+            egui::TextStyle::Button.resolve(&egui::Style::default()),
+            None,
+        ),
+        TextStyle::Body => (egui::TextStyle::Body.resolve(&egui::Style::default()), None),
+        TextStyle::Italics => (
+            egui::TextStyle::Body.resolve(&egui::Style::default()),
+            Some(egui::Color32::GRAY),
+        ),
+        TextStyle::Monospace => (
+            egui::TextStyle::Monospace.resolve(&egui::Style::default()),
+            None,
+        ),
+    };
+
+    let mut format = TextFormat {
+        font_id,
+        ..Default::default()
+    };
+    if let Some(color) = color {
+        format.color = color;
+    }
+    job.append(text, 0.0, format);
+}
+
 pub struct ElnPackApp {
     entry_title: String,
     body_text: String,
@@ -53,6 +143,7 @@ pub struct ElnPackApp {
     performed_minute: i32,
     thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
     thumbnail_failures: HashSet<PathBuf>,
+    show_preview: bool,
 }
 
 impl Default for ElnPackApp {
@@ -75,6 +166,7 @@ impl Default for ElnPackApp {
             performed_minute,
             thumbnail_cache: HashMap::new(),
             thumbnail_failures: HashSet::new(),
+            show_preview: false,
         }
     }
 }
@@ -154,13 +246,26 @@ impl ElnPackApp {
     }
 
     fn render_description_input(&mut self, ui: &mut egui::Ui) {
-        ui.label("Main Text");
+        ui.horizontal(|ui| {
+            ui.label("Main Text (Markdown)");
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.selectable_value(&mut self.show_preview, true, "Preview");
+                ui.selectable_value(&mut self.show_preview, false, "Edit");
+            });
+        });
         ui.add_space(4.0);
-        ui.add(
-            egui::TextEdit::multiline(&mut self.body_text)
-                .desired_width(f32::INFINITY)
-                .desired_rows(8),
-        );
+
+        if self.show_preview {
+            ui.group(|ui| {
+                render_markdown_preview(ui, &self.body_text);
+            });
+        } else {
+            ui.add(
+                egui::TextEdit::multiline(&mut self.body_text)
+                    .desired_width(f32::INFINITY)
+                    .desired_rows(8),
+            );
+        }
     }
 
     fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {

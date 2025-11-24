@@ -16,3 +16,4 @@ mime_guess = "2"
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 image = { version = "0.24", default-features = false, features = ["png", "jpeg", "bmp", "tiff", "gif", "webp"] }
+pulldown-cmark = "0.11"

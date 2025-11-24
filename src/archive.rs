@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use mime_guess::mime::Mime;
+use pulldown_cmark::{Options, Parser, html};
 use sha2::{Digest, Sha256};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use zip::{CompressionMethod, write::FileOptions};
@@ -119,13 +120,14 @@ pub fn build_and_write_archive(
     let timestamp = performed_at
         .format(&Rfc3339)
         .map_err(|err| anyhow::anyhow!("Failed to format performed_at timestamp: {}", err))?;
+    let body_html = markdown_to_html(body);
     let org_id = "https://elnpack.app/#organization";
 
     let experiment_node = serde_json::json!({
         "@id": "./experiment/",
         "@type": "Dataset",
         "name": title,
-        "text": body,
+        "text": body_html,
         "dateCreated": timestamp,
         "dateModified": timestamp,
         "author": { "@id": org_id },
@@ -194,4 +196,14 @@ fn sanitize_component(value: &str) -> String {
 
 fn guess_mime(path: &Path) -> Mime {
     mime_guess::from_path(path).first_or_octet_stream()
+}
+
+fn markdown_to_html(body: &str) -> String {
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_FOOTNOTES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    let parser = Parser::new_ext(body, options);
+    let mut html_output = String::new();
+    html::push_html(&mut html_output, parser);
+    html_output
 }
