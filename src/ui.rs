@@ -150,6 +150,7 @@ pub struct ElnPackApp {
     thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
     thumbnail_failures: HashSet<PathBuf>,
     show_preview: bool,
+    heading_level: u8,
 }
 
 impl Default for ElnPackApp {
@@ -173,6 +174,7 @@ impl Default for ElnPackApp {
             thumbnail_cache: HashMap::new(),
             thumbnail_failures: HashSet::new(),
             show_preview: false,
+            heading_level: 1,
         }
     }
 }
@@ -278,6 +280,18 @@ impl ElnPackApp {
                 }
                 if ui.button("List").clicked() {
                     self.insert_snippet("\n- item");
+                }
+                ui.separator();
+                egui::ComboBox::from_label("Heading")
+                    .selected_text(format!("H{}", self.heading_level))
+                    .show_ui(ui, |ui| {
+                        for lvl in 1..=3u8 {
+                            ui.selectable_value(&mut self.heading_level, lvl, format!("H{}", lvl));
+                        }
+                    });
+                if ui.button("Add heading").clicked() {
+                    let hashes = "#".repeat(self.heading_level as usize);
+                    self.insert_snippet(&format!("{}\u{00A0}Title", hashes));
                 }
             });
             ui.add_space(4.0);
