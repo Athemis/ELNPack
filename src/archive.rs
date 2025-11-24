@@ -67,7 +67,8 @@ pub fn build_and_write_archive(
     let file = File::create(output)
         .with_context(|| format!("Failed to write archive file {:?}", output))?;
     let mut zip = zip::ZipWriter::new(file);
-    let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
+    let options: FileOptions<'_, ()> =
+        FileOptions::default().compression_method(CompressionMethod::Deflated);
 
     zip.add_directory(&root_prefix, options)
         .context("Failed to create root directory in archive")?;

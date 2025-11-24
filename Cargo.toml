@@ -4,16 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-eframe = "0.28"
-egui = "0.28"
-egui_extras = { version = "0.28", features = ["datepicker", "chrono", "image", "svg"] }
+eframe = "0.33.2"
+egui = "0.33.2"
+egui_extras = { version = "0.33.2", features = ["datepicker", "chrono", "image", "svg"] }
 rfd = "0.15"
-zip = { version = "0.6", default-features = false, features = ["deflate"] }
+zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
 serde_json = "1"
 time = { version = "0.3", features = ["formatting", "macros", "parsing"] }
-sha2 = "0.10"
+sha2 = "0.10.9"
 mime_guess = "2"
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-image = { version = "0.24", default-features = false, features = ["png", "jpeg", "bmp", "tiff", "gif", "webp"] }
-pulldown-cmark = "0.11"
+image = { version = "0.25.9", default-features = false, features = ["png", "jpeg", "bmp", "tiff", "gif", "webp"] }
+pulldown-cmark = "0.13"
+usvg = { version = "0.45.1", default-features = false, features = ["text"] }
+egui-phosphor = { version = "0.11.0", default-features = false, features = ["regular"] }

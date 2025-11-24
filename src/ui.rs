@@ -3,10 +3,13 @@ use std::path::{Path, PathBuf};
 
 use chrono::{Datelike, NaiveDate, Utc};
 use eframe::egui;
+use egui::RichText;
 use egui::SizeHint;
+use egui::text::{CCursor, CCursorRange};
+use egui::text_edit::TextEditState;
 use egui_extras::DatePickerButton;
 use egui_extras::image::load_svg_bytes_with_size;
-use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
+use usvg::Options;
 use time::{Date, Month, OffsetDateTime, Time};
 
 use crate::archive::{build_and_write_archive, ensure_extension, suggested_archive_name};
@@ -33,8 +36,13 @@ fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, String> {
         .is_some_and(|ext| ext.eq_ignore_ascii_case("svg"))
     {
         let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-        let hint = SizeHint::Size(MAX, MAX);
-        return load_svg_bytes_with_size(&bytes, Some(hint)).map_err(|e| e.to_string());
+        let hint = SizeHint::Size {
+            width: MAX,
+            height: MAX,
+            maintain_aspect_ratio: true,
+        };
+        let options = Options::default();
+        return load_svg_bytes_with_size(&bytes, hint, &options).map_err(|e| e.to_string());
     }
 
     let dyn_img = image::open(path).map_err(|e| e.to_string())?;
@@ -44,103 +52,8 @@ fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, String> {
     Ok(egui::ColorImage::from_rgba_unmultiplied(size, &pixels))
 }
 
-fn render_markdown_preview(ui: &mut egui::Ui, text: &str) {
-    let mut job = egui::text::LayoutJob::default();
-    let mut stack: Vec<TextStyle> = vec![TextStyle::Body];
-
-    for event in Parser::new_ext(text, Options::all()) {
-        match event {
-            Event::Start(tag) => match tag {
-                Tag::Paragraph => {
-                    if !job.sections.is_empty() {
-                        append_text(&mut job, "\n\n", TextStyle::Body);
-                    }
-                }
-                Tag::Heading { level, .. } => {
-                    stack.push(match level {
-                        pulldown_cmark::HeadingLevel::H1 => TextStyle::Heading,
-                        pulldown_cmark::HeadingLevel::H2 => TextStyle::Heading,
-                        _ => TextStyle::Strong,
-                    });
-                }
-                Tag::Emphasis => stack.push(TextStyle::Italics),
-                Tag::Strong => stack.push(TextStyle::Strong),
-                Tag::CodeBlock(_) => stack.push(TextStyle::Monospace),
-                Tag::Item => {
-                    append_text(
-                        &mut job,
-                        "• ",
-                        stack.last().copied().unwrap_or(TextStyle::Body),
-                    );
-                }
-                _ => {}
-            },
-            Event::End(tag) => match tag {
-                TagEnd::Paragraph => append_text(&mut job, "\n\n", TextStyle::Body),
-                TagEnd::Heading { .. } | TagEnd::Emphasis | TagEnd::Strong | TagEnd::CodeBlock => {
-                    stack.pop();
-                }
-                _ => {}
-            },
-            Event::Text(t) | Event::Code(t) => {
-                append_text(
-                    &mut job,
-                    &t,
-                    stack.last().copied().unwrap_or(TextStyle::Body),
-                );
-            }
-            Event::HardBreak => append_text(&mut job, "\n", TextStyle::Body),
-            Event::SoftBreak => append_text(&mut job, " ", TextStyle::Body),
-            _ => {}
-        }
-    }
-
-    ui.label(job);
-}
-
 fn format_two(n: i32) -> String {
     format!("{:02}", n.clamp(0, 99))
-}
-
-#[derive(Clone, Copy)]
-enum TextStyle {
-    Heading,
-    Strong,
-    Body,
-    Italics,
-    Monospace,
-}
-
-fn append_text(job: &mut egui::text::LayoutJob, text: &str, style: TextStyle) {
-    use egui::text::TextFormat;
-    let (font_id, color) = match style {
-        TextStyle::Heading => (
-            egui::TextStyle::Heading.resolve(&egui::Style::default()),
-            None,
-        ),
-        TextStyle::Strong => (
-            egui::TextStyle::Button.resolve(&egui::Style::default()),
-            None,
-        ),
-        TextStyle::Body => (egui::TextStyle::Body.resolve(&egui::Style::default()), None),
-        TextStyle::Italics => (
-            egui::TextStyle::Body.resolve(&egui::Style::default()),
-            Some(egui::Color32::GRAY),
-        ),
-        TextStyle::Monospace => (
-            egui::TextStyle::Monospace.resolve(&egui::Style::default()),
-            None,
-        ),
-    };
-
-    let mut format = TextFormat {
-        font_id,
-        ..Default::default()
-    };
-    if let Some(color) = color {
-        format.color = color;
-    }
-    job.append(text, 0.0, format);
 }
 
 pub struct ElnPackApp {
@@ -153,8 +66,23 @@ pub struct ElnPackApp {
     performed_minute: i32,
     thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
     thumbnail_failures: HashSet<PathBuf>,
-    show_preview: bool,
     heading_level: u8,
+    body_cursor: Option<CCursorRange>,
+    body_cursor_override: Option<CCursorRange>,
+    code_choice: CodeChoice,
+    list_choice: ListChoice,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CodeChoice {
+    Inline,
+    Block,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ListChoice {
+    Unordered,
+    Ordered,
 }
 
 impl Default for ElnPackApp {
@@ -177,8 +105,11 @@ impl Default for ElnPackApp {
             performed_minute,
             thumbnail_cache: HashMap::new(),
             thumbnail_failures: HashSet::new(),
-            show_preview: false,
             heading_level: 1,
+            body_cursor: None,
+            body_cursor_override: None,
+            code_choice: CodeChoice::Inline,
+            list_choice: ListChoice::Unordered,
         }
     }
 }
@@ -258,55 +189,147 @@ impl ElnPackApp {
     }
 
     fn render_description_input(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.label("Main Text (Markdown)");
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.selectable_value(&mut self.show_preview, true, "Preview");
-                ui.selectable_value(&mut self.show_preview, false, "Edit");
-            });
-        });
+        ui.label("Main Text (Markdown)");
         ui.add_space(4.0);
 
-        if self.show_preview {
-            ui.group(|ui| {
-                render_markdown_preview(ui, &self.body_text);
-            });
-        } else {
-            ui.horizontal(|ui| {
-                ui.label("Heading");
-                egui::ComboBox::from_id_source("heading_picker")
-                    .selected_text(format!("H{}", self.heading_level))
-                    .show_ui(ui, |ui| {
-                        for lvl in 1..=6u8 {
-                            if ui
-                                .selectable_value(&mut self.heading_level, lvl, format!("H{}", lvl))
-                                .clicked()
-                            {
-                                self.insert_heading(lvl);
-                            }
+        ui.horizontal(|ui| {
+            ui.label("Heading");
+            egui::ComboBox::from_id_salt("heading_picker")
+                .selected_text(format!("H{}", self.heading_level))
+                .show_ui(ui, |ui| {
+                    for lvl in 1..=6u8 {
+                        if ui
+                            .selectable_value(&mut self.heading_level, lvl, format!("H{}", lvl))
+                            .clicked()
+                        {
+                            self.insert_heading_at_cursor(lvl);
                         }
-                    });
-                ui.separator();
-                if ui.button("B").clicked() {
-                    self.insert_snippet("**bold**");
-                }
-                if ui.button("I").clicked() {
-                    self.insert_snippet("_italic_");
-                }
-                if ui.button("Code").clicked() {
-                    self.insert_snippet("`code`");
-                }
-                if ui.button("List").clicked() {
-                    self.insert_snippet("\n- item");
-                }
+                    }
             });
-            ui.add_space(4.0);
-            ui.add(
-                egui::TextEdit::multiline(&mut self.body_text)
-                    .desired_width(f32::INFINITY)
-                    .desired_rows(8),
-            );
+            ui.separator();
+            if ui.button("B").clicked() {
+                self.insert_snippet_at_cursor("**bold**");
+            }
+            if ui.button("I").clicked() {
+                self.insert_snippet_at_cursor("_italic_");
+            }
+            ui.label(format!("{} Code", egui_phosphor::regular::CODE_SIMPLE));
+            egui::ComboBox::from_id_salt("code_picker")
+                .selected_text(match self.code_choice {
+                    CodeChoice::Inline => RichText::new(format!(
+                        "{} Inline",
+                        egui_phosphor::regular::CODE_SIMPLE
+                    )),
+                    CodeChoice::Block => RichText::new(format!(
+                        "{} Block",
+                        egui_phosphor::regular::CODE_BLOCK
+                    )),
+                })
+                .show_ui(ui, |ui| {
+                    if ui
+                        .selectable_value(
+                            &mut self.code_choice,
+                            CodeChoice::Inline,
+                            RichText::new(format!(
+                                "{} Inline",
+                                egui_phosphor::regular::CODE_SIMPLE
+                            )),
+                        )
+                        .clicked()
+                    {
+                        self.insert_snippet_at_cursor("`code`");
+                    }
+                    if ui
+                        .selectable_value(
+                            &mut self.code_choice,
+                            CodeChoice::Block,
+                            RichText::new(format!(
+                                "{} Block",
+                                egui_phosphor::regular::CODE_BLOCK
+                            )),
+                        )
+                        .clicked()
+                    {
+                        self.insert_block_snippet_at_cursor("```\ncode\n```");
+                    }
+                });
+            if ui.button("Link").clicked() {
+                self.insert_snippet_at_cursor("[text](https://example.com)");
+            }
+            ui.label(format!("{} List", egui_phosphor::regular::LIST_DASHES));
+            egui::ComboBox::from_id_salt("list_picker")
+                .selected_text(match self.list_choice {
+                    ListChoice::Unordered => RichText::new(format!(
+                        "{} Bulleted",
+                        egui_phosphor::regular::LIST_DASHES
+                    )),
+                    ListChoice::Ordered => RichText::new(format!(
+                        "{} Numbered",
+                        egui_phosphor::regular::LIST_NUMBERS
+                    )),
+                })
+                .show_ui(ui, |ui| {
+                    if ui
+                        .selectable_value(
+                            &mut self.list_choice,
+                            ListChoice::Unordered,
+                            RichText::new(format!(
+                                "{} Bulleted",
+                                egui_phosphor::regular::LIST_DASHES
+                            )),
+                        )
+                        .clicked()
+                    {
+                        self.insert_block_snippet_at_cursor("\n- item");
+                    }
+                    if ui
+                        .selectable_value(
+                            &mut self.list_choice,
+                            ListChoice::Ordered,
+                            RichText::new(format!(
+                                "{} Numbered",
+                                egui_phosphor::regular::LIST_NUMBERS
+                            )),
+                        )
+                        .clicked()
+                    {
+                        self.insert_block_snippet_at_cursor("\n1. first");
+                    }
+                });
+            if ui.button("Quote").clicked() {
+                self.insert_block_snippet_at_cursor("\n> quote");
+            }
+            if ui.button("Image").clicked() {
+                self.insert_snippet_at_cursor("![alt text](path/to/image.png)");
+            }
+            if ui.button("Strike").clicked() {
+                self.insert_snippet_at_cursor("~~text~~");
+            }
+            if ui.button("Rule").clicked() {
+                self.insert_block_snippet_at_cursor("\n---\n");
+            }
+        });
+        ui.add_space(4.0);
+        let body_id = ui.id().with("body_text_edit");
+        if let Some(state) = TextEditState::load(ui.ctx(), body_id) {
+            self.body_cursor = state.cursor.char_range();
         }
+        let mut output = egui::TextEdit::multiline(&mut self.body_text)
+            .id_source(body_id)
+            .desired_width(f32::INFINITY)
+            .desired_rows(8)
+            .show(ui);
+        if let Some(override_range) = self.body_cursor_override.take() {
+            output.state.cursor.set_char_range(Some(override_range.clone()));
+            self.body_cursor = Some(override_range);
+        } else {
+            self.body_cursor = output
+                .state
+                .cursor
+                .char_range()
+                .or_else(|| Some(CCursorRange::one(CCursor::new(self.body_text.chars().count()))));
+        }
+        output.state.store(ui.ctx(), body_id);
     }
 
     fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {
@@ -314,7 +337,7 @@ impl ElnPackApp {
         ui.add_space(4.0);
 
         ui.horizontal(|ui| {
-            ui.label("📅 Date");
+            ui.label("📆 Date");
             ui.add(DatePickerButton::new(&mut self.performed_date).show_icon(false));
 
             ui.label("🕒 Time");
@@ -322,14 +345,14 @@ impl ElnPackApp {
                 egui::DragValue::new(&mut self.performed_hour)
                     .range(0..=23)
                     .speed(0.1)
-                    .clamp_to_range(true)
+                    .clamp_existing_to_range(true)
                     .custom_formatter(|v, _| format_two(v as i32)),
             );
             ui.add(
                 egui::DragValue::new(&mut self.performed_minute)
                     .range(0..=59)
                     .speed(0.1)
-                    .clamp_to_range(true)
+                    .clamp_existing_to_range(true)
                     .custom_formatter(|v, _| format_two(v as i32)),
             );
 
@@ -354,7 +377,7 @@ impl ElnPackApp {
         ui.label("Attachments");
         ui.add_space(4.0);
 
-        egui::Frame::none()
+        egui::Frame::new()
             .fill(egui::Color32::from_gray(250))
             .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(221)))
             .inner_margin(8.0)
@@ -540,19 +563,60 @@ impl ElnPackApp {
         }
     }
 
-    fn insert_snippet(&mut self, snippet: &str) {
-        if !self.body_text.ends_with(char::is_whitespace) && !self.body_text.is_empty() {
-            self.body_text.push(' ');
-        }
-        self.body_text.push_str(snippet);
+    fn insert_snippet_at_cursor(&mut self, snippet: &str) {
+        self.insert_at_cursor(snippet, false);
     }
 
-    fn insert_heading(&mut self, level: u8) {
+    fn insert_block_snippet_at_cursor(&mut self, snippet: &str) {
+        self.insert_at_cursor(snippet, true);
+    }
+
+    fn insert_heading_at_cursor(&mut self, level: u8) {
         let level = level.clamp(1, 6);
         let hashes = "#".repeat(level as usize);
-        if !self.body_text.ends_with('\n') && !self.body_text.is_empty() {
-            self.body_text.push('\n');
-        }
-        self.body_text.push_str(&format!("{} Title\n", hashes));
+        let block = format!("{} Title\n", hashes);
+        self.insert_block_snippet_at_cursor(&block);
     }
+
+    fn insert_at_cursor(&mut self, snippet: &str, ensure_newline: bool) {
+        let mut insertion = snippet.to_string();
+        if ensure_newline {
+            if !insertion.ends_with('\n') {
+                insertion.push('\n');
+            }
+            if !self.body_text.ends_with('\n') && !self.body_text.is_empty() {
+                insertion = format!("\n{insertion}");
+            }
+        } else if !self.body_text.is_empty() && !self.body_text.ends_with(char::is_whitespace) {
+            insertion.insert(0, ' ');
+        }
+
+        let (start_char, end_char) = if let Some(range) = &self.body_cursor {
+            let sorted = if range.is_sorted() { range.clone() } else { CCursorRange::two(range.secondary, range.primary) };
+            (sorted.primary.index, sorted.secondary.index)
+        } else {
+            let len = self.body_text.chars().count();
+            (len, len)
+        };
+
+        let start = char_to_byte(&self.body_text, start_char);
+        let end = char_to_byte(&self.body_text, end_char);
+
+        self.body_text.replace_range(start..end, &insertion);
+
+        let new_pos = start_char + insertion.chars().count();
+        let new_range = CCursorRange::one(CCursor::new(new_pos));
+        self.body_cursor = Some(new_range);
+        self.body_cursor_override = self.body_cursor.clone();
+    }
+}
+
+fn char_to_byte(text: &str, char_idx: usize) -> usize {
+    if char_idx == text.chars().count() {
+        return text.len();
+    }
+    text.char_indices()
+        .nth(char_idx)
+        .map(|(i, _)| i)
+        .unwrap_or_else(|| text.len())
 }
