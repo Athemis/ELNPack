@@ -51,6 +51,11 @@ fn render_markdown_preview(ui: &mut egui::Ui, text: &str) {
     for event in Parser::new_ext(text, Options::all()) {
         match event {
             Event::Start(tag) => match tag {
+                Tag::Paragraph => {
+                    if !job.sections.is_empty() {
+                        append_text(&mut job, "\n\n", TextStyle::Body);
+                    }
+                }
                 Tag::Heading { level, .. } => {
                     stack.push(match level {
                         pulldown_cmark::HeadingLevel::H1 => TextStyle::Heading,
@@ -71,6 +76,7 @@ fn render_markdown_preview(ui: &mut egui::Ui, text: &str) {
                 _ => {}
             },
             Event::End(tag) => match tag {
+                TagEnd::Paragraph => append_text(&mut job, "\n\n", TextStyle::Body),
                 TagEnd::Heading { .. } | TagEnd::Emphasis | TagEnd::Strong | TagEnd::CodeBlock => {
                     stack.pop();
                 }
@@ -260,6 +266,21 @@ impl ElnPackApp {
                 render_markdown_preview(ui, &self.body_text);
             });
         } else {
+            ui.horizontal(|ui| {
+                if ui.button("B").clicked() {
+                    self.insert_snippet("**bold**");
+                }
+                if ui.button("I").clicked() {
+                    self.insert_snippet("_italic_");
+                }
+                if ui.button("Code").clicked() {
+                    self.insert_snippet("`code`");
+                }
+                if ui.button("List").clicked() {
+                    self.insert_snippet("\n- item");
+                }
+            });
+            ui.add_space(4.0);
             ui.add(
                 egui::TextEdit::multiline(&mut self.body_text)
                     .desired_width(f32::INFINITY)
@@ -485,5 +506,12 @@ impl ElnPackApp {
                 self.status_text = format!("Error: {}", err);
             }
         }
+    }
+
+    fn insert_snippet(&mut self, snippet: &str) {
+        if !self.body_text.ends_with(char::is_whitespace) && !self.body_text.is_empty() {
+            self.body_text.push(' ');
+        }
+        self.body_text.push_str(snippet);
     }
 }
