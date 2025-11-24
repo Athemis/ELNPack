@@ -5,6 +5,7 @@
 - Rust 2024 crate; entry point at `src/main.rs`, which initializes the eframe application (ELNPack).
 - UI shell in `src/ui.rs`; it wires the overall layout and delegates to components.
 - Markdown editor encapsulated in `src/editor.rs`; all toolbar, caret handling, and text editing live here.
+- Attachments panel in `src/attachments.rs`; handles attachment list, thumbnails, and file dialogs.
 - Business logic in `src/archive.rs`; handles RO-Crate archive creation, file operations, and metadata generation.
 - Add new Rust modules under `src/` and integration tests under `tests/` to keep responsibilities clear.
 - No build script needed; egui compiles directly with the Rust code.
@@ -35,8 +36,9 @@
 ## Module Responsibilities
 
 - **`src/main.rs`**: Application entry point; sets up eframe and launches the UI.
-- **`src/ui.rs`**: UI composition and screens; delegates text editing to `editor` and calls `archive` for business operations.
+- **`src/ui.rs`**: UI composition and screens; delegates text editing to `editor`, attachments to `attachments`, and calls `archive` for business operations.
 - **`src/editor.rs`**: Markdown editor component (toolbar, cursor-aware insertions, text area).
+- **`src/attachments.rs`**: Attachments panel handling list, thumbnails, and file dialogs.
 - **`src/archive.rs`**: Pure business logic for archive creation, file handling, name sanitization, and RO-Crate metadata generation. No UI dependencies.
 
 ## Testing Guidelines

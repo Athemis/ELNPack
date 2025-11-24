@@ -1,4 +1,5 @@
 mod archive;
+mod attachments;
 mod editor;
 mod ui;
 
@@ -18,7 +19,7 @@ fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "elnPack",
+        "ELNPack",
         options,
         Box::new(|cc| {
             cc.egui_ctx.set_fonts(fonts);

@@ -12,6 +12,7 @@ A lightweight electronic lab notebook (ELN) entry packager built with Rust, efra
 - `src/main.rs` — application entry; sets up eframe and fonts.
 - `src/ui.rs` — overall UI composition and screens.
 - `src/editor.rs` — encapsulated Markdown editor component.
+- `src/attachments.rs` — attachments panel (list, thumbnails, file dialogs).
 - `src/archive.rs` — archive building, file handling, metadata generation.
 
 ## Development

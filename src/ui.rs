@@ -1,54 +1,13 @@
-use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use chrono::{Datelike, NaiveDate, Utc};
 use eframe::egui;
-use egui::SizeHint;
 use egui_extras::DatePickerButton;
-use egui_extras::image::load_svg_bytes_with_size;
-use usvg::Options;
 use time::{Date, Month, OffsetDateTime, Time};
 
 use crate::archive::{build_and_write_archive, ensure_extension, suggested_archive_name};
 use crate::editor::MarkdownEditor;
-
-pub struct AttachmentItem {
-    pub name: String,
-    pub path: PathBuf,
-}
-
-fn is_image(path: &Path) -> bool {
-    matches!(path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|s| s.to_ascii_lowercase()),
-        Some(ext) if matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "bmp" | "tiff" | "tif" | "gif" | "webp" | "svg")
-    )
-}
-
-fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, String> {
-    const MAX: u32 = 256;
-    if path
-        .extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("svg"))
-    {
-        let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-        let hint = SizeHint::Size {
-            width: MAX,
-            height: MAX,
-            maintain_aspect_ratio: true,
-        };
-        let options = Options::default();
-        return load_svg_bytes_with_size(&bytes, hint, &options).map_err(|e| e.to_string());
-    }
-
-    let dyn_img = image::open(path).map_err(|e| e.to_string())?;
-    let resized = dyn_img.thumbnail(MAX, MAX).to_rgba8();
-    let size = [resized.width() as usize, resized.height() as usize];
-    let pixels = resized.into_raw();
-    Ok(egui::ColorImage::from_rgba_unmultiplied(size, &pixels))
-}
+use crate::attachments::AttachmentsPanel;
 
 fn format_two(n: i32) -> String {
     format!("{:02}", n.clamp(0, 99))
@@ -57,13 +16,11 @@ fn format_two(n: i32) -> String {
 pub struct ElnPackApp {
     entry_title: String,
     markdown: MarkdownEditor,
-    attachments: Vec<AttachmentItem>,
+    attachments: AttachmentsPanel,
     status_text: String,
     performed_date: NaiveDate,
     performed_hour: i32,
     performed_minute: i32,
-    thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
-    thumbnail_failures: HashSet<PathBuf>,
 }
 
 impl Default for ElnPackApp {
@@ -79,13 +36,11 @@ impl Default for ElnPackApp {
         Self {
             entry_title: String::new(),
             markdown: MarkdownEditor::default(),
-            attachments: Vec::new(),
+            attachments: AttachmentsPanel::default(),
             status_text: String::new(),
             performed_date: today,
             performed_hour,
             performed_minute,
-            thumbnail_cache: HashMap::new(),
-            thumbnail_failures: HashSet::new(),
         }
     }
 }
@@ -164,13 +119,13 @@ impl ElnPackApp {
         ui.text_edit_singleline(&mut self.entry_title);
     }
 
-        fn render_description_input(&mut self, ui: &mut egui::Ui) {
+    fn render_description_input(&mut self, ui: &mut egui::Ui) {
         ui.label("Main Text (Markdown)");
         ui.add_space(4.0);
         self.markdown.ui(ui);
     }
 
-fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {
+    fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {
         ui.label("Performed at (UTC)");
         ui.add_space(4.0);
 
@@ -212,82 +167,17 @@ fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {
     }
 
     fn render_attachments_section(&mut self, ui: &mut egui::Ui) {
-        ui.label("Attachments");
-        ui.add_space(4.0);
-
-        egui::Frame::new()
-            .fill(egui::Color32::from_gray(250))
-            .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(221)))
-            .inner_margin(8.0)
-            .show(ui, |ui| {
-                let available_height = ui.available_height().min(200.0);
-
-                egui::ScrollArea::vertical()
-                    .max_height(available_height)
-                    .show(ui, |ui| {
-                        if self.attachments.is_empty() {
-                            ui.label(
-                                egui::RichText::new("No attachments")
-                                    .color(egui::Color32::from_gray(150)),
-                            );
-                        } else {
-                            self.render_attachment_list(ui);
-                        }
-                    });
-            });
-    }
-
-    fn render_attachment_list(&mut self, ui: &mut egui::Ui) {
-        let mut to_remove = None;
-
-        for index in 0..self.attachments.len() {
-            let (name, path) = {
-                let item = &self.attachments[index];
-                (item.name.clone(), item.path.clone())
-            };
-            ui.horizontal(|ui| {
-                if let Some(texture) = self.get_thumbnail(ui.ctx(), &path) {
-                    let size = texture.size_vec2();
-                    let max = 96.0;
-                    let scale = (max / size.x).min(max / size.y).min(1.0);
-                    ui.add(egui::Image::new((texture.id(), size * scale)));
-                }
-
-                ui.vertical(|ui| {
-                    ui.label(&name);
-                    ui.label(
-                        egui::RichText::new(path.to_string_lossy())
-                            .small()
-                            .color(egui::Color32::from_gray(102)),
-                    );
-                });
-
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Remove").clicked() {
-                        to_remove = Some(index);
-                    }
-                });
-            });
-
-            if index < self.attachments.len() - 1 {
-                ui.separator();
-            }
-        }
-
-        if let Some(index) = to_remove {
-            if let Some(removed) = self.attachments.get(index) {
-                self.thumbnail_cache.remove(&removed.path);
-                self.thumbnail_failures.remove(&removed.path);
-            }
-            self.attachments.remove(index);
-            self.status_text = "Attachment removed".to_string();
+        if let Some(msg) = self.attachments.ui(ui) {
+            self.status_text = msg;
         }
     }
 
     fn render_action_buttons(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button("Add files").clicked() {
-                self.add_attachments();
+                if let Some(msg) = self.attachments.add_via_dialog() {
+                    self.status_text = msg;
+                }
             }
 
             let save_button = egui::Button::new("Save archive");
@@ -307,56 +197,6 @@ fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {
         if !self.status_text.is_empty() {
             ui.label(egui::RichText::new(&self.status_text).color(egui::Color32::from_gray(68)));
         }
-    }
-
-    fn add_attachments(&mut self) {
-        if let Some(files) = rfd::FileDialog::new()
-            .set_title("Select attachments")
-            .pick_files()
-        {
-            let added = files.len();
-            for file in files {
-                let name = file
-                    .file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| format!("attachment-{}", self.attachments.len() + 1));
-
-                self.attachments.push(AttachmentItem { name, path: file });
-            }
-            self.status_text = format!("Added {} attachment(s)", added);
-        }
-    }
-
-    fn get_thumbnail(&mut self, ctx: &egui::Context, path: &Path) -> Option<egui::TextureHandle> {
-        if let Some(handle) = self.thumbnail_cache.get(path) {
-            return Some(handle.clone());
-        }
-
-        if self.thumbnail_failures.contains(path) {
-            return None;
-        }
-
-        if !is_image(path) {
-            self.thumbnail_failures.insert(path.to_path_buf());
-            return None;
-        }
-
-        let image = match load_image_thumbnail(path) {
-            Ok(img) => img,
-            Err(_) => {
-                self.thumbnail_failures.insert(path.to_path_buf());
-                return None;
-            }
-        };
-
-        let texture = ctx.load_texture(
-            format!("thumb-{}", path.display()),
-            image,
-            egui::TextureOptions::default(),
-        );
-        self.thumbnail_cache
-            .insert(path.to_path_buf(), texture.clone());
-        Some(texture)
     }
 
     fn save_archive(&mut self) {
@@ -388,8 +228,12 @@ fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {
         };
 
         let output_path = ensure_extension(selected_path, "eln");
-        let attachment_paths: Vec<PathBuf> =
-            self.attachments.iter().map(|a| a.path.clone()).collect();
+        let attachment_paths: Vec<PathBuf> = self
+            .attachments
+            .attachments()
+            .iter()
+            .map(|a| a.path.clone())
+            .collect();
 
         match build_and_write_archive(&output_path, title, body, &attachment_paths, performed_at) {
             Ok(_) => {

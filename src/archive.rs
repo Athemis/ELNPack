@@ -77,10 +77,12 @@ pub fn build_and_write_archive(
 
     let mut file_nodes = Vec::new();
     for (idx, source_path) in attachments.iter().enumerate() {
-        let display_name = source_path
+        let raw_name = source_path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_else(|| format!("attachment-{}.bin", idx + 1));
+
+        let display_name = sanitize_component(&raw_name);
         let archive_path = format!("{}{}", experiment_dir, display_name);
         let id = format!("./experiment/{}", display_name);
 
@@ -181,11 +183,15 @@ pub fn build_and_write_archive(
 fn sanitize_component(value: &str) -> String {
     let mut sanitized = String::new();
     for ch in value.chars() {
-        if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
-            sanitized.push(ch);
-        } else if ch.is_whitespace() {
-            sanitized.push('_');
-        }
+        match ch {
+            c if c.is_ascii_alphanumeric() || matches!(c, '-' | '_') => sanitized.push(c),
+            c if c.is_whitespace() => sanitized.push('_'),
+            _ => {
+                if let Some(rep) = deunicode::deunicode_char(ch) {
+                    sanitized.push_str(rep);
+                }
+            }
+        };
     }
     let trimmed = sanitized.trim_matches('_');
     if trimmed.is_empty() {
@@ -206,5 +212,7 @@ fn markdown_to_html(body: &str) -> String {
     let parser = Parser::new_ext(body, options);
     let mut html_output = String::new();
     html::push_html(&mut html_output, parser);
-    html_output
+    ammonia::Builder::default()
+        .clean(&html_output)
+        .to_string()
 }
