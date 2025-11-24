@@ -31,13 +31,6 @@ fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, image::ImageErr
     Ok(egui::ColorImage::from_rgba_unmultiplied(size, &pixels))
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum ThemeMode {
-    Auto,
-    Light,
-    Dark,
-}
-
 pub struct ElnPackApp {
     entry_title: String,
     body_text: String,
@@ -48,7 +41,6 @@ pub struct ElnPackApp {
     performed_minute: i32,
     thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
     thumbnail_failures: HashSet<PathBuf>,
-    theme_mode: ThemeMode,
 }
 
 impl Default for ElnPackApp {
@@ -71,15 +63,12 @@ impl Default for ElnPackApp {
             performed_minute,
             thumbnail_cache: HashMap::new(),
             thumbnail_failures: HashSet::new(),
-            theme_mode: ThemeMode::Auto,
         }
     }
 }
 
 impl eframe::App for ElnPackApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.apply_theme(ctx);
-
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(8.0);
 
@@ -99,7 +88,7 @@ impl eframe::App for ElnPackApp {
                 self.render_performed_at_input(ui);
                 ui.add_space(12.0);
 
-                self.render_theme_controls(ui, ctx);
+                self.render_theme_controls(ui);
                 ui.add_space(12.0);
 
                 self.render_attachments_section(ui);
@@ -115,30 +104,13 @@ impl eframe::App for ElnPackApp {
 }
 
 impl ElnPackApp {
-    fn apply_theme(&mut self, ctx: &egui::Context) {
-        match self.theme_mode {
-            ThemeMode::Auto => {}
-            ThemeMode::Light => ctx.set_visuals(egui::Visuals::light()),
-            ThemeMode::Dark => ctx.set_visuals(egui::Visuals::dark()),
-        }
-    }
-
-    fn render_theme_controls(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
+    fn render_theme_controls(&mut self, ui: &mut egui::Ui) {
         ui.group(|ui| {
             ui.label("Theme");
             ui.horizontal(|ui| {
-                ui.selectable_value(&mut self.theme_mode, ThemeMode::Auto, "Auto");
-                ui.selectable_value(&mut self.theme_mode, ThemeMode::Light, "Light");
-                ui.selectable_value(&mut self.theme_mode, ThemeMode::Dark, "Dark");
+                egui::widgets::global_dark_light_mode_switch(ui);
+                egui::widgets::global_dark_light_mode_buttons(ui);
             });
-
-            if self.theme_mode == ThemeMode::Auto {
-                ui.label(
-                    egui::RichText::new("Uses system theme at startup")
-                        .small()
-                        .color(egui::Color32::from_gray(120)),
-                );
-            }
         });
     }
 
