@@ -70,7 +70,7 @@ impl Default for ElnPackApp {
 impl eframe::App for ElnPackApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
-            ui.add_space(4.0);
+            ui.add_space(6.0);
             ui.horizontal(|ui| {
                 ui.heading("ELN Entry");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -78,7 +78,6 @@ impl eframe::App for ElnPackApp {
                 });
             });
             ui.add_space(4.0);
-            ui.separator();
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
