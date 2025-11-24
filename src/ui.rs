@@ -69,14 +69,20 @@ impl Default for ElnPackApp {
 
 impl eframe::App for ElnPackApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                ui.heading("ELN Entry");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    self.render_theme_controls(ui);
+                });
+            });
+            ui.add_space(4.0);
+            ui.separator();
+        });
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(8.0);
-
-            ui.vertical_centered(|ui| {
-                ui.heading("ELN Entry");
-            });
-
-            ui.add_space(16.0);
 
             egui::ScrollArea::vertical().show(ui, |ui| {
                 self.render_title_input(ui);
@@ -86,9 +92,6 @@ impl eframe::App for ElnPackApp {
                 ui.add_space(12.0);
 
                 self.render_performed_at_input(ui);
-                ui.add_space(12.0);
-
-                self.render_theme_controls(ui);
                 ui.add_space(12.0);
 
                 self.render_attachments_section(ui);
@@ -105,13 +108,8 @@ impl eframe::App for ElnPackApp {
 
 impl ElnPackApp {
     fn render_theme_controls(&mut self, ui: &mut egui::Ui) {
-        ui.group(|ui| {
-            ui.label("Theme");
-            ui.horizontal(|ui| {
-                egui::widgets::global_dark_light_mode_switch(ui);
-                egui::widgets::global_dark_light_mode_buttons(ui);
-            });
-        });
+        ui.add_space(2.0);
+        egui::widgets::global_dark_light_mode_switch(ui);
     }
 
     fn build_performed_at(&self) -> Result<OffsetDateTime, String> {
