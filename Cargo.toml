@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 eframe = "0.28"
 egui = "0.28"
-egui_extras = { version = "0.28", features = ["datepicker", "chrono", "image"] }
+egui_extras = { version = "0.28", features = ["datepicker", "chrono", "image", "svg"] }
 rfd = "0.15"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 serde_json = "1"

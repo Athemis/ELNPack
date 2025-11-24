@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use chrono::{Datelike, NaiveDate, Utc};
 use eframe::egui;
+use egui::SizeHint;
 use egui_extras::DatePickerButton;
+use egui_extras::image::load_svg_bytes_with_size;
 use time::{Date, Month, OffsetDateTime, Time};
 
 use crate::archive::{build_and_write_archive, ensure_extension, suggested_archive_name};
@@ -18,13 +20,23 @@ fn is_image(path: &Path) -> bool {
         .extension()
         .and_then(|e| e.to_str())
         .map(|s| s.to_ascii_lowercase()),
-    Some(ext) if matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "bmp" | "tiff" | "tif" | "gif" | "webp")
+        Some(ext) if matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "bmp" | "tiff" | "tif" | "gif" | "webp" | "svg")
     )
 }
 
-fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, image::ImageError> {
+fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, String> {
     const MAX: u32 = 256;
-    let dyn_img = image::open(path)?;
+    if path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("svg"))
+    {
+        let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+        let hint = SizeHint::Size(MAX, MAX);
+        return load_svg_bytes_with_size(&bytes, Some(hint)).map_err(|e| e.to_string());
+    }
+
+    let dyn_img = image::open(path).map_err(|e| e.to_string())?;
     let resized = dyn_img.thumbnail(MAX, MAX).to_rgba8();
     let size = [resized.width() as usize, resized.height() as usize];
     let pixels = resized.into_raw();
