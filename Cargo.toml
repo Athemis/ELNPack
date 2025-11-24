@@ -1,0 +1,15 @@
+[package]
+name = "elnpack-ui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = "0.28"
+egui = "0.28"
+rfd = "0.15"
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
+serde_json = "1"
+time = { version = "0.3", features = ["formatting", "macros"] }
+sha2 = "0.10"
+mime_guess = "2"
+anyhow = "1"
