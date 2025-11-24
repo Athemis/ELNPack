@@ -1,6 +1,7 @@
 mod archive;
 mod ui;
 
+use eframe::Theme;
 use eframe::egui;
 
 fn main() -> eframe::Result<()> {
@@ -8,6 +9,8 @@ fn main() -> eframe::Result<()> {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([800.0, 600.0])
             .with_min_inner_size([600.0, 400.0]),
+        follow_system_theme: true,
+        default_theme: Theme::Dark,
         ..Default::default()
     };
 
