@@ -229,30 +229,6 @@ fn sanitize_component(value: &str) -> String {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::sanitize_component;
-    use super::suggested_archive_name;
-
-    #[test]
-    fn sanitize_component_transliterates_then_replaces_specials() {
-        let result = sanitize_component("Café (draft).md");
-        assert_eq!(result, "Cafe_draft_md");
-    }
-
-    #[test]
-    fn sanitize_component_handles_whitespace_after_deunicode() {
-        let result = sanitize_component("Ångström data 2025/11/25");
-        assert_eq!(result, "Angstrom_data_2025_11_25");
-    }
-
-    #[test]
-    fn suggested_archive_name_reuses_sanitizer_and_lowercases() {
-        let result = suggested_archive_name("Ångström Study v1");
-        assert_eq!(result, "angstrom_study_v1.eln");
-    }
-}
-
 /// Guess MIME type from file path; falls back to `application/octet-stream`.
 fn guess_mime(path: &Path) -> Mime {
     mime_guess::from_path(path).first_or_octet_stream()
@@ -267,4 +243,70 @@ fn markdown_to_html(body: &str) -> String {
     let mut html_output = String::new();
     html::push_html(&mut html_output, parser);
     ammonia::Builder::default().clean(&html_output).to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use super::ensure_extension;
+    use super::guess_mime;
+    use super::markdown_to_html;
+    use super::sanitize_component;
+    use super::suggested_archive_name;
+
+    // Sanitization should transliterate accents and collapse punctuation/whitespace into single underscores.
+    #[test]
+    fn sanitize_component_transliterates_then_replaces_specials() {
+        let result = sanitize_component("Café (draft).md");
+        assert_eq!(result, "Cafe_draft_md");
+    }
+
+    // Whitespace inserted by transliteration must also collapse to underscores.
+    #[test]
+    fn sanitize_component_handles_whitespace_after_deunicode() {
+        let result = sanitize_component("Ångström data 2025/11/25");
+        assert_eq!(result, "Angstrom_data_2025_11_25");
+    }
+
+    #[test]
+    fn suggested_archive_name_reuses_sanitizer_and_lowercases() {
+        let result = suggested_archive_name("Ångström Study v1");
+        assert_eq!(result, "angstrom_study_v1.eln");
+    }
+
+    // Should leave an existing matching extension untouched, ignoring case.
+    #[test]
+    fn ensure_extension_preserves_matching_extension_case_insensitive() {
+        let path = PathBuf::from("/tmp/report.ELN");
+        let result = ensure_extension(path.clone(), "eln");
+
+        assert_eq!(result, path);
+    }
+
+    // Should replace an unmatched extension with the requested one.
+    #[test]
+    fn ensure_extension_replaces_when_different() {
+        let path = PathBuf::from("report.txt");
+        let result = ensure_extension(path, "eln");
+
+        assert_eq!(result.extension().and_then(|e| e.to_str()), Some("eln"));
+    }
+
+    // Unknown extensions should fall back to the safe octet-stream MIME type.
+    #[test]
+    fn guess_mime_defaults_to_octet_stream_for_unknown_extension() {
+        let mime = guess_mime(Path::new("attachment.customext"));
+
+        assert_eq!(mime.essence_str(), "application/octet-stream");
+    }
+
+    // Markdown HTML rendering should sanitize scripts while retaining formatting like strikethrough.
+    #[test]
+    fn markdown_to_html_sanitizes_and_keeps_formatting() {
+        let html = markdown_to_html("Hello <script>alert('x')</script> ~~gone~~");
+
+        assert!(html.contains("<del>gone</del>"));
+        assert!(!html.contains("script"));
+    }
 }

@@ -209,3 +209,78 @@ fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, String> {
     let pixels = resized.into_raw();
     Ok(egui::ColorImage::from_rgba_unmultiplied(size, &pixels))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use eframe::egui::Color32;
+    use image::{ImageBuffer, Rgba};
+
+    use super::is_image;
+    use super::load_image_thumbnail;
+
+    fn unique_path(filename: &str) -> std::path::PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!("elnpack-test-{nanos}-{filename}"))
+    }
+
+    // Ensures extension filtering matches documented formats and rejects others.
+    #[test]
+    fn is_image_recognizes_supported_extensions() {
+        assert!(is_image(Path::new("photo.PNG")));
+        assert!(is_image(Path::new("diagram.svg")));
+        assert!(!is_image(Path::new("notes.txt")));
+    }
+
+    // Raster thumbnails should retain aspect ratio and respect max bounds.
+    #[test]
+    fn load_image_thumbnail_handles_raster_image() {
+        let path = unique_path("thumb.png");
+        let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
+            ImageBuffer::from_pixel(10, 12, Rgba([0, 255, 0, 255]));
+        img.save(&path).expect("png saved");
+
+        let thumb = load_image_thumbnail(&path).expect("thumbnail created");
+
+        assert!(thumb.size[0] <= 256 && thumb.size[1] <= 256);
+        let aspect = thumb.size[0] as f32 / thumb.size[1] as f32;
+        let expected_aspect = 10.0 / 12.0;
+        assert!((aspect - expected_aspect).abs() < 0.05);
+
+        let _ = fs::remove_file(&path);
+    }
+
+    // SVG input should rasterize successfully within size limits.
+    #[test]
+    fn load_image_thumbnail_renders_svg() {
+        let path = unique_path("icon.svg");
+        let svg = r#"<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><rect width='16' height='16' fill='red'/></svg>"#;
+        fs::write(&path, svg).expect("svg saved");
+
+        let thumb = load_image_thumbnail(&path).expect("thumbnail created");
+
+        assert!(thumb.size[0] <= 256 && thumb.size[1] <= 256);
+        assert!(thumb.pixels.iter().any(|p| *p != Color32::TRANSPARENT));
+
+        let _ = fs::remove_file(&path);
+    }
+
+    // Invalid image data should yield an error instead of panicking.
+    #[test]
+    fn load_image_thumbnail_errors_on_invalid_image() {
+        let path = unique_path("invalid.png");
+        fs::write(&path, b"not an image").expect("file written");
+
+        let result = load_image_thumbnail(&path);
+
+        assert!(result.is_err());
+
+        let _ = fs::remove_file(&path);
+    }
+}
