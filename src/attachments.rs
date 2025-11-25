@@ -2,7 +2,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use eframe::egui;
@@ -20,20 +19,12 @@ pub struct AttachmentItem {
 }
 
 /// UI component that tracks attachments and renders previews when possible.
+#[derive(Default)]
 pub struct AttachmentsPanel {
     attachments: Vec<AttachmentItem>,
     thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
     thumbnail_failures: HashSet<PathBuf>,
-}
-
-impl Default for AttachmentsPanel {
-    fn default() -> Self {
-        Self {
-            attachments: Vec::new(),
-            thumbnail_cache: HashMap::new(),
-            thumbnail_failures: HashSet::new(),
-        }
-    }
+    hashes: HashSet<String>,
 }
 
 impl AttachmentsPanel {
@@ -54,8 +45,7 @@ impl AttachmentsPanel {
             .show(ui, |ui| {
                 if self.attachments.is_empty() {
                     ui.label(
-                        egui::RichText::new("No attachments")
-                            .color(egui::Color32::from_gray(150)),
+                        egui::RichText::new("No attachments").color(egui::Color32::from_gray(150)),
                     );
                 } else if status.is_none() {
                     status = self.render_attachment_list(ui);
@@ -69,26 +59,55 @@ impl AttachmentsPanel {
     ///
     /// Returns a short status message when files were added.
     pub fn add_via_dialog(&mut self) -> Option<String> {
-        if let Some(files) = rfd::FileDialog::new()
+        let files = rfd::FileDialog::new()
             .set_title("Select attachments")
-            .pick_files()
-        {
-            let added = files.len();
-            for file in files {
-                let name = file
-                    .file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| format!("attachment-{}", self.attachments.len() + 1));
+            .pick_files()?;
 
-                let mime = guess_mime(&file).unwrap_or_else(|| "application/octet-stream".into());
-                let sha256 = hash_file(&file).unwrap_or_else(|| "unavailable".into());
-                let size = file.metadata().map(|m| m.len()).unwrap_or(0);
+        let mut added = 0usize;
+        let mut skipped = 0usize;
 
-                self.attachments.push(AttachmentItem { name, path: file, mime, sha256, size });
+        for file in files {
+            if self.add_attachment(file) {
+                added += 1;
+            } else {
+                skipped += 1;
             }
-            return Some(format!("Added {} attachment(s)", added));
         }
-        None
+
+        Some(match (added, skipped) {
+            (a, 0) => format!("Added {} attachment(s)", a),
+            (a, s) => format!("Added {} attachment(s); skipped {} duplicate(s)", a, s),
+        })
+    }
+
+    /// Add a single attachment file, checking for duplicates by hash.
+    ///
+    /// Returns true if the file was added, false if it was a duplicate.
+    fn add_attachment(&mut self, path: PathBuf) -> bool {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| format!("attachment-{}", self.attachments.len() + 1));
+
+        let mime = guess_mime(&path);
+        let sha256 = hash_file(&path).unwrap_or_else(|| "unavailable".into());
+        let size = path.metadata().map(|m| m.len()).unwrap_or(0);
+
+        if sha256 != "unavailable" && self.hashes.contains(&sha256) {
+            return false;
+        }
+
+        if sha256 != "unavailable" {
+            self.hashes.insert(sha256.clone());
+        }
+        self.attachments.push(AttachmentItem {
+            name,
+            path,
+            mime,
+            sha256,
+            size,
+        });
+        true
     }
 
     fn render_attachment_list(&mut self, ui: &mut egui::Ui) -> Option<String> {
@@ -151,6 +170,9 @@ impl AttachmentsPanel {
             if let Some(removed) = self.attachments.get(index) {
                 self.thumbnail_cache.remove(&removed.path);
                 self.thumbnail_failures.remove(&removed.path);
+                if removed.sha256 != "unavailable" {
+                    self.hashes.remove(&removed.sha256);
+                }
             }
             self.attachments.remove(index);
             return Some("Attachment removed".to_string());
@@ -197,35 +219,34 @@ impl AttachmentsPanel {
 
 /// Return true when the path extension is a supported raster or SVG image.
 fn is_image(path: &Path) -> bool {
-    matches!(path
-        .extension()
+    path.extension()
         .and_then(|e| e.to_str())
-        .map(|s| s.to_ascii_lowercase()),
-        Some(ext) if matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "bmp" | "tiff" | "tif" | "gif" | "webp" | "svg")
-    )
+        .is_some_and(|ext| {
+            matches!(
+                ext.to_ascii_lowercase().as_str(),
+                "png" | "jpg" | "jpeg" | "bmp" | "tiff" | "tif" | "gif" | "webp" | "svg"
+            )
+        })
 }
 
-fn guess_mime(path: &Path) -> Option<String> {
-    Some(
-        mime_guess::from_path(path)
-            .first_or_octet_stream()
-            .essence_str()
-            .to_string(),
-    )
+/// Return true when the path extension is SVG.
+fn is_svg(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("svg"))
+}
+
+fn guess_mime(path: &Path) -> String {
+    mime_guess::from_path(path)
+        .first_or_octet_stream()
+        .essence_str()
+        .to_string()
 }
 
 fn hash_file(path: &Path) -> Option<String> {
-    let file = File::open(path).ok()?;
-    let mut reader = BufReader::new(file);
+    let mut file = File::open(path).ok()?;
     let mut hasher = Sha256::new();
-    let mut buf = [0u8; 8192];
-    loop {
-        let read = reader.read(&mut buf).ok()?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buf[..read]);
-    }
+    std::io::copy(&mut file, &mut hasher).ok()?;
     Some(format!("{:x}", hasher.finalize()))
 }
 
@@ -247,11 +268,8 @@ fn format_bytes(bytes: u64) -> String {
 /// Load and resize an image to a thumbnail-friendly `ColorImage`.
 fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, String> {
     const MAX: u32 = 256;
-    if path
-        .extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("svg"))
-    {
+
+    if is_svg(path) {
         let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
         let hint = egui::SizeHint::Size {
             width: MAX,
@@ -278,8 +296,7 @@ mod tests {
     use eframe::egui::Color32;
     use image::{ImageBuffer, Rgba};
 
-    use super::is_image;
-    use super::load_image_thumbnail;
+    use super::{AttachmentsPanel, is_image, load_image_thumbnail};
 
     fn unique_path(filename: &str) -> std::path::PathBuf {
         let nanos = SystemTime::now()
@@ -341,5 +358,28 @@ mod tests {
         assert!(result.is_err());
 
         let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn add_via_dialog_skips_duplicates_by_hash() {
+        // Prepare two identical temp files.
+        let path1 = unique_path("dup1.bin");
+        let path2 = unique_path("dup2.bin");
+        fs::write(&path1, b"same-bytes").unwrap();
+        fs::write(&path2, b"same-bytes").unwrap();
+
+        let mut panel = AttachmentsPanel::default();
+        // Simulate adding files directly to avoid dialog.
+        panel.add_attachment(path1.clone());
+        panel.add_attachment(path2.clone());
+
+        assert_eq!(
+            panel.attachments.len(),
+            1,
+            "duplicate file should be skipped"
+        );
+
+        let _ = fs::remove_file(path1);
+        let _ = fs::remove_file(path2);
     }
 }

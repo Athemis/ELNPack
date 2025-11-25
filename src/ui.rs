@@ -296,7 +296,7 @@ impl ElnPackApp {
                             }
                         }
 
-                        if self.keywords_list.len() % cols != 0 {
+                        if !self.keywords_list.len().is_multiple_of(cols) {
                             ui.end_row();
                         }
 
@@ -324,10 +324,9 @@ impl ElnPackApp {
                     .add(egui::Button::new(self.plus_label("Add files")))
                     .on_hover_text("Add files")
                     .clicked()
+                    && let Some(msg) = self.attachments.add_via_dialog()
                 {
-                    if let Some(msg) = self.attachments.add_via_dialog() {
-                        self.status_text = msg;
-                    }
+                    self.status_text = msg;
                 }
 
                 ui.add_space(6.0);
@@ -427,16 +426,14 @@ impl ElnPackApp {
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     if ui.button("Add").clicked() {
-                        let mut added_any = false;
-                        let mut saw_duplicate = false;
-                        let mut saw_empty_segment = false;
+                        let mut added_count: usize = 0;
+                        let mut dup_count: usize = 0;
+                        let mut empty_count: usize = 0;
 
                         for part in self.new_keyword_input.split(',') {
                             let trimmed = part.trim();
                             if trimmed.is_empty() {
-                                if !self.new_keyword_input.is_empty() {
-                                    saw_empty_segment = true;
-                                }
+                                empty_count += 1;
                                 continue;
                             }
 
@@ -445,29 +442,35 @@ impl ElnPackApp {
                                 .iter()
                                 .any(|existing| existing.eq_ignore_ascii_case(trimmed));
                             if exists {
-                                saw_duplicate = true;
+                                dup_count += 1;
                                 continue;
                             }
 
                             self.keywords_list.push(trimmed.to_string());
-                            added_any = true;
+                            added_count += 1;
                         }
 
-                        if saw_empty_segment || saw_duplicate {
-                            let mut issues = Vec::new();
-                            if saw_empty_segment {
-                                issues.push("empty entries (extra commas)");
-                            }
-                            if saw_duplicate {
-                                issues.push("duplicates");
-                            }
-                            let msg = format!(
-                                "Some keywords were skipped due to {}.",
-                                issues.join(" and ")
-                            );
-                            self.error_modal = Some(msg);
+                        let mut skipped_parts = Vec::new();
+                        if dup_count > 0 {
+                            skipped_parts.push(format!("{dup_count} duplicate(s)"));
                         }
-                        if added_any && !saw_empty_segment {
+                        if empty_count > 0 {
+                            skipped_parts.push(format!("{empty_count} empty entry/entries"));
+                        }
+
+                        self.status_text = match (added_count, skipped_parts.is_empty()) {
+                            (a, false) if a > 0 => {
+                                format!(
+                                    "Added {a} keyword(s); skipped {}.",
+                                    skipped_parts.join(" and ")
+                                )
+                            }
+                            (a, true) if a > 0 => format!("Added {a} keyword(s)."),
+                            (_, _) => "No keywords added; skipped duplicates or empty entries."
+                                .to_string(),
+                        };
+
+                        if added_count > 0 {
                             self.new_keyword_modal_open = false;
                             self.new_keyword_input.clear();
                         }

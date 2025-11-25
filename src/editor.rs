@@ -205,10 +205,7 @@ impl MarkdownEditor {
             .desired_rows(8)
             .show(ui);
         if let Some(override_range) = self.cursor_override.take() {
-            output
-                .state
-                .cursor
-                .set_char_range(Some(override_range.clone()));
+            output.state.cursor.set_char_range(Some(override_range));
             self.cursor = Some(override_range);
         } else {
             self.cursor = output
@@ -297,7 +294,7 @@ impl MarkdownEditor {
         let new_pos = start_char + insertion.chars().count();
         let new_range = CCursorRange::one(CCursor::new(new_pos));
         self.cursor = Some(new_range);
-        self.cursor_override = self.cursor.clone();
+        self.cursor_override = self.cursor;
     }
 }
 
