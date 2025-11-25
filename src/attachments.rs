@@ -155,7 +155,11 @@ impl AttachmentsPanel {
                 });
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Remove").clicked() {
+                    if ui
+                        .button(egui::RichText::new(egui_phosphor::regular::TRASH_SIMPLE))
+                        .on_hover_text("Remove attached file")
+                        .clicked()
+                    {
                         to_remove = Some(index);
                     }
                 });
