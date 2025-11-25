@@ -67,34 +67,34 @@ impl MarkdownEditor {
             ui.separator();
 
             // Inline styles
-        if ui
-            .button(RichText::new(egui_phosphor::regular::TEXT_BOLDER))
-            .on_hover_text("Bold")
-            .clicked()
-        {
-            self.apply_inline_style("**", "**", "bold");
-        }
-        if ui
-            .button(RichText::new(egui_phosphor::regular::TEXT_ITALIC))
-            .on_hover_text("Italic")
-            .clicked()
-        {
-            self.apply_inline_style("_", "_", "italic");
-        }
-        if ui
-            .button(RichText::new(egui_phosphor::regular::TEXT_STRIKETHROUGH))
-            .on_hover_text("Strikethrough")
-            .clicked()
-        {
-            self.apply_inline_style("~~", "~~", "text");
-        }
-        if ui
-            .button(RichText::new(egui_phosphor::regular::TEXT_UNDERLINE))
-            .on_hover_text("Underline")
-            .clicked()
-        {
-            self.apply_inline_style("<u>", "</u>", "text");
-        }
+            if ui
+                .button(RichText::new(egui_phosphor::regular::TEXT_BOLDER))
+                .on_hover_text("Bold")
+                .clicked()
+            {
+                self.apply_style("**", "**", "bold", false);
+            }
+            if ui
+                .button(RichText::new(egui_phosphor::regular::TEXT_ITALIC))
+                .on_hover_text("Italic")
+                .clicked()
+            {
+                self.apply_style("_", "_", "italic", false);
+            }
+            if ui
+                .button(RichText::new(egui_phosphor::regular::TEXT_STRIKETHROUGH))
+                .on_hover_text("Strikethrough")
+                .clicked()
+            {
+                self.apply_style("~~", "~~", "text", false);
+            }
+            if ui
+                .button(RichText::new(egui_phosphor::regular::TEXT_UNDERLINE))
+                .on_hover_text("Underline")
+                .clicked()
+            {
+                self.apply_style("<u>", "</u>", "text", false);
+            }
 
             // Code
             let code_resp = egui::ComboBox::from_id_salt("code_picker")
@@ -113,7 +113,7 @@ impl MarkdownEditor {
                         .on_hover_text("Inline code")
                         .clicked()
                     {
-                        self.apply_inline_style("`", "`", "code");
+                        self.apply_style("`", "`", "code", false);
                     }
                     if ui
                         .selectable_value(
@@ -124,7 +124,7 @@ impl MarkdownEditor {
                         .on_hover_text("Code block")
                         .clicked()
                     {
-                        self.apply_block_style("```\n", "\n```", "code");
+                        self.apply_style("```\n", "\n```", "code", true);
                     }
                 });
             code_resp.response.on_hover_text("Code");
@@ -146,7 +146,7 @@ impl MarkdownEditor {
                         .on_hover_text("Bulleted list")
                         .clicked()
                     {
-                        self.apply_block_style("\n- ", "", "item");
+                        self.apply_style("\n- ", "", "item", true);
                     }
                     if ui
                         .selectable_value(
@@ -157,40 +157,40 @@ impl MarkdownEditor {
                         .on_hover_text("Numbered list")
                         .clicked()
                     {
-                        self.apply_block_style("\n1. ", "", "first");
+                        self.apply_style("\n1. ", "", "first", true);
                     }
                 });
             list_resp.response.on_hover_text("List");
 
             // Other inserts
-        if ui
-            .button(RichText::new(egui_phosphor::regular::LINK_SIMPLE))
-            .on_hover_text("Link")
-            .clicked()
-        {
-            self.apply_inline_style("[", "](https://example.com)", "text");
-        }
-        if ui
-            .button(RichText::new(egui_phosphor::regular::QUOTES))
-            .on_hover_text("Quote")
-            .clicked()
-        {
-            self.apply_block_style("\n> ", "", "quote");
-        }
-        if ui
-            .button(RichText::new(egui_phosphor::regular::IMAGE_SQUARE))
-            .on_hover_text("Image")
-            .clicked()
-        {
-            self.apply_inline_style("![", "](path/to/image.png)", "alt text");
-        }
-        if ui
-            .button(RichText::new(egui_phosphor::regular::RULER))
-            .on_hover_text("Rule")
-            .clicked()
+            if ui
+                .button(RichText::new(egui_phosphor::regular::LINK_SIMPLE))
+                .on_hover_text("Link")
+                .clicked()
             {
-        self.apply_block_style("\n---\n", "", "");
-    }
+                self.apply_style("[", "](https://example.com)", "text", false);
+            }
+            if ui
+                .button(RichText::new(egui_phosphor::regular::QUOTES))
+                .on_hover_text("Quote")
+                .clicked()
+            {
+                self.apply_style("\n> ", "", "quote", true);
+            }
+            if ui
+                .button(RichText::new(egui_phosphor::regular::IMAGE_SQUARE))
+                .on_hover_text("Image")
+                .clicked()
+            {
+                self.apply_style("![", "](path/to/image.png)", "alt text", false);
+            }
+            if ui
+                .button(RichText::new(egui_phosphor::regular::RULER))
+                .on_hover_text("Rule")
+                .clicked()
+            {
+                self.apply_style("\n---\n", "", "", true);
+            }
         });
 
         ui.add_space(4.0);
@@ -220,54 +220,25 @@ impl MarkdownEditor {
         output.state.store(ui.ctx(), body_id);
     }
 
-    fn apply_inline_style(&mut self, prefix: &str, suffix: &str, placeholder: &str) {
-        self.insert_at_cursor(prefix, suffix, placeholder, false);
-    }
-
-    fn apply_block_style(&mut self, prefix: &str, suffix: &str, placeholder: &str) {
-        self.insert_at_cursor(prefix, suffix, placeholder, true);
-    }
-
     fn insert_heading_at_cursor(&mut self, level: u8) {
         let level = level.clamp(1, 6);
         let hashes = "#".repeat(level as usize);
-        let (start_char, end_char) = if let Some(range) = &self.cursor {
-            let (a, b) = (range.primary.index, range.secondary.index);
-            (a.min(b), a.max(b))
-        } else {
-            let len = self.text.chars().count();
-            (len, len)
-        };
-
-        let selected = if start_char < end_char {
-            self.text
-                .chars()
-                .skip(start_char)
-                .take(end_char - start_char)
-                .collect::<String>()
-        } else {
-            "".to_string()
-        };
-
+        let (_, _, selected) = self.selection();
         let cleaned = selected
             .trim()
             .trim_start_matches('#')
             .trim_start()
             .to_string();
-        let content = if cleaned.is_empty() { "Title" } else { cleaned.as_str() };
+        let content = if cleaned.is_empty() {
+            "Title"
+        } else {
+            cleaned.as_str()
+        };
 
-        let insertion = format!("{} {}\n", hashes, content);
-        let start = char_to_byte(&self.text, start_char);
-        let end = char_to_byte(&self.text, end_char);
-        self.text.replace_range(start..end, &insertion);
-
-        let new_pos = start_char + insertion.chars().count();
-        let new_range = CCursorRange::one(CCursor::new(new_pos));
-        self.cursor = Some(new_range);
-        self.cursor_override = self.cursor.clone();
+        self.apply_style(&format!("{} ", hashes), "\n", content, true);
     }
 
-    fn insert_at_cursor(&mut self, prefix: &str, suffix: &str, placeholder: &str, ensure_newline: bool) {
+    fn selection(&self) -> (usize, usize, String) {
         let (start_char, end_char) = if let Some(range) = &self.cursor {
             let (a, b) = (range.primary.index, range.secondary.index);
             (a.min(b), a.max(b))
@@ -283,13 +254,23 @@ impl MarkdownEditor {
                 .take(end_char - start_char)
                 .collect::<String>()
         } else {
-            "".to_string()
+            String::new()
         };
+
+        (start_char, end_char, selected)
+    }
+
+    fn apply_style(&mut self, prefix: &str, suffix: &str, placeholder: &str, ensure_newline: bool) {
+        let (start_char, end_char, selected) = self.selection();
 
         let mut insertion = format!(
             "{}{}{}",
             prefix,
-            if selected.is_empty() { placeholder } else { &selected },
+            if selected.is_empty() {
+                placeholder
+            } else {
+                &selected
+            },
             suffix
         );
 
@@ -300,7 +281,8 @@ impl MarkdownEditor {
             if !self.text.ends_with('\n') && !self.text.is_empty() {
                 insertion = format!("\n{insertion}");
             }
-        } else if !self.text.is_empty()
+        } else if selected.is_empty()
+            && !self.text.is_empty()
             && start_char == end_char
             && !self.text[..char_to_byte(&self.text, start_char)].ends_with(char::is_whitespace)
         {
