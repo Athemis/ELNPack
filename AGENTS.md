@@ -48,7 +48,7 @@
 - **`src/ui.rs`**: UI composition and screens; delegates text editing to `editor`, attachments to `attachments`, and calls `archive` for business operations.
 - **`src/editor.rs`**: Markdown editor component (toolbar, cursor-aware insertions, text area).
 - **`src/attachments.rs`**: Attachments panel handling list, thumbnails, and file dialogs.
-- **`src/archive.rs`**: Pure business logic for archive creation, file handling, name sanitization, and RO-Crate metadata generation. Filename sanitization transliterates with `deunicode`, then collapses non-alnum/whitespace to single underscores; `suggested_archive_name` must reuse this helper. No UI dependencies.
+- **`src/archive.rs`**: Pure business logic for archive creation, file handling, name sanitization, and RO-Crate metadata generation. `ro-crate-metadata.json` inside archives must conform to RO-Crate 1.1 (https://w3id.org/ro/crate/1.1), and the archive structure follows the ELN File Format specification (https://github.com/TheELNConsortium/TheELNFileFormat/blob/master/SPECIFICATION.md). Filename sanitization transliterates with `deunicode`, then collapses non-alnum/whitespace to single underscores; `suggested_archive_name` must reuse this helper. No UI dependencies.
 
 ## Testing Guidelines
 
