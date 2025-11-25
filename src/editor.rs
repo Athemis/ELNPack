@@ -210,28 +210,29 @@ impl MarkdownEditor {
                         self.cursor = state.cursor.char_range();
                     }
 
-                    // Render the TextEdit filling available space
-                    ui.add_sized(
-                        ui.available_size(),
-                        egui::TextEdit::multiline(&mut self.text)
-                            .code_editor()
-                            .id_source(body_id),
-                    );
+                    // Calculate desired rows based on available height
+                    let line_height = ui.text_style_height(&egui::TextStyle::Monospace);
+                    let desired_rows = (ui.available_height() / line_height).max(1.0) as usize;
 
-                    // Load state again after rendering to capture any changes
-                    if let Some(mut state) = TextEditState::load(ui.ctx(), body_id) {
-                        // Apply cursor override if we set one during toolbar actions
-                        if let Some(override_range) = self.cursor_override.take() {
-                            state.cursor.set_char_range(Some(override_range));
-                            self.cursor = Some(override_range);
-                            state.store(ui.ctx(), body_id);
-                        } else {
-                            // Update our internal cursor from the TextEdit's state
-                            self.cursor = state.cursor.char_range().or_else(|| {
-                                Some(CCursorRange::one(CCursor::new(self.text.chars().count())))
-                            });
-                        }
+                    // Render the TextEdit filling available space and capture output
+                    let mut output = egui::TextEdit::multiline(&mut self.text)
+                        .code_editor()
+                        .id_source(body_id)
+                        .desired_width(f32::INFINITY)
+                        .desired_rows(desired_rows)
+                        .show(ui);
+
+                    // Apply cursor override if we set one during toolbar actions
+                    if let Some(override_range) = self.cursor_override.take() {
+                        output.state.cursor.set_char_range(Some(override_range));
+                        self.cursor = Some(override_range);
+                    } else {
+                        // Update our internal cursor from the TextEdit's state
+                        self.cursor = output.state.cursor.char_range().or_else(|| {
+                            Some(CCursorRange::one(CCursor::new(self.text.chars().count())))
+                        });
                     }
+                    output.state.store(ui.ctx(), body_id);
                 });
         });
     }
