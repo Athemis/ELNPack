@@ -2,7 +2,9 @@
 
 mod archive;
 mod attachments;
+mod datetime_picker;
 mod editor;
+mod keywords;
 mod ui;
 
 use eframe::egui;
