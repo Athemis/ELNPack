@@ -48,173 +48,192 @@ impl MarkdownEditor {
 
     /// Render the toolbar and text area, applying cursor-aware insertions.
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            // Headings
-            let heading_resp = egui::ComboBox::from_id_salt("heading_picker")
-                .width(40.0)
-                .selected_text(RichText::new(format!("H{}", self.heading_level)).strong())
-                .show_ui(ui, |ui| {
-                    for lvl in 1..=6u8 {
+        ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+                // Headings
+                let heading_resp = egui::ComboBox::from_id_salt("heading_picker")
+                    .width(40.0)
+                    .selected_text(RichText::new(format!("H{}", self.heading_level)).strong())
+                    .show_ui(ui, |ui| {
+                        for lvl in 1..=6u8 {
+                            if ui
+                                .selectable_value(&mut self.heading_level, lvl, format!("H{}", lvl))
+                                .clicked()
+                            {
+                                self.insert_heading_at_cursor(lvl);
+                            }
+                        }
+                    });
+                heading_resp.response.on_hover_text("Heading");
+                ui.separator();
+
+                // Inline styles
+                if ui
+                    .button(RichText::new(egui_phosphor::regular::TEXT_BOLDER))
+                    .on_hover_text("Bold")
+                    .clicked()
+                {
+                    self.apply_style("**", "**", "bold", false);
+                }
+                if ui
+                    .button(RichText::new(egui_phosphor::regular::TEXT_ITALIC))
+                    .on_hover_text("Italic")
+                    .clicked()
+                {
+                    self.apply_style("_", "_", "italic", false);
+                }
+                if ui
+                    .button(RichText::new(egui_phosphor::regular::TEXT_STRIKETHROUGH))
+                    .on_hover_text("Strikethrough")
+                    .clicked()
+                {
+                    self.apply_style("~~", "~~", "text", false);
+                }
+                if ui
+                    .button(RichText::new(egui_phosphor::regular::TEXT_UNDERLINE))
+                    .on_hover_text("Underline")
+                    .clicked()
+                {
+                    self.apply_style("<u>", "</u>", "text", false);
+                }
+
+                // Code
+                let code_resp = egui::ComboBox::from_id_salt("code_picker")
+                    .width(40.0)
+                    .selected_text(match self.code_choice {
+                        CodeChoice::Inline => RichText::new(egui_phosphor::regular::CODE_SIMPLE),
+                        CodeChoice::Block => RichText::new(egui_phosphor::regular::CODE_BLOCK),
+                    })
+                    .show_ui(ui, |ui| {
                         if ui
-                            .selectable_value(&mut self.heading_level, lvl, format!("H{}", lvl))
+                            .selectable_value(
+                                &mut self.code_choice,
+                                CodeChoice::Inline,
+                                RichText::new(egui_phosphor::regular::CODE_SIMPLE),
+                            )
+                            .on_hover_text("Inline code")
                             .clicked()
                         {
-                            self.insert_heading_at_cursor(lvl);
+                            self.apply_style("`", "`", "code", false);
+                        }
+                        if ui
+                            .selectable_value(
+                                &mut self.code_choice,
+                                CodeChoice::Block,
+                                RichText::new(egui_phosphor::regular::CODE_BLOCK),
+                            )
+                            .on_hover_text("Code block")
+                            .clicked()
+                        {
+                            self.apply_style("```\n", "\n```", "code", true);
+                        }
+                    });
+                code_resp.response.on_hover_text("Code");
+
+                // Lists
+                let list_resp = egui::ComboBox::from_id_salt("list_picker")
+                    .width(40.0)
+                    .selected_text(match self.list_choice {
+                        ListChoice::Unordered => RichText::new(egui_phosphor::regular::LIST_DASHES),
+                        ListChoice::Ordered => RichText::new(egui_phosphor::regular::LIST_NUMBERS),
+                    })
+                    .show_ui(ui, |ui| {
+                        if ui
+                            .selectable_value(
+                                &mut self.list_choice,
+                                ListChoice::Unordered,
+                                RichText::new(egui_phosphor::regular::LIST_DASHES),
+                            )
+                            .on_hover_text("Bulleted list")
+                            .clicked()
+                        {
+                            self.apply_style("\n- ", "", "item", true);
+                        }
+                        if ui
+                            .selectable_value(
+                                &mut self.list_choice,
+                                ListChoice::Ordered,
+                                RichText::new(egui_phosphor::regular::LIST_NUMBERS),
+                            )
+                            .on_hover_text("Numbered list")
+                            .clicked()
+                        {
+                            self.apply_style("\n1. ", "", "first", true);
+                        }
+                    });
+                list_resp.response.on_hover_text("List");
+
+                // Other inserts
+                if ui
+                    .button(RichText::new(egui_phosphor::regular::LINK_SIMPLE))
+                    .on_hover_text("Link")
+                    .clicked()
+                {
+                    self.apply_style("[", "](https://example.com)", "text", false);
+                }
+                if ui
+                    .button(RichText::new(egui_phosphor::regular::QUOTES))
+                    .on_hover_text("Quote")
+                    .clicked()
+                {
+                    self.apply_style("\n> ", "", "quote", true);
+                }
+                if ui
+                    .button(RichText::new(egui_phosphor::regular::IMAGE_SQUARE))
+                    .on_hover_text("Image")
+                    .clicked()
+                {
+                    self.apply_style("![", "](path/to/image.png)", "alt text", false);
+                }
+                if ui
+                    .button(RichText::new(egui_phosphor::regular::RULER))
+                    .on_hover_text("Rule")
+                    .clicked()
+                {
+                    self.apply_style("\n---\n", "", "", true);
+                }
+            });
+
+            ui.add_space(4.0);
+
+            egui::Resize::default()
+                .id_salt("markdown_editor_resize")
+                .resizable([false, true])
+                .default_size([ui.available_width(), 200.0])
+                .min_size([ui.available_width(), 100.0])
+                .max_size([ui.available_width(), f32::INFINITY])
+                .show(ui, |ui| {
+                    let body_id = ui.id().with("body_text_edit");
+
+                    // Load existing state before rendering
+                    if let Some(state) = TextEditState::load(ui.ctx(), body_id) {
+                        self.cursor = state.cursor.char_range();
+                    }
+
+                    // Render the TextEdit filling available space
+                    ui.add_sized(
+                        ui.available_size(),
+                        egui::TextEdit::multiline(&mut self.text)
+                            .code_editor()
+                            .id_source(body_id),
+                    );
+
+                    // Load state again after rendering to capture any changes
+                    if let Some(mut state) = TextEditState::load(ui.ctx(), body_id) {
+                        // Apply cursor override if we set one during toolbar actions
+                        if let Some(override_range) = self.cursor_override.take() {
+                            state.cursor.set_char_range(Some(override_range));
+                            self.cursor = Some(override_range);
+                            state.store(ui.ctx(), body_id);
+                        } else {
+                            // Update our internal cursor from the TextEdit's state
+                            self.cursor = state.cursor.char_range().or_else(|| {
+                                Some(CCursorRange::one(CCursor::new(self.text.chars().count())))
+                            });
                         }
                     }
                 });
-            heading_resp.response.on_hover_text("Heading");
-            ui.separator();
-
-            // Inline styles
-            if ui
-                .button(RichText::new(egui_phosphor::regular::TEXT_BOLDER))
-                .on_hover_text("Bold")
-                .clicked()
-            {
-                self.apply_style("**", "**", "bold", false);
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::TEXT_ITALIC))
-                .on_hover_text("Italic")
-                .clicked()
-            {
-                self.apply_style("_", "_", "italic", false);
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::TEXT_STRIKETHROUGH))
-                .on_hover_text("Strikethrough")
-                .clicked()
-            {
-                self.apply_style("~~", "~~", "text", false);
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::TEXT_UNDERLINE))
-                .on_hover_text("Underline")
-                .clicked()
-            {
-                self.apply_style("<u>", "</u>", "text", false);
-            }
-
-            // Code
-            let code_resp = egui::ComboBox::from_id_salt("code_picker")
-                .width(40.0)
-                .selected_text(match self.code_choice {
-                    CodeChoice::Inline => RichText::new(egui_phosphor::regular::CODE_SIMPLE),
-                    CodeChoice::Block => RichText::new(egui_phosphor::regular::CODE_BLOCK),
-                })
-                .show_ui(ui, |ui| {
-                    if ui
-                        .selectable_value(
-                            &mut self.code_choice,
-                            CodeChoice::Inline,
-                            RichText::new(egui_phosphor::regular::CODE_SIMPLE),
-                        )
-                        .on_hover_text("Inline code")
-                        .clicked()
-                    {
-                        self.apply_style("`", "`", "code", false);
-                    }
-                    if ui
-                        .selectable_value(
-                            &mut self.code_choice,
-                            CodeChoice::Block,
-                            RichText::new(egui_phosphor::regular::CODE_BLOCK),
-                        )
-                        .on_hover_text("Code block")
-                        .clicked()
-                    {
-                        self.apply_style("```\n", "\n```", "code", true);
-                    }
-                });
-            code_resp.response.on_hover_text("Code");
-
-            // Lists
-            let list_resp = egui::ComboBox::from_id_salt("list_picker")
-                .width(40.0)
-                .selected_text(match self.list_choice {
-                    ListChoice::Unordered => RichText::new(egui_phosphor::regular::LIST_DASHES),
-                    ListChoice::Ordered => RichText::new(egui_phosphor::regular::LIST_NUMBERS),
-                })
-                .show_ui(ui, |ui| {
-                    if ui
-                        .selectable_value(
-                            &mut self.list_choice,
-                            ListChoice::Unordered,
-                            RichText::new(egui_phosphor::regular::LIST_DASHES),
-                        )
-                        .on_hover_text("Bulleted list")
-                        .clicked()
-                    {
-                        self.apply_style("\n- ", "", "item", true);
-                    }
-                    if ui
-                        .selectable_value(
-                            &mut self.list_choice,
-                            ListChoice::Ordered,
-                            RichText::new(egui_phosphor::regular::LIST_NUMBERS),
-                        )
-                        .on_hover_text("Numbered list")
-                        .clicked()
-                    {
-                        self.apply_style("\n1. ", "", "first", true);
-                    }
-                });
-            list_resp.response.on_hover_text("List");
-
-            // Other inserts
-            if ui
-                .button(RichText::new(egui_phosphor::regular::LINK_SIMPLE))
-                .on_hover_text("Link")
-                .clicked()
-            {
-                self.apply_style("[", "](https://example.com)", "text", false);
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::QUOTES))
-                .on_hover_text("Quote")
-                .clicked()
-            {
-                self.apply_style("\n> ", "", "quote", true);
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::IMAGE_SQUARE))
-                .on_hover_text("Image")
-                .clicked()
-            {
-                self.apply_style("![", "](path/to/image.png)", "alt text", false);
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::RULER))
-                .on_hover_text("Rule")
-                .clicked()
-            {
-                self.apply_style("\n---\n", "", "", true);
-            }
         });
-
-        ui.add_space(4.0);
-        let body_id = ui.id().with("body_text_edit");
-        if let Some(state) = TextEditState::load(ui.ctx(), body_id) {
-            self.cursor = state.cursor.char_range();
-        }
-        let mut output = egui::TextEdit::multiline(&mut self.text)
-            .code_editor()
-            .id_source(body_id)
-            .desired_width(f32::INFINITY)
-            .desired_rows(8)
-            .show(ui);
-        if let Some(override_range) = self.cursor_override.take() {
-            output.state.cursor.set_char_range(Some(override_range));
-            self.cursor = Some(override_range);
-        } else {
-            self.cursor = output
-                .state
-                .cursor
-                .char_range()
-                .or_else(|| Some(CCursorRange::one(CCursor::new(self.text.chars().count()))));
-        }
-        output.state.store(ui.ctx(), body_id);
     }
 
     fn insert_heading_at_cursor(&mut self, level: u8) {
