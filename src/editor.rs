@@ -1,7 +1,7 @@
 use eframe::egui;
+use egui::RichText;
 use egui::text::{CCursor, CCursorRange};
 use egui::text_edit::TextEditState;
-use egui::RichText;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum CodeChoice {
@@ -199,7 +199,10 @@ impl MarkdownEditor {
             .desired_rows(8)
             .show(ui);
         if let Some(override_range) = self.cursor_override.take() {
-            output.state.cursor.set_char_range(Some(override_range.clone()));
+            output
+                .state
+                .cursor
+                .set_char_range(Some(override_range.clone()));
             self.cursor = Some(override_range);
         } else {
             self.cursor = output

@@ -6,8 +6,8 @@ use egui_extras::DatePickerButton;
 use time::{Date, Month, OffsetDateTime, Time};
 
 use crate::archive::{build_and_write_archive, ensure_extension, suggested_archive_name};
-use crate::editor::MarkdownEditor;
 use crate::attachments::AttachmentsPanel;
+use crate::editor::MarkdownEditor;
 
 fn format_two(n: i32) -> String {
     format!("{:02}", n.clamp(0, 99))

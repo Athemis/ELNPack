@@ -24,6 +24,14 @@
 - Use the Context7 MCP when you need library or API documentation: resolve the library id, then fetch docs via the Context7 MCP get-library-docs endpoint.
 - Prefer official documentation domains returned by Context7; avoid ad-hoc web searches unless Context7 lacks coverage.
 
+### Rustdoc conventions to follow
+- Use `///` for public items and `//!` for module-level docs; start with a one-line summary ending with a period.
+- Structure details with `#` headings (e.g., `# Examples`, `# Errors`, `# Panics`, `# Safety`, `# Performance`).
+- Include small, runnable examples marked `no_run`/`ignore` when side effects exist; keep them minimal and dependency-free.
+- Explain invariants, panics, and error cases explicitly; prefer present tense and describe behavior, not intent.
+- Link related items with intra-doc links like ``[`TypeName`]`` or ``[`module::function`]``; disambiguate with full paths when needed.
+- Document private helpers when it aids maintainers; keep explanations concise.
+
 ## Coding Style & Naming Conventions
 
 - Follow rustfmt defaults (4-space indent, trailing commas where appropriate); run `cargo fmt` before committing.
@@ -32,6 +40,7 @@
 - Validate user input in business logic before reflecting it in the UI to avoid inconsistent state.
 - Use English language within the codebase.
 - Separate UI concerns (`src/ui.rs`) from business logic (`src/archive.rs`) for maintainability and testability.
+- Code comments: use sparingly to explain intent, invariants, or non-obvious control flow; avoid restating what the code already makes clear.
 
 ## Module Responsibilities
 
@@ -39,7 +48,7 @@
 - **`src/ui.rs`**: UI composition and screens; delegates text editing to `editor`, attachments to `attachments`, and calls `archive` for business operations.
 - **`src/editor.rs`**: Markdown editor component (toolbar, cursor-aware insertions, text area).
 - **`src/attachments.rs`**: Attachments panel handling list, thumbnails, and file dialogs.
-- **`src/archive.rs`**: Pure business logic for archive creation, file handling, name sanitization, and RO-Crate metadata generation. No UI dependencies.
+- **`src/archive.rs`**: Pure business logic for archive creation, file handling, name sanitization, and RO-Crate metadata generation. Filename sanitization transliterates with `deunicode`, then collapses non-alnum/whitespace to single underscores; `suggested_archive_name` must reuse this helper. No UI dependencies.
 
 ## Testing Guidelines
 

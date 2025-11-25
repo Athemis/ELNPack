@@ -1,3 +1,10 @@
+//! Business logic for building ELN RO-Crate archives.
+//!
+//! Responsibilities:
+//! - Sanitize user-provided names for filesystem safety.
+//! - Package experiment content and attachments into a ZIP with RO-Crate metadata.
+//! - Provide lightweight helpers for MIME guessing and markdown rendering.
+
 use std::{
     fs::{self, File},
     io::{Read, Write},
@@ -11,24 +18,19 @@ use sha2::{Digest, Sha256};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use zip::{CompressionMethod, write::FileOptions};
 
+/// Suggest a safe archive filename from a user-facing title.
+///
+/// Non-alphanumeric characters become `_`, sequences are collapsed, and a
+/// default of `eln-entry.eln` is returned when the title is empty.
 pub fn suggested_archive_name(title: &str) -> String {
-    let mut sanitized = String::new();
-    for ch in title.chars() {
-        if ch.is_ascii_alphanumeric() {
-            sanitized.push(ch.to_ascii_lowercase());
-        } else if ch.is_whitespace() || matches!(ch, '-' | '_') {
-            sanitized.push('_');
-        }
-    }
-    let trimmed = sanitized.trim_matches('_');
-    let base = if trimmed.is_empty() {
-        "eln-entry"
-    } else {
-        trimmed
-    };
-    format!("{}.eln", base)
+    let base = sanitize_component(title).to_ascii_lowercase();
+    let final_base = if base.is_empty() { "eln_entry" } else { &base };
+    format!("{}.eln", final_base)
 }
 
+/// Force a specific extension onto a path when it is missing or different.
+///
+/// Keeps existing matching extension (case-insensitive); otherwise replaces it.
 pub fn ensure_extension(mut path: PathBuf, extension: &str) -> PathBuf {
     let replace = !matches!(
         path.extension().and_then(|e| e.to_str()),
@@ -41,6 +43,11 @@ pub fn ensure_extension(mut path: PathBuf, extension: &str) -> PathBuf {
     path
 }
 
+/// Build a RO-Crate archive ZIP containing the experiment text, metadata, and attachments.
+///
+/// Creates directories inside the archive, copies attachments with sanitized names,
+/// emits RO-Crate JSON-LD metadata, and writes the final ZIP to `output`.
+/// Parent directories for `output` are created if missing.
 pub fn build_and_write_archive(
     output: &Path,
     title: &str,
@@ -48,6 +55,7 @@ pub fn build_and_write_archive(
     attachments: &[PathBuf],
     performed_at: OffsetDateTime,
 ) -> Result<()> {
+    // Ensure parent exists so the archive can be written without IO errors.
     if let Some(parent) = output.parent()
         && !parent.exists()
     {
@@ -180,19 +188,39 @@ pub fn build_and_write_archive(
     Ok(())
 }
 
+/// Produce a filesystem-safe path component.
+///
+/// # Steps
+/// - Transliterate Unicode to ASCII with `deunicode` (e.g., "Å" → "A").
+/// - Preserve ASCII alphanumerics plus `-` and `_`.
+/// - Replace whitespace or any other character with a single `_`, collapsing runs.
+/// - Trim leading/trailing `_`; fall back to `"eln_entry"` if nothing remains.
+///
+/// # Examples
+/// ```ignore
+/// let name = sanitize_component("Café (draft).md");
+/// assert_eq!(name, "Cafe_draft_md");
+/// ```
 fn sanitize_component(value: &str) -> String {
-    let mut sanitized = String::new();
-    for ch in value.chars() {
+    let transliterated = deunicode::deunicode(value);
+    let mut sanitized = String::with_capacity(transliterated.len());
+
+    for ch in transliterated.chars() {
         match ch {
             c if c.is_ascii_alphanumeric() || matches!(c, '-' | '_') => sanitized.push(c),
-            c if c.is_whitespace() => sanitized.push('_'),
-            _ => {
-                if let Some(rep) = deunicode::deunicode_char(ch) {
-                    sanitized.push_str(rep);
+            c if c.is_whitespace() => {
+                if !sanitized.ends_with('_') {
+                    sanitized.push('_');
                 }
             }
-        };
+            _ => {
+                if !sanitized.ends_with('_') {
+                    sanitized.push('_');
+                }
+            }
+        }
     }
+
     let trimmed = sanitized.trim_matches('_');
     if trimmed.is_empty() {
         "eln_entry".into()
@@ -201,10 +229,36 @@ fn sanitize_component(value: &str) -> String {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::sanitize_component;
+    use super::suggested_archive_name;
+
+    #[test]
+    fn sanitize_component_transliterates_then_replaces_specials() {
+        let result = sanitize_component("Café (draft).md");
+        assert_eq!(result, "Cafe_draft_md");
+    }
+
+    #[test]
+    fn sanitize_component_handles_whitespace_after_deunicode() {
+        let result = sanitize_component("Ångström data 2025/11/25");
+        assert_eq!(result, "Angstrom_data_2025_11_25");
+    }
+
+    #[test]
+    fn suggested_archive_name_reuses_sanitizer_and_lowercases() {
+        let result = suggested_archive_name("Ångström Study v1");
+        assert_eq!(result, "angstrom_study_v1.eln");
+    }
+}
+
+/// Guess MIME type from file path; falls back to `application/octet-stream`.
 fn guess_mime(path: &Path) -> Mime {
     mime_guess::from_path(path).first_or_octet_stream()
 }
 
+/// Render markdown to sanitized HTML for embedding in RO-Crate metadata.
 fn markdown_to_html(body: &str) -> String {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_FOOTNOTES);
@@ -212,7 +266,5 @@ fn markdown_to_html(body: &str) -> String {
     let parser = Parser::new_ext(body, options);
     let mut html_output = String::new();
     html::push_html(&mut html_output, parser);
-    ammonia::Builder::default()
-        .clean(&html_output)
-        .to_string()
+    ammonia::Builder::default().clean(&html_output).to_string()
 }

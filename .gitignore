@@ -51,3 +51,6 @@ target/
 # Windows
 Thumbs.db
 ehthumbs.db
+
+# SSH Keys
+id_ed25519*
