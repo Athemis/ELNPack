@@ -1,3 +1,5 @@
+//! Application entry point wiring egui/eframe to launch the ELNPack UI.
+
 mod archive;
 mod attachments;
 mod editor;
@@ -6,6 +8,7 @@ mod ui;
 use eframe::egui;
 use egui_phosphor::Variant;
 
+/// Bootstrap the desktop application and run the main egui event loop.
 fn main() -> eframe::Result<()> {
     // Register Phosphor icon font.
     let mut fonts = egui::FontDefinitions::default();

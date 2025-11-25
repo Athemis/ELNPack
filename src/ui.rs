@@ -1,3 +1,6 @@
+//! Top-level egui application shell for composing an ELN entry.
+//! Handles layout, form controls, and wiring to archive creation.
+
 use std::path::PathBuf;
 
 use chrono::{Datelike, NaiveDate, Utc};
@@ -13,6 +16,7 @@ fn format_two(n: i32) -> String {
     format!("{:02}", n.clamp(0, 99))
 }
 
+/// Stateful egui application for building and exporting ELN entries.
 pub struct ElnPackApp {
     entry_title: String,
     markdown: MarkdownEditor,
@@ -89,6 +93,10 @@ impl ElnPackApp {
         egui::widgets::global_theme_preference_switch(ui);
     }
 
+    /// Build a validated `OffsetDateTime` from the form controls.
+    ///
+    /// Returns an error string suitable for display when an input is out of range
+    /// (e.g., hours outside 0-23 or invalid calendar dates).
     fn build_performed_at(&self) -> Result<OffsetDateTime, String> {
         let month = Month::try_from(self.performed_date.month() as u8)
             .map_err(|_| "Month must be 1-12".to_string())?;
@@ -113,18 +121,21 @@ impl ElnPackApp {
         Ok(date.with_time(time).assume_utc())
     }
 
+    /// Render the entry title field.
     fn render_title_input(&mut self, ui: &mut egui::Ui) {
         ui.label("Title");
         ui.add_space(4.0);
         ui.text_edit_singleline(&mut self.entry_title);
     }
 
+    /// Render the markdown editor field and toolbar.
     fn render_description_input(&mut self, ui: &mut egui::Ui) {
         ui.label("Main Text (Markdown)");
         ui.add_space(4.0);
         self.markdown.ui(ui);
     }
 
+    /// Render date/time controls for when the experiment was performed.
     fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {
         ui.label("Performed at (UTC)");
         ui.add_space(4.0);
@@ -166,12 +177,14 @@ impl ElnPackApp {
         );
     }
 
+    /// Render the attachments list and capture status text from it.
     fn render_attachments_section(&mut self, ui: &mut egui::Ui) {
         if let Some(msg) = self.attachments.ui(ui) {
             self.status_text = msg;
         }
     }
 
+    /// Render the file dialog buttons and trigger archive saving.
     fn render_action_buttons(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button("Add files").clicked() {
@@ -193,12 +206,14 @@ impl ElnPackApp {
         });
     }
 
+    /// Render latest status/error message when present.
     fn render_status(&self, ui: &mut egui::Ui) {
         if !self.status_text.is_empty() {
             ui.label(egui::RichText::new(&self.status_text).color(egui::Color32::from_gray(68)));
         }
     }
 
+    /// Validate inputs, open the save dialog, and write the archive.
     fn save_archive(&mut self) {
         let title = self.entry_title.trim();
         let body = self.markdown.text().trim();

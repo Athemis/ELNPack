@@ -1,3 +1,5 @@
+//! Markdown editor widget with toolbar helpers for common formatting.
+
 use eframe::egui;
 use egui::RichText;
 use egui::text::{CCursor, CCursorRange};
@@ -15,6 +17,7 @@ enum ListChoice {
     Ordered,
 }
 
+/// Rich-text-like markdown editor state and behaviors.
 pub struct MarkdownEditor {
     text: String,
     heading_level: u8,
@@ -38,10 +41,12 @@ impl Default for MarkdownEditor {
 }
 
 impl MarkdownEditor {
+    /// Current editor contents as plain text.
     pub fn text(&self) -> &str {
         &self.text
     }
 
+    /// Render the toolbar and text area, applying cursor-aware insertions.
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             // Headings
@@ -266,6 +271,7 @@ impl MarkdownEditor {
     }
 }
 
+/// Convert a character index to a byte index, clamping to the end when out of bounds.
 fn char_to_byte(text: &str, char_idx: usize) -> usize {
     if char_idx == text.chars().count() {
         return text.len();

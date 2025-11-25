@@ -1,3 +1,5 @@
+//! Attachments panel handling selection, listing, and thumbnail previews.
+
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -5,11 +7,13 @@ use eframe::egui;
 use egui_extras::image::load_svg_bytes_with_size;
 use usvg::Options;
 
+/// User-selected attachment with display name and filesystem path.
 pub struct AttachmentItem {
     pub name: String,
     pub path: PathBuf,
 }
 
+/// UI component that tracks attachments and renders previews when possible.
 pub struct AttachmentsPanel {
     attachments: Vec<AttachmentItem>,
     thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
@@ -27,10 +31,12 @@ impl Default for AttachmentsPanel {
 }
 
 impl AttachmentsPanel {
+    /// Current list of attachments in selection order.
     pub fn attachments(&self) -> &[AttachmentItem] {
         &self.attachments
     }
 
+    /// Render the attachments panel and return a status string to surface in the UI.
     pub fn ui(&mut self, ui: &mut egui::Ui) -> Option<String> {
         let mut status: Option<String> = None;
 
@@ -62,6 +68,9 @@ impl AttachmentsPanel {
         status
     }
 
+    /// Open a file picker and add selected files as attachments.
+    ///
+    /// Returns a short status message when files were added.
     pub fn add_via_dialog(&mut self) -> Option<String> {
         if let Some(files) = rfd::FileDialog::new()
             .set_title("Select attachments")
@@ -130,6 +139,9 @@ impl AttachmentsPanel {
         None
     }
 
+    /// Lazily load or reuse a thumbnail texture for an attachment path.
+    ///
+    /// Skips non-images and caches failures to avoid repeated decoding attempts.
     fn get_thumbnail(&mut self, ctx: &egui::Context, path: &Path) -> Option<egui::TextureHandle> {
         if let Some(handle) = self.thumbnail_cache.get(path) {
             return Some(handle.clone());
@@ -163,6 +175,7 @@ impl AttachmentsPanel {
     }
 }
 
+/// Return true when the path extension is a supported raster or SVG image.
 fn is_image(path: &Path) -> bool {
     matches!(path
         .extension()
@@ -172,6 +185,7 @@ fn is_image(path: &Path) -> bool {
     )
 }
 
+/// Load and resize an image to a thumbnail-friendly `ColorImage`.
 fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, String> {
     const MAX: u32 = 256;
     if path
