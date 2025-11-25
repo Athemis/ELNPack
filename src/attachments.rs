@@ -52,20 +52,14 @@ impl AttachmentsPanel {
             .stroke(visuals.window_stroke())
             .inner_margin(8.0)
             .show(ui, |ui| {
-                let available_height = ui.available_height().min(200.0);
-
-                egui::ScrollArea::vertical()
-                    .max_height(available_height)
-                    .show(ui, |ui| {
-                        if self.attachments.is_empty() {
-                            ui.label(
-                                egui::RichText::new("No attachments")
-                                    .color(egui::Color32::from_gray(150)),
-                            );
-                        } else if status.is_none() {
-                            status = self.render_attachment_list(ui);
-                        }
-                    });
+                if self.attachments.is_empty() {
+                    ui.label(
+                        egui::RichText::new("No attachments")
+                            .color(egui::Color32::from_gray(150)),
+                    );
+                } else if status.is_none() {
+                    status = self.render_attachment_list(ui);
+                }
             });
 
         status
