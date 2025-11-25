@@ -335,7 +335,8 @@ mod tests {
     }
 
     #[test]
-    fn archive_genre_resource_serializes_to_expected_str() {
+    fn archive_genre_serializes_to_expected_str() {
         assert_eq!(ArchiveGenre::Resource.as_str(), "resource");
+        assert_eq!(ArchiveGenre::Experiment.as_str(), "experiment");
     }
 }

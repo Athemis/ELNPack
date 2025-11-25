@@ -24,6 +24,13 @@ pub struct ElnPackApp {
     markdown: MarkdownEditor,
     attachments: AttachmentsPanel,
     status_text: String,
+    error_modal: Option<String>,
+    archive_genre: ArchiveGenre,
+    keywords_list: Vec<String>,
+    new_keyword_modal_open: bool,
+    new_keyword_input: String,
+    editing_keyword: Option<usize>,
+    editing_buffer: String,
     performed_date: NaiveDate,
     performed_hour: i32,
     performed_minute: i32,
@@ -44,6 +51,13 @@ impl Default for ElnPackApp {
             markdown: MarkdownEditor::default(),
             attachments: AttachmentsPanel::default(),
             status_text: String::new(),
+            error_modal: None,
+            archive_genre: ArchiveGenre::Experiment,
+            keywords_list: Vec::new(),
+            new_keyword_modal_open: false,
+            new_keyword_input: String::new(),
+            editing_keyword: None,
+            editing_buffer: String::new(),
             performed_date: today,
             performed_hour,
             performed_minute,
@@ -64,6 +78,9 @@ impl eframe::App for ElnPackApp {
             ui.add_space(4.0);
         });
 
+        self.render_error_modal(ctx);
+        self.render_add_keyword_modal(ctx);
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(8.0);
 
@@ -75,6 +92,9 @@ impl eframe::App for ElnPackApp {
                 ui.add_space(12.0);
 
                 self.render_performed_at_input(ui);
+                ui.add_space(12.0);
+
+                self.render_metadata_inputs(ui);
                 ui.add_space(12.0);
 
                 self.render_attachments_section(ui);
@@ -179,6 +199,241 @@ impl ElnPackApp {
         );
     }
 
+    /// Render archive metadata controls (genre and keywords).
+    fn render_metadata_inputs(&mut self, ui: &mut egui::Ui) {
+        ui.label("Archive metadata");
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.label("Genre");
+            ui.radio_value(&mut self.archive_genre, ArchiveGenre::Experiment, "Experiment");
+            ui.radio_value(&mut self.archive_genre, ArchiveGenre::Resource, "Resource");
+        });
+
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.label("Keyword list");
+            if ui.button("+ Add keyword").clicked() {
+                self.new_keyword_modal_open = true;
+                self.new_keyword_input.clear();
+            }
+        });
+
+        ui.label(
+            egui::RichText::new("Tip: In the add dialog you can paste comma-separated keywords; they will be split safely.")
+                .small()
+                .color(egui::Color32::from_gray(110)),
+        );
+
+        ui.add_space(4.0);
+        let available = ui.available_width();
+        let approx_chip_width = 180.0;
+        let cols = (available / approx_chip_width).floor().max(1.0) as usize;
+
+        egui::Grid::new("keywords_grid")
+            .num_columns(cols)
+            .spacing(egui::vec2(8.0, 6.0))
+            .min_col_width(120.0)
+            .show(ui, |ui| {
+                if self.keywords_list.is_empty() {
+                    ui.label(
+                        egui::RichText::new("No keywords added yet.")
+                            .italics()
+                            .color(egui::Color32::from_gray(110)),
+                    );
+                    for _ in 1..cols {
+                        ui.label("");
+                    }
+                    ui.end_row();
+                    return;
+                }
+
+                let mut to_remove: Option<usize> = None;
+                for (i, kw) in self.keywords_list.clone().into_iter().enumerate() {
+                    ui.group(|ui| {
+                        ui.horizontal(|ui| {
+                            if self.editing_keyword == Some(i) {
+                                let response = ui.add(
+                                    egui::TextEdit::singleline(&mut self.editing_buffer)
+                                        .hint_text("Edit keyword")
+                                        .desired_width(140.0),
+                                );
+
+                                let enter = response.lost_focus()
+                                    && ui.input(|inp| {
+                                        inp.key_pressed(egui::Key::Enter) || inp.key_pressed(egui::Key::Tab)
+                                    });
+                                if enter {
+                                    self.commit_keyword_edit(i);
+                                }
+
+                                if ui.button("✔").on_hover_text("Save").clicked() {
+                                    self.commit_keyword_edit(i);
+                                }
+
+                                if ui.button("✕").on_hover_text("Cancel").clicked() {
+                                    self.editing_keyword = None;
+                                    self.editing_buffer.clear();
+                                }
+                            } else {
+                                let chip_resp = ui.add(
+                                    egui::Button::new(&kw)
+                                        .selected(false)
+                                        .wrap()
+                                        .min_size(egui::vec2(0.0, 0.0)),
+                                );
+                                if chip_resp.clicked() {
+                                    self.editing_keyword = Some(i);
+                                    self.editing_buffer = kw.clone();
+                                }
+
+                                if ui
+                                    .button(
+                                        egui::RichText::new(egui_phosphor::regular::TRASH_SIMPLE)
+                                            .color(egui::Color32::from_gray(140)),
+                                    )
+                                    .on_hover_text("Remove keyword")
+                                    .clicked()
+                                {
+                                    to_remove = Some(i);
+                                }
+                            }
+                        });
+                    });
+
+                    if (i + 1) % cols == 0 {
+                        ui.end_row();
+                    }
+                }
+
+                if self.keywords_list.len() % cols != 0 {
+                    ui.end_row();
+                }
+
+                if let Some(idx) = to_remove {
+                    self.keywords_list.remove(idx);
+                    if self.editing_keyword == Some(idx) {
+                        self.editing_keyword = None;
+                        self.editing_buffer.clear();
+                    }
+                }
+            });
+    }
+
+    /// Render a simple modal window for error messages.
+    fn render_error_modal(&mut self, ctx: &egui::Context) {
+        if let Some(message) = self.error_modal.clone() {
+            egui::Window::new("Validation error")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+                .show(ctx, |ui| {
+                    ui.label(message);
+                    ui.add_space(8.0);
+                    if ui.button("OK").clicked() {
+                        self.error_modal = None;
+                    }
+                });
+        }
+    }
+
+    /// Render modal to add a single keyword safely.
+    fn render_add_keyword_modal(&mut self, ctx: &egui::Context) {
+        if !self.new_keyword_modal_open {
+            return;
+        }
+
+        egui::Window::new("Add keyword(s)")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.label("Keyword(s)");
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.new_keyword_input)
+                        .hint_text("e.g., microscopy or microscopy, dataset"),
+                );
+
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if ui.button("Add").clicked() {
+                        let mut added_any = false;
+                        let mut saw_duplicate = false;
+                        let mut saw_empty_segment = false;
+
+                        for part in self.new_keyword_input.split(',') {
+                            let trimmed = part.trim();
+                            if trimmed.is_empty() {
+                                if !self.new_keyword_input.is_empty() {
+                                    saw_empty_segment = true;
+                                }
+                                continue;
+                            }
+
+                            let exists = self
+                                .keywords_list
+                                .iter()
+                                .any(|existing| existing.eq_ignore_ascii_case(trimmed));
+                            if exists {
+                                saw_duplicate = true;
+                                continue;
+                            }
+
+                            self.keywords_list.push(trimmed.to_string());
+                            added_any = true;
+                        }
+
+                        if saw_empty_segment || saw_duplicate {
+                            let mut issues = Vec::new();
+                            if saw_empty_segment {
+                                issues.push("empty entries (extra commas)");
+                            }
+                            if saw_duplicate {
+                                issues.push("duplicates");
+                            }
+                            let msg = format!(
+                                "Some keywords were skipped due to {}.",
+                                issues.join(" and ")
+                            );
+                            self.error_modal = Some(msg);
+                        }
+                        if added_any && !saw_empty_segment {
+                            self.new_keyword_modal_open = false;
+                            self.new_keyword_input.clear();
+                        }
+                    }
+
+                    if ui.button("Cancel").clicked() {
+                        self.new_keyword_modal_open = false;
+                        self.new_keyword_input.clear();
+                    }
+                });
+            });
+    }
+
+    /// Commit an inline keyword edit with validation.
+    fn commit_keyword_edit(&mut self, idx: usize) {
+        let new_kw = self.editing_buffer.trim();
+        if new_kw.is_empty() {
+            self.error_modal = Some("Keyword cannot be empty.".into());
+            return;
+        }
+
+        let duplicate = self.keywords_list.iter().enumerate().any(|(i, existing)| {
+            i != idx && existing.eq_ignore_ascii_case(new_kw)
+        });
+        if duplicate {
+            self.error_modal = Some("Keyword already exists.".into());
+            return;
+        }
+
+        if let Some(slot) = self.keywords_list.get_mut(idx) {
+            *slot = new_kw.to_string();
+        }
+        self.editing_keyword = None;
+        self.editing_buffer.clear();
+    }
+
     /// Render the attachments list and capture status text from it.
     fn render_attachments_section(&mut self, ui: &mut egui::Ui) {
         if let Some(msg) = self.attachments.ui(ui) {
@@ -215,25 +470,49 @@ impl ElnPackApp {
         }
     }
 
+    /// Validate form fields before opening the save dialog.
+    ///
+    /// Returns trimmed title/body, performed_at timestamp, and parsed keywords.
+    /// On failure, returns a user-facing error message.
+    fn validate_before_save(&mut self) -> Result<(String, String, OffsetDateTime, Vec<String>), String> {
+        let title = self.entry_title.trim().to_string();
+        let body = self.markdown.text().trim().to_string();
+
+        if title.is_empty() {
+            return Err("Please enter a title.".into());
+        }
+
+        let mut keywords_set = std::collections::BTreeSet::new();
+        for kw in &self.keywords_list {
+            keywords_set.insert(kw.to_string());
+        }
+
+        let performed_at = self
+            .build_performed_at()
+            .map_err(|err| format!("Invalid date/time: {}", err))?;
+
+        let keywords: Vec<String> = keywords_set.into_iter().collect();
+        Ok((title, body, performed_at, keywords))
+    }
+
     /// Validate inputs, open the save dialog, and write the archive.
     fn save_archive(&mut self) {
-        let title = self.entry_title.trim();
-        let body = self.markdown.text().trim();
-
-        let performed_at = match self.build_performed_at() {
-            Ok(dt) => dt,
-            Err(err) => {
-                self.status_text = format!("Invalid date/time: {}", err);
+        let (title, body, performed_at, keywords) = match self.validate_before_save() {
+            Ok(data) => data,
+            Err(msg) => {
+                self.status_text = msg.clone();
+                self.error_modal = Some(msg);
                 return;
             }
         };
 
         if title.is_empty() {
+            // Defensive: should be caught by validation above.
             self.status_text = "Please enter a title.".to_string();
             return;
         }
 
-        let default_name = suggested_archive_name(title);
+        let default_name = suggested_archive_name(&title);
         let dialog = rfd::FileDialog::new()
             .set_title("Save ELN archive")
             .add_filter("ELN archive", &["eln"])
@@ -252,14 +531,13 @@ impl ElnPackApp {
             .map(|a| a.path.clone())
             .collect();
 
-        let keywords: Vec<String> = Vec::new();
         match build_and_write_archive(
             &output_path,
-            title,
-            body,
+            &title,
+            &body,
             &attachment_paths,
             performed_at,
-            ArchiveGenre::Experiment,
+            self.archive_genre,
             &keywords,
         ) {
             Ok(_) => {
