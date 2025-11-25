@@ -19,15 +19,13 @@ pub struct DateTimePicker {
 
 impl Default for DateTimePicker {
     fn default() -> Self {
-        let now = Utc::now();
+        let now = Local::now();
         let today = now.date_naive();
-        let offset_now = OffsetDateTime::from_unix_timestamp(now.timestamp())
-            .expect("Unix timestamp conversion must succeed");
 
         Self {
             date: today,
-            hour: offset_now.hour() as i32,
-            minute: offset_now.minute() as i32,
+            hour: now.hour() as i32,
+            minute: now.minute() as i32,
         }
     }
 }

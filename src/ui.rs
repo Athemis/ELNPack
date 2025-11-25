@@ -140,10 +140,19 @@ impl ElnPackApp {
                     self.datetime.ui(ui);
                     ui.end_row();
                 });
+
+            ui.add_space(6.0);
+            ui.label(
+                egui::RichText::new(
+                    "Times are shown in your local time zone and stored as UTC in the archive.",
+                )
+                .small()
+                .color(egui::Color32::from_gray(110)),
+            );
         });
     }
 
-    /// Render keywords list and controls within the main form.
+    /// Helper that formats a label with a PLUS icon prefix.
     fn plus_label(&self, text: &str) -> egui::RichText {
         egui::RichText::new(format!("{} {}", egui_phosphor::regular::PLUS, text))
     }
