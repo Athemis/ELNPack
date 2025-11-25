@@ -12,11 +12,18 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use mime_guess::mime::Mime;
 use pulldown_cmark::{Options, Parser, html};
-use sha2::{Digest, Sha256};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use zip::{CompressionMethod, write::FileOptions};
+
+/// Attachment metadata supplied by the UI to avoid recomputing hashes and MIME.
+#[derive(Clone, Debug)]
+pub struct AttachmentMeta {
+    pub path: PathBuf,
+    pub mime: String,
+    pub sha256: String,
+    pub size: u64,
+}
 
 /// Suggest a safe archive filename from a user-facing title.
 ///
@@ -68,7 +75,7 @@ pub fn build_and_write_archive(
     output: &Path,
     title: &str,
     body: &str,
-    attachments: &[PathBuf],
+    attachments: &[AttachmentMeta],
     performed_at: OffsetDateTime,
     genre: ArchiveGenre,
     keywords: &[String],
@@ -102,8 +109,9 @@ pub fn build_and_write_archive(
         .context("Failed to create experiment directory in archive")?;
 
     let mut file_nodes = Vec::new();
-    for (idx, source_path) in attachments.iter().enumerate() {
-        let raw_name = source_path
+    for (idx, meta) in attachments.iter().enumerate() {
+        let raw_name = meta
+            .path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_else(|| format!("attachment-{}.bin", idx + 1));
@@ -115,33 +123,31 @@ pub fn build_and_write_archive(
         zip.start_file(&archive_path, options)
             .with_context(|| format!("Failed to add file {} to archive", archive_path))?;
 
-        let mut reader = File::open(source_path)
-            .with_context(|| format!("Failed to read attachment {:?}", source_path))?;
-        let mut hasher = Sha256::new();
-        let mut written = 0u64;
+        let mut reader = File::open(&meta.path)
+            .with_context(|| format!("Failed to read attachment {:?}", meta.path))?;
+        let mut _written = 0u64;
         let mut buffer = [0u8; 8192];
         loop {
             let read = reader
                 .read(&mut buffer)
-                .with_context(|| format!("Failed to read from {:?}", source_path))?;
+                .with_context(|| format!("Failed to read from {:?}", meta.path))?;
             if read == 0 {
                 break;
             }
-            hasher.update(&buffer[..read]);
             zip.write_all(&buffer[..read])
                 .with_context(|| format!("Failed to write {} into archive", archive_path))?;
-            written += read as u64;
+            _written += read as u64;
         }
 
-        let sha256 = format!("{:x}", hasher.finalize());
-        let encoding = guess_mime(source_path).essence_str().to_string();
+        let sha256 = meta.sha256.clone();
+        let encoding = meta.mime.clone();
 
         file_nodes.push(serde_json::json!({
             "@id": id,
             "@type": "File",
             "name": display_name,
             "encodingFormat": encoding,
-            "contentSize": written.to_string(),
+            "contentSize": meta.size.to_string(),
             "sha256": sha256,
         }));
     }
@@ -249,11 +255,6 @@ fn sanitize_component(value: &str) -> String {
     }
 }
 
-/// Guess MIME type from file path; falls back to `application/octet-stream`.
-fn guess_mime(path: &Path) -> Mime {
-    mime_guess::from_path(path).first_or_octet_stream()
-}
-
 /// Render markdown to sanitized HTML for embedding in RO-Crate metadata.
 fn markdown_to_html(body: &str) -> String {
     let mut options = Options::empty();
@@ -267,14 +268,13 @@ fn markdown_to_html(body: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
     // SystemTime kept for potential temp-file helpers; silence unused warning until reintroduced.
     #[allow(unused_imports)]
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::ArchiveGenre;
     use super::ensure_extension;
-    use super::guess_mime;
     use super::markdown_to_html;
     use super::sanitize_component;
     use super::suggested_archive_name;
@@ -315,14 +315,6 @@ mod tests {
         let result = ensure_extension(path, "eln");
 
         assert_eq!(result.extension().and_then(|e| e.to_str()), Some("eln"));
-    }
-
-    // Unknown extensions should fall back to the safe octet-stream MIME type.
-    #[test]
-    fn guess_mime_defaults_to_octet_stream_for_unknown_extension() {
-        let mime = guess_mime(Path::new("attachment.customext"));
-
-        assert_eq!(mime.essence_str(), "application/octet-stream");
     }
 
     // Markdown HTML rendering should sanitize scripts while retaining formatting like strikethrough.

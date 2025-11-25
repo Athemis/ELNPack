@@ -1,16 +1,22 @@
 //! Attachments panel handling selection, listing, and thumbnail previews.
 
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use eframe::egui;
 use egui_extras::image::load_svg_bytes_with_size;
+use sha2::{Digest, Sha256};
 use usvg::Options;
 
 /// User-selected attachment with display name and filesystem path.
 pub struct AttachmentItem {
     pub name: String,
     pub path: PathBuf,
+    pub mime: String,
+    pub sha256: String,
+    pub size: u64,
 }
 
 /// UI component that tracks attachments and renders previews when possible.
@@ -80,7 +86,11 @@ impl AttachmentsPanel {
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_else(|| format!("attachment-{}", self.attachments.len() + 1));
 
-                self.attachments.push(AttachmentItem { name, path: file });
+                let mime = guess_mime(&file).unwrap_or_else(|| "application/octet-stream".into());
+                let sha256 = hash_file(&file).unwrap_or_else(|| "unavailable".into());
+                let size = file.metadata().map(|m| m.len()).unwrap_or(0);
+
+                self.attachments.push(AttachmentItem { name, path: file, mime, sha256, size });
             }
             return Some(format!("Added {} attachment(s)", added));
         }
@@ -91,17 +101,26 @@ impl AttachmentsPanel {
         let mut to_remove = None;
 
         for index in 0..self.attachments.len() {
-            let (name, path) = {
+            let (name, path, mime, sha, size) = {
                 let item = &self.attachments[index];
-                (item.name.clone(), item.path.clone())
+                (
+                    item.name.clone(),
+                    item.path.clone(),
+                    item.mime.clone(),
+                    item.sha256.clone(),
+                    item.size,
+                )
             };
             ui.horizontal(|ui| {
-                if let Some(texture) = self.get_thumbnail(ui.ctx(), &path) {
+                let _thumb_slot = if let Some(texture) = self.get_thumbnail(ui.ctx(), &path) {
                     let size = texture.size_vec2();
                     let max = 96.0;
                     let scale = (max / size.x).min(max / size.y).min(1.0);
-                    ui.add(egui::Image::new((texture.id(), size * scale)));
-                }
+                    ui.add(egui::Image::new((texture.id(), size * scale))).rect
+                } else {
+                    // Reserve space so text aligns across rows even without thumbnails.
+                    ui.allocate_space(egui::vec2(96.0, 72.0)).1
+                };
 
                 ui.vertical(|ui| {
                     ui.label(&name);
@@ -109,6 +128,16 @@ impl AttachmentsPanel {
                         egui::RichText::new(path.to_string_lossy())
                             .small()
                             .color(egui::Color32::from_gray(102)),
+                    );
+                    ui.label(
+                        egui::RichText::new(format!("{} | sha256 {}", mime, sha))
+                            .small()
+                            .color(egui::Color32::from_gray(90)),
+                    );
+                    ui.label(
+                        egui::RichText::new(format_bytes(size))
+                            .small()
+                            .color(egui::Color32::from_gray(90)),
                     );
                 });
 
@@ -180,6 +209,45 @@ fn is_image(path: &Path) -> bool {
         .map(|s| s.to_ascii_lowercase()),
         Some(ext) if matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "bmp" | "tiff" | "tif" | "gif" | "webp" | "svg")
     )
+}
+
+fn guess_mime(path: &Path) -> Option<String> {
+    Some(
+        mime_guess::from_path(path)
+            .first_or_octet_stream()
+            .essence_str()
+            .to_string(),
+    )
+}
+
+fn hash_file(path: &Path) -> Option<String> {
+    let file = File::open(path).ok()?;
+    let mut reader = BufReader::new(file);
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 8192];
+    loop {
+        let read = reader.read(&mut buf).ok()?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buf[..read]);
+    }
+    Some(format!("{:x}", hasher.finalize()))
+}
+
+fn format_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
+    let mut value = bytes as f64;
+    let mut unit = 0;
+    while value >= 1024.0 && unit < UNITS.len() - 1 {
+        value /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{bytes} B")
+    } else {
+        format!("{value:.1} {}", UNITS[unit])
+    }
 }
 
 /// Load and resize an image to a thumbnail-friendly `ColorImage`.

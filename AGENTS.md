@@ -41,6 +41,7 @@
 - Use English language within the codebase.
 - Separate UI concerns (`src/ui.rs`) from business logic (`src/archive.rs`) for maintainability and testability.
 - Code comments: use sparingly to explain intent, invariants, or non-obvious control flow; avoid restating what the code already makes clear.
+- Phosphor icons: the font is registered in `src/main.rs`; use `egui_phosphor::regular::NAME` (via `RichText` or button labels) instead of embedding SVGs. Keep icon+text buttons short (`format!("{} Label", icon)`) and reuse the helpers already in `src/ui.rs` where possible.
 
 ## Module Responsibilities
 

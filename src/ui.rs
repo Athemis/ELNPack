@@ -1,15 +1,13 @@
 //! Top-level egui application shell for composing an ELN entry.
 //! Handles layout, form controls, and wiring to archive creation.
 
-use std::path::PathBuf;
-
 use chrono::{Datelike, Local, NaiveDate, TimeZone, Timelike, Utc};
 use eframe::egui;
 use egui_extras::DatePickerButton;
 use time::OffsetDateTime;
 
 use crate::archive::{
-    ArchiveGenre, build_and_write_archive, ensure_extension, suggested_archive_name,
+    ArchiveGenre, AttachmentMeta, build_and_write_archive, ensure_extension, suggested_archive_name,
 };
 use crate::attachments::AttachmentsPanel;
 use crate::editor::MarkdownEditor;
@@ -67,10 +65,7 @@ impl Default for ElnPackApp {
 
 impl eframe::App for ElnPackApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Consistent spacing across the main form.
-        ctx.style_mut(|style| {
-            style.spacing.item_spacing = egui::vec2(6.0, 6.0);
-        });
+        self.ensure_spacing(ctx);
 
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             ui.add_space(6.0);
@@ -85,32 +80,6 @@ impl eframe::App for ElnPackApp {
 
         self.render_error_modal(ctx);
         self.render_add_keyword_modal(ctx);
-
-        egui::SidePanel::right("side_panel")
-            .resizable(true)
-            .default_width(260.0)
-            .width_range(200.0..=360.0)
-            .show(ctx, |ui| {
-                ui.heading("Attachments");
-                ui.add_space(6.0);
-                if ui
-                    .add(egui::Button::new(egui::RichText::new(format!(
-                        "{} Add files",
-                        egui_phosphor::regular::PLUS
-                    ))))
-                    .clicked()
-                {
-                    if let Some(msg) = self.attachments.add_via_dialog() {
-                        self.status_text = msg;
-                    }
-                }
-                ui.add_space(8.0);
-                ui.separator();
-                ui.add_space(8.0);
-                if let Some(msg) = self.attachments.ui(ui) {
-                    self.status_text = msg;
-                }
-            });
 
         egui::TopBottomPanel::bottom("status_panel")
             .resizable(false)
@@ -134,6 +103,9 @@ impl eframe::App for ElnPackApp {
                 self.render_keywords_section(ui);
                 ui.add_space(12.0);
 
+                self.render_attachments_section(ui);
+                ui.add_space(12.0);
+
                 self.render_action_buttons(ui);
                 ui.add_space(8.0);
             });
@@ -142,6 +114,12 @@ impl eframe::App for ElnPackApp {
 }
 
 impl ElnPackApp {
+    fn ensure_spacing(&self, ctx: &egui::Context) {
+        ctx.style_mut(|style| {
+            style.spacing.item_spacing = egui::vec2(6.0, 6.0);
+        });
+    }
+
     fn render_theme_controls(&mut self, ui: &mut egui::Ui) {
         ui.add_space(2.0);
         egui::widgets::global_theme_preference_switch(ui);
@@ -219,10 +197,13 @@ impl ElnPackApp {
         egui::CollapsingHeader::new("Keywords")
             .default_open(true)
             .show(ui, |ui| {
-                if ui.button("+ Add keyword").clicked() {
-                    self.new_keyword_modal_open = true;
-                    self.new_keyword_input.clear();
-                }
+        if ui
+            .add(egui::Button::new(self.plus_label("Add keyword")))
+            .clicked()
+        {
+            self.new_keyword_modal_open = true;
+            self.new_keyword_input.clear();
+        }
 
                 ui.add_space(6.0);
                 ui.label(
@@ -327,6 +308,32 @@ impl ElnPackApp {
                             }
                         }
                     });
+            });
+    }
+
+    fn plus_label(&self, text: &str) -> egui::RichText {
+        egui::RichText::new(format!("{} {}", egui_phosphor::regular::PLUS, text))
+    }
+
+    /// Render attachments as a collapsible section in the main column.
+    fn render_attachments_section(&mut self, ui: &mut egui::Ui) {
+        egui::CollapsingHeader::new("Attachments")
+            .default_open(true)
+            .show(ui, |ui| {
+                if ui
+                    .add(egui::Button::new(self.plus_label("Add files")))
+                    .on_hover_text("Add files")
+                    .clicked()
+                {
+                    if let Some(msg) = self.attachments.add_via_dialog() {
+                        self.status_text = msg;
+                    }
+                }
+
+                ui.add_space(6.0);
+                if let Some(msg) = self.attachments.ui(ui) {
+                    self.status_text = msg;
+                }
             });
     }
 
@@ -578,18 +585,23 @@ impl ElnPackApp {
         };
 
         let output_path = ensure_extension(selected_path, "eln");
-        let attachment_paths: Vec<PathBuf> = self
+        let attachment_meta: Vec<AttachmentMeta> = self
             .attachments
             .attachments()
             .iter()
-            .map(|a| a.path.clone())
+            .map(|a| AttachmentMeta {
+                path: a.path.clone(),
+                mime: a.mime.clone(),
+                sha256: a.sha256.clone(),
+                size: a.size,
+            })
             .collect();
 
         match build_and_write_archive(
             &output_path,
             &title,
             &body,
-            &attachment_paths,
+            &attachment_meta,
             performed_at,
             self.archive_genre,
             &keywords,
