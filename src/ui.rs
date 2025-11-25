@@ -8,7 +8,9 @@ use eframe::egui;
 use egui_extras::DatePickerButton;
 use time::{Date, Month, OffsetDateTime, Time};
 
-use crate::archive::{build_and_write_archive, ensure_extension, suggested_archive_name};
+use crate::archive::{
+    ArchiveGenre, build_and_write_archive, ensure_extension, suggested_archive_name,
+};
 use crate::attachments::AttachmentsPanel;
 use crate::editor::MarkdownEditor;
 
@@ -250,7 +252,16 @@ impl ElnPackApp {
             .map(|a| a.path.clone())
             .collect();
 
-        match build_and_write_archive(&output_path, title, body, &attachment_paths, performed_at) {
+        let keywords: Vec<String> = Vec::new();
+        match build_and_write_archive(
+            &output_path,
+            title,
+            body,
+            &attachment_paths,
+            performed_at,
+            ArchiveGenre::Experiment,
+            &keywords,
+        ) {
             Ok(_) => {
                 self.status_text = format!("Archive saved: {}", output_path.display());
             }

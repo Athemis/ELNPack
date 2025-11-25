@@ -28,6 +28,22 @@ pub fn suggested_archive_name(title: &str) -> String {
     format!("{}.eln", final_base)
 }
 
+/// Allowed archive genres for RO-Crate metadata.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ArchiveGenre {
+    Experiment,
+    Resource,
+}
+
+impl ArchiveGenre {
+    fn as_str(&self) -> &'static str {
+        match self {
+            ArchiveGenre::Experiment => "experiment",
+            ArchiveGenre::Resource => "resource",
+        }
+    }
+}
+
 /// Force a specific extension onto a path when it is missing or different.
 ///
 /// Keeps existing matching extension (case-insensitive); otherwise replaces it.
@@ -54,6 +70,8 @@ pub fn build_and_write_archive(
     body: &str,
     attachments: &[PathBuf],
     performed_at: OffsetDateTime,
+    genre: ArchiveGenre,
+    keywords: &[String],
 ) -> Result<()> {
     // Ensure parent exists so the archive can be written without IO errors.
     if let Some(parent) = output.parent()
@@ -142,6 +160,8 @@ pub fn build_and_write_archive(
         "dateCreated": timestamp,
         "dateModified": timestamp,
         "author": { "@id": org_id },
+        "genre": genre.as_str(),
+        "keywords": keywords,
         "hasPart": file_nodes.iter().map(|node| {
             serde_json::json!({"@id": node["@id"].as_str().unwrap_or("./experiment/") })
         }).collect::<Vec<_>>(),
@@ -158,7 +178,7 @@ pub fn build_and_write_archive(
         "@id": "ro-crate-metadata.json",
         "@type": "CreativeWork",
         "about": { "@id": "./" },
-        "conformsTo": { "@id": "https://w3id.org/ro/crate/1.1" },
+        "conformsTo": { "@id": "https://w3id.org/ro/crate/1.2" },
         "dateCreated": timestamp,
         "sdPublisher": { "@id": org_id },
     });
@@ -174,7 +194,7 @@ pub fn build_and_write_archive(
     graph.extend(file_nodes);
 
     let metadata = serde_json::json!({
-        "@context": "https://w3id.org/ro/crate/1.1/context",
+        "@context": "https://w3id.org/ro/crate/1.2/context",
         "@graph": graph,
     });
 
@@ -248,7 +268,11 @@ fn markdown_to_html(body: &str) -> String {
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
+    // SystemTime kept for potential temp-file helpers; silence unused warning until reintroduced.
+    #[allow(unused_imports)]
+    use std::time::{SystemTime, UNIX_EPOCH};
 
+    use super::ArchiveGenre;
     use super::ensure_extension;
     use super::guess_mime;
     use super::markdown_to_html;
@@ -308,5 +332,10 @@ mod tests {
 
         assert!(html.contains("<del>gone</del>"));
         assert!(!html.contains("script"));
+    }
+
+    #[test]
+    fn archive_genre_resource_serializes_to_expected_str() {
+        assert_eq!(ArchiveGenre::Resource.as_str(), "resource");
     }
 }
