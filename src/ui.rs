@@ -3,10 +3,10 @@
 
 use std::path::PathBuf;
 
-use chrono::{Datelike, NaiveDate, Utc};
+use chrono::{Datelike, Local, NaiveDate, TimeZone, Timelike, Utc};
 use eframe::egui;
 use egui_extras::DatePickerButton;
-use time::{Date, Month, OffsetDateTime, Time};
+use time::OffsetDateTime;
 
 use crate::archive::{
     ArchiveGenre, build_and_write_archive, ensure_extension, suggested_archive_name,
@@ -67,6 +67,11 @@ impl Default for ElnPackApp {
 
 impl eframe::App for ElnPackApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Consistent spacing across the main form.
+        ctx.style_mut(|style| {
+            style.spacing.item_spacing = egui::vec2(6.0, 6.0);
+        });
+
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             ui.add_space(6.0);
             ui.horizontal(|ui| {
@@ -81,6 +86,38 @@ impl eframe::App for ElnPackApp {
         self.render_error_modal(ctx);
         self.render_add_keyword_modal(ctx);
 
+        egui::SidePanel::right("side_panel")
+            .resizable(true)
+            .default_width(260.0)
+            .width_range(200.0..=360.0)
+            .show(ctx, |ui| {
+                ui.heading("Attachments");
+                ui.add_space(6.0);
+                if ui
+                    .add(egui::Button::new(egui::RichText::new(format!(
+                        "{} Add files",
+                        egui_phosphor::regular::PLUS
+                    ))))
+                    .clicked()
+                {
+                    if let Some(msg) = self.attachments.add_via_dialog() {
+                        self.status_text = msg;
+                    }
+                }
+                ui.add_space(8.0);
+                ui.separator();
+                ui.add_space(8.0);
+                if let Some(msg) = self.attachments.ui(ui) {
+                    self.status_text = msg;
+                }
+            });
+
+        egui::TopBottomPanel::bottom("status_panel")
+            .resizable(false)
+            .show(ctx, |ui| {
+                self.render_status(ui);
+            });
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(8.0);
 
@@ -88,22 +125,17 @@ impl eframe::App for ElnPackApp {
                 self.render_title_input(ui);
                 ui.add_space(12.0);
 
+                self.render_meta_group(ui);
+                ui.add_space(12.0);
+
                 self.render_description_input(ui);
                 ui.add_space(12.0);
 
-                self.render_performed_at_input(ui);
-                ui.add_space(12.0);
-
-                self.render_metadata_inputs(ui);
-                ui.add_space(12.0);
-
-                self.render_attachments_section(ui);
+                self.render_keywords_section(ui);
                 ui.add_space(12.0);
 
                 self.render_action_buttons(ui);
                 ui.add_space(8.0);
-
-                self.render_status(ui);
             });
         });
     }
@@ -120,16 +152,6 @@ impl ElnPackApp {
     /// Returns an error string suitable for display when an input is out of range
     /// (e.g., hours outside 0-23 or invalid calendar dates).
     fn build_performed_at(&self) -> Result<OffsetDateTime, String> {
-        let month = Month::try_from(self.performed_date.month() as u8)
-            .map_err(|_| "Month must be 1-12".to_string())?;
-
-        let date = Date::from_calendar_date(
-            self.performed_date.year(),
-            month,
-            self.performed_date.day() as u8,
-        )
-        .map_err(|_| "Invalid calendar date".to_string())?;
-
         if !(0..=23).contains(&self.performed_hour) {
             return Err("Hour must be 0-23".into());
         }
@@ -137,17 +159,32 @@ impl ElnPackApp {
             return Err("Minute must be 0-59".into());
         }
 
-        let time = Time::from_hms(self.performed_hour as u8, self.performed_minute as u8, 0)
-            .map_err(|_| "Invalid time".to_string())?;
+        let naive = chrono::NaiveDate::from_ymd_opt(
+            self.performed_date.year(),
+            self.performed_date.month(),
+            self.performed_date.day(),
+        )
+        .and_then(|d| d.and_hms_opt(self.performed_hour as u32, self.performed_minute as u32, 0))
+        .ok_or_else(|| "Invalid calendar date or time".to_string())?;
 
-        Ok(date.with_time(time).assume_utc())
+        let local_dt = Local
+            .from_local_datetime(&naive)
+            .single()
+            .ok_or_else(|| "Invalid local date/time (likely skipped by offset)".to_string())?;
+        let utc_ts = local_dt.with_timezone(&Utc).timestamp();
+        let utc_dt = OffsetDateTime::from_unix_timestamp(utc_ts)
+            .map_err(|e| format!("Failed to construct timestamp: {e}"))?;
+        Ok(utc_dt)
     }
 
     /// Render the entry title field.
     fn render_title_input(&mut self, ui: &mut egui::Ui) {
         ui.label("Title");
         ui.add_space(4.0);
-        ui.text_edit_singleline(&mut self.entry_title);
+        ui.add(
+            egui::TextEdit::singleline(&mut self.entry_title)
+                .hint_text("e.g., Cell viability assay day 3"),
+        );
     }
 
     /// Render the markdown editor field and toolbar.
@@ -157,16 +194,163 @@ impl ElnPackApp {
         self.markdown.ui(ui);
     }
 
-    /// Render date/time controls for when the experiment was performed.
-    fn render_performed_at_input(&mut self, ui: &mut egui::Ui) {
-        ui.label("Performed at (UTC)");
-        ui.add_space(4.0);
+    /// Grouped metadata block with entry type and performed-at controls.
+    fn render_meta_group(&mut self, ui: &mut egui::Ui) {
+        egui::Frame::group(ui.style()).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            egui::Grid::new("meta_grid")
+                .num_columns(2)
+                .spacing(egui::vec2(8.0, 10.0))
+                .min_col_width(140.0)
+                .show(ui, |ui| {
+                    ui.label("Entry type");
+                    self.render_entry_type(ui);
+                    ui.end_row();
 
+                    ui.label("Performed at");
+                    self.render_performed_at_compact(ui);
+                    ui.end_row();
+                });
+        });
+    }
+
+    /// Render keywords list and controls within the main form.
+    fn render_keywords_section(&mut self, ui: &mut egui::Ui) {
+        egui::CollapsingHeader::new("Keywords")
+            .default_open(true)
+            .show(ui, |ui| {
+                if ui.button("+ Add keyword").clicked() {
+                    self.new_keyword_modal_open = true;
+                    self.new_keyword_input.clear();
+                }
+
+                ui.add_space(6.0);
+                ui.label(
+                    egui::RichText::new(
+                        "Tip: Paste comma-separated keywords in the dialog; they will be split safely.",
+                    )
+                    .small()
+                    .color(egui::Color32::from_gray(110)),
+                );
+
+                ui.add_space(8.0);
+                let available = ui.available_width();
+                let approx_chip_width = 180.0;
+                let cols = (available / approx_chip_width).floor().max(1.0) as usize;
+
+                egui::Grid::new("keywords_grid")
+                    .num_columns(cols)
+                    .spacing(egui::vec2(8.0, 6.0))
+                    .min_col_width(120.0)
+                    .show(ui, |ui| {
+                        if self.keywords_list.is_empty() {
+                            ui.label(
+                                egui::RichText::new("No keywords added yet.")
+                                    .italics()
+                                    .color(egui::Color32::from_gray(110)),
+                            );
+                            for _ in 1..cols {
+                                ui.label("");
+                            }
+                            ui.end_row();
+                            return;
+                        }
+
+                        let mut to_remove: Option<usize> = None;
+                        for (i, kw) in self.keywords_list.clone().into_iter().enumerate() {
+                            ui.group(|ui| {
+                                ui.horizontal(|ui| {
+                                    if self.editing_keyword == Some(i) {
+                                        let response = ui.add(
+                                            egui::TextEdit::singleline(&mut self.editing_buffer)
+                                                .hint_text("Edit keyword")
+                                                .desired_width(140.0),
+                                        );
+
+                                        let enter = response.lost_focus()
+                                            && ui.input(|inp| {
+                                                inp.key_pressed(egui::Key::Enter)
+                                                    || inp.key_pressed(egui::Key::Tab)
+                                            });
+                                        if enter {
+                                            self.commit_keyword_edit(i);
+                                        }
+
+                                        if ui.button("✔").on_hover_text("Save").clicked() {
+                                            self.commit_keyword_edit(i);
+                                        }
+
+                                        if ui.button("✕").on_hover_text("Cancel").clicked() {
+                                            self.editing_keyword = None;
+                                            self.editing_buffer.clear();
+                                        }
+                                    } else {
+                                        let chip_resp = ui.add(
+                                            egui::Button::new(&kw)
+                                                .selected(false)
+                                                .wrap()
+                                                .min_size(egui::vec2(0.0, 0.0)),
+                                        );
+                                        if chip_resp.clicked() {
+                                            self.editing_keyword = Some(i);
+                                            self.editing_buffer = kw.clone();
+                                        }
+
+                                        if ui
+                                            .button(
+                                                egui::RichText::new(egui_phosphor::regular::TRASH_SIMPLE)
+                                                    .color(egui::Color32::from_gray(140)),
+                                            )
+                                            .on_hover_text("Remove keyword")
+                                            .clicked()
+                                        {
+                                            to_remove = Some(i);
+                                        }
+                                    }
+                                });
+                            });
+
+                            if (i + 1) % cols == 0 {
+                                ui.end_row();
+                            }
+                        }
+
+                        if self.keywords_list.len() % cols != 0 {
+                            ui.end_row();
+                        }
+
+                        if let Some(idx) = to_remove {
+                            self.keywords_list.remove(idx);
+                            if self.editing_keyword == Some(idx) {
+                                self.editing_keyword = None;
+                                self.editing_buffer.clear();
+                            }
+                        }
+                    });
+            });
+    }
+
+    /// Render entry type selection (segmented buttons).
+    fn render_entry_type(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.label("📆 Date");
-            ui.add(DatePickerButton::new(&mut self.performed_date).show_icon(false));
+            let exp = egui::Button::new("Experiment")
+                .selected(matches!(self.archive_genre, ArchiveGenre::Experiment));
+            if ui.add(exp).clicked() {
+                self.archive_genre = ArchiveGenre::Experiment;
+            }
+            let res = egui::Button::new("Resource")
+                .selected(matches!(self.archive_genre, ArchiveGenre::Resource));
+            if ui.add(res).clicked() {
+                self.archive_genre = ArchiveGenre::Resource;
+            }
+        });
+    }
 
-            ui.label("🕒 Time");
+    /// Compact date/time controls for meta grid.
+    fn render_performed_at_compact(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.add(DatePickerButton::new(&mut self.performed_date).show_icon(true));
+            ui.add_space(8.0);
             ui.add(
                 egui::DragValue::new(&mut self.performed_hour)
                     .range(0..=23)
@@ -174,6 +358,7 @@ impl ElnPackApp {
                     .clamp_existing_to_range(true)
                     .custom_formatter(|v, _| format_two(v as i32)),
             );
+            ui.label(":");
             ui.add(
                 egui::DragValue::new(&mut self.performed_minute)
                     .range(0..=59)
@@ -181,143 +366,21 @@ impl ElnPackApp {
                     .clamp_existing_to_range(true)
                     .custom_formatter(|v, _| format_two(v as i32)),
             );
-
-            if ui.button("Use current time").clicked() {
-                let now = Utc::now();
-                let offset_now = OffsetDateTime::from_unix_timestamp(now.timestamp())
-                    .expect("Unix timestamp conversion must succeed");
+            ui.add_space(8.0);
+            if ui
+                .button(egui::RichText::new(format!(
+                    "{} Now",
+                    egui_phosphor::regular::CLOCK
+                )))
+                .on_hover_text("Set date/time to your current local time (stored as UTC)")
+                .clicked()
+            {
+                let now = Local::now();
                 self.performed_date = now.date_naive();
-                self.performed_hour = offset_now.hour() as i32;
-                self.performed_minute = offset_now.minute() as i32;
+                self.performed_hour = now.hour() as i32;
+                self.performed_minute = now.minute() as i32;
             }
         });
-
-        ui.label(
-            egui::RichText::new("Example: 2025-11-24 14:05 (UTC)")
-                .small()
-                .color(egui::Color32::from_gray(120)),
-        );
-    }
-
-    /// Render archive metadata controls (genre and keywords).
-    fn render_metadata_inputs(&mut self, ui: &mut egui::Ui) {
-        ui.label("Archive metadata");
-        ui.add_space(4.0);
-
-        ui.horizontal(|ui| {
-            ui.label("Genre");
-            ui.radio_value(&mut self.archive_genre, ArchiveGenre::Experiment, "Experiment");
-            ui.radio_value(&mut self.archive_genre, ArchiveGenre::Resource, "Resource");
-        });
-
-        ui.add_space(6.0);
-        ui.horizontal(|ui| {
-            ui.label("Keyword list");
-            if ui.button("+ Add keyword").clicked() {
-                self.new_keyword_modal_open = true;
-                self.new_keyword_input.clear();
-            }
-        });
-
-        ui.label(
-            egui::RichText::new("Tip: In the add dialog you can paste comma-separated keywords; they will be split safely.")
-                .small()
-                .color(egui::Color32::from_gray(110)),
-        );
-
-        ui.add_space(4.0);
-        let available = ui.available_width();
-        let approx_chip_width = 180.0;
-        let cols = (available / approx_chip_width).floor().max(1.0) as usize;
-
-        egui::Grid::new("keywords_grid")
-            .num_columns(cols)
-            .spacing(egui::vec2(8.0, 6.0))
-            .min_col_width(120.0)
-            .show(ui, |ui| {
-                if self.keywords_list.is_empty() {
-                    ui.label(
-                        egui::RichText::new("No keywords added yet.")
-                            .italics()
-                            .color(egui::Color32::from_gray(110)),
-                    );
-                    for _ in 1..cols {
-                        ui.label("");
-                    }
-                    ui.end_row();
-                    return;
-                }
-
-                let mut to_remove: Option<usize> = None;
-                for (i, kw) in self.keywords_list.clone().into_iter().enumerate() {
-                    ui.group(|ui| {
-                        ui.horizontal(|ui| {
-                            if self.editing_keyword == Some(i) {
-                                let response = ui.add(
-                                    egui::TextEdit::singleline(&mut self.editing_buffer)
-                                        .hint_text("Edit keyword")
-                                        .desired_width(140.0),
-                                );
-
-                                let enter = response.lost_focus()
-                                    && ui.input(|inp| {
-                                        inp.key_pressed(egui::Key::Enter) || inp.key_pressed(egui::Key::Tab)
-                                    });
-                                if enter {
-                                    self.commit_keyword_edit(i);
-                                }
-
-                                if ui.button("✔").on_hover_text("Save").clicked() {
-                                    self.commit_keyword_edit(i);
-                                }
-
-                                if ui.button("✕").on_hover_text("Cancel").clicked() {
-                                    self.editing_keyword = None;
-                                    self.editing_buffer.clear();
-                                }
-                            } else {
-                                let chip_resp = ui.add(
-                                    egui::Button::new(&kw)
-                                        .selected(false)
-                                        .wrap()
-                                        .min_size(egui::vec2(0.0, 0.0)),
-                                );
-                                if chip_resp.clicked() {
-                                    self.editing_keyword = Some(i);
-                                    self.editing_buffer = kw.clone();
-                                }
-
-                                if ui
-                                    .button(
-                                        egui::RichText::new(egui_phosphor::regular::TRASH_SIMPLE)
-                                            .color(egui::Color32::from_gray(140)),
-                                    )
-                                    .on_hover_text("Remove keyword")
-                                    .clicked()
-                                {
-                                    to_remove = Some(i);
-                                }
-                            }
-                        });
-                    });
-
-                    if (i + 1) % cols == 0 {
-                        ui.end_row();
-                    }
-                }
-
-                if self.keywords_list.len() % cols != 0 {
-                    ui.end_row();
-                }
-
-                if let Some(idx) = to_remove {
-                    self.keywords_list.remove(idx);
-                    if self.editing_keyword == Some(idx) {
-                        self.editing_keyword = None;
-                        self.editing_buffer.clear();
-                    }
-                }
-            });
     }
 
     /// Render a simple modal window for error messages.
@@ -419,9 +482,11 @@ impl ElnPackApp {
             return;
         }
 
-        let duplicate = self.keywords_list.iter().enumerate().any(|(i, existing)| {
-            i != idx && existing.eq_ignore_ascii_case(new_kw)
-        });
+        let duplicate = self
+            .keywords_list
+            .iter()
+            .enumerate()
+            .any(|(i, existing)| i != idx && existing.eq_ignore_ascii_case(new_kw));
         if duplicate {
             self.error_modal = Some("Keyword already exists.".into());
             return;
@@ -434,22 +499,9 @@ impl ElnPackApp {
         self.editing_buffer.clear();
     }
 
-    /// Render the attachments list and capture status text from it.
-    fn render_attachments_section(&mut self, ui: &mut egui::Ui) {
-        if let Some(msg) = self.attachments.ui(ui) {
-            self.status_text = msg;
-        }
-    }
-
     /// Render the file dialog buttons and trigger archive saving.
     fn render_action_buttons(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            if ui.button("Add files").clicked() {
-                if let Some(msg) = self.attachments.add_via_dialog() {
-                    self.status_text = msg;
-                }
-            }
-
             let save_button = egui::Button::new("Save archive");
             let save_enabled = !self.entry_title.trim().is_empty();
 
@@ -474,7 +526,9 @@ impl ElnPackApp {
     ///
     /// Returns trimmed title/body, performed_at timestamp, and parsed keywords.
     /// On failure, returns a user-facing error message.
-    fn validate_before_save(&mut self) -> Result<(String, String, OffsetDateTime, Vec<String>), String> {
+    fn validate_before_save(
+        &mut self,
+    ) -> Result<(String, String, OffsetDateTime, Vec<String>), String> {
         let title = self.entry_title.trim().to_string();
         let body = self.markdown.text().trim().to_string();
 

@@ -40,9 +40,6 @@ impl AttachmentsPanel {
     pub fn ui(&mut self, ui: &mut egui::Ui) -> Option<String> {
         let mut status: Option<String> = None;
 
-        ui.label("Attachments");
-        ui.add_space(4.0);
-
         let visuals = ui.visuals().clone();
         egui::Frame::new()
             .fill(visuals.panel_fill)

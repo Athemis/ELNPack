@@ -67,34 +67,34 @@ impl MarkdownEditor {
             ui.separator();
 
             // Inline styles
-            if ui
-                .button(RichText::new(egui_phosphor::regular::TEXT_BOLDER))
-                .on_hover_text("Bold")
-                .clicked()
-            {
-                self.insert_snippet_at_cursor("**bold**");
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::TEXT_ITALIC))
-                .on_hover_text("Italic")
-                .clicked()
-            {
-                self.insert_snippet_at_cursor("_italic_");
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::TEXT_STRIKETHROUGH))
-                .on_hover_text("Strikethrough")
-                .clicked()
-            {
-                self.insert_snippet_at_cursor("~~text~~");
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::TEXT_UNDERLINE))
-                .on_hover_text("Underline")
-                .clicked()
-            {
-                self.insert_snippet_at_cursor("<u>text</u>");
-            }
+        if ui
+            .button(RichText::new(egui_phosphor::regular::TEXT_BOLDER))
+            .on_hover_text("Bold")
+            .clicked()
+        {
+            self.apply_inline_style("**", "**", "bold");
+        }
+        if ui
+            .button(RichText::new(egui_phosphor::regular::TEXT_ITALIC))
+            .on_hover_text("Italic")
+            .clicked()
+        {
+            self.apply_inline_style("_", "_", "italic");
+        }
+        if ui
+            .button(RichText::new(egui_phosphor::regular::TEXT_STRIKETHROUGH))
+            .on_hover_text("Strikethrough")
+            .clicked()
+        {
+            self.apply_inline_style("~~", "~~", "text");
+        }
+        if ui
+            .button(RichText::new(egui_phosphor::regular::TEXT_UNDERLINE))
+            .on_hover_text("Underline")
+            .clicked()
+        {
+            self.apply_inline_style("<u>", "</u>", "text");
+        }
 
             // Code
             let code_resp = egui::ComboBox::from_id_salt("code_picker")
@@ -113,7 +113,7 @@ impl MarkdownEditor {
                         .on_hover_text("Inline code")
                         .clicked()
                     {
-                        self.insert_snippet_at_cursor("`code`");
+                        self.apply_inline_style("`", "`", "code");
                     }
                     if ui
                         .selectable_value(
@@ -124,7 +124,7 @@ impl MarkdownEditor {
                         .on_hover_text("Code block")
                         .clicked()
                     {
-                        self.insert_block_snippet_at_cursor("```\ncode\n```");
+                        self.apply_block_style("```\n", "\n```", "code");
                     }
                 });
             code_resp.response.on_hover_text("Code");
@@ -146,7 +146,7 @@ impl MarkdownEditor {
                         .on_hover_text("Bulleted list")
                         .clicked()
                     {
-                        self.insert_block_snippet_at_cursor("\n- item");
+                        self.apply_block_style("\n- ", "", "item");
                     }
                     if ui
                         .selectable_value(
@@ -157,40 +157,40 @@ impl MarkdownEditor {
                         .on_hover_text("Numbered list")
                         .clicked()
                     {
-                        self.insert_block_snippet_at_cursor("\n1. first");
+                        self.apply_block_style("\n1. ", "", "first");
                     }
                 });
             list_resp.response.on_hover_text("List");
 
             // Other inserts
-            if ui
-                .button(RichText::new(egui_phosphor::regular::LINK_SIMPLE))
-                .on_hover_text("Link")
-                .clicked()
+        if ui
+            .button(RichText::new(egui_phosphor::regular::LINK_SIMPLE))
+            .on_hover_text("Link")
+            .clicked()
+        {
+            self.apply_inline_style("[", "](https://example.com)", "text");
+        }
+        if ui
+            .button(RichText::new(egui_phosphor::regular::QUOTES))
+            .on_hover_text("Quote")
+            .clicked()
+        {
+            self.apply_block_style("\n> ", "", "quote");
+        }
+        if ui
+            .button(RichText::new(egui_phosphor::regular::IMAGE_SQUARE))
+            .on_hover_text("Image")
+            .clicked()
+        {
+            self.apply_inline_style("![", "](path/to/image.png)", "alt text");
+        }
+        if ui
+            .button(RichText::new(egui_phosphor::regular::RULER))
+            .on_hover_text("Rule")
+            .clicked()
             {
-                self.insert_snippet_at_cursor("[text](https://example.com)");
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::QUOTES))
-                .on_hover_text("Quote")
-                .clicked()
-            {
-                self.insert_block_snippet_at_cursor("\n> quote");
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::IMAGE_SQUARE))
-                .on_hover_text("Image")
-                .clicked()
-            {
-                self.insert_snippet_at_cursor("![alt text](path/to/image.png)");
-            }
-            if ui
-                .button(RichText::new(egui_phosphor::regular::RULER))
-                .on_hover_text("Rule")
-                .clicked()
-            {
-                self.insert_block_snippet_at_cursor("\n---\n");
-            }
+        self.apply_block_style("\n---\n", "", "");
+    }
         });
 
         ui.add_space(4.0);
@@ -199,6 +199,7 @@ impl MarkdownEditor {
             self.cursor = state.cursor.char_range();
         }
         let mut output = egui::TextEdit::multiline(&mut self.text)
+            .code_editor()
             .id_source(body_id)
             .desired_width(f32::INFINITY)
             .desired_rows(8)
@@ -219,23 +220,79 @@ impl MarkdownEditor {
         output.state.store(ui.ctx(), body_id);
     }
 
-    fn insert_snippet_at_cursor(&mut self, snippet: &str) {
-        self.insert_at_cursor(snippet, false);
+    fn apply_inline_style(&mut self, prefix: &str, suffix: &str, placeholder: &str) {
+        self.insert_at_cursor(prefix, suffix, placeholder, false);
     }
 
-    fn insert_block_snippet_at_cursor(&mut self, snippet: &str) {
-        self.insert_at_cursor(snippet, true);
+    fn apply_block_style(&mut self, prefix: &str, suffix: &str, placeholder: &str) {
+        self.insert_at_cursor(prefix, suffix, placeholder, true);
     }
 
     fn insert_heading_at_cursor(&mut self, level: u8) {
         let level = level.clamp(1, 6);
         let hashes = "#".repeat(level as usize);
-        let block = format!("{} Title\n", hashes);
-        self.insert_block_snippet_at_cursor(&block);
+        let (start_char, end_char) = if let Some(range) = &self.cursor {
+            let (a, b) = (range.primary.index, range.secondary.index);
+            (a.min(b), a.max(b))
+        } else {
+            let len = self.text.chars().count();
+            (len, len)
+        };
+
+        let selected = if start_char < end_char {
+            self.text
+                .chars()
+                .skip(start_char)
+                .take(end_char - start_char)
+                .collect::<String>()
+        } else {
+            "".to_string()
+        };
+
+        let cleaned = selected
+            .trim()
+            .trim_start_matches('#')
+            .trim_start()
+            .to_string();
+        let content = if cleaned.is_empty() { "Title" } else { cleaned.as_str() };
+
+        let insertion = format!("{} {}\n", hashes, content);
+        let start = char_to_byte(&self.text, start_char);
+        let end = char_to_byte(&self.text, end_char);
+        self.text.replace_range(start..end, &insertion);
+
+        let new_pos = start_char + insertion.chars().count();
+        let new_range = CCursorRange::one(CCursor::new(new_pos));
+        self.cursor = Some(new_range);
+        self.cursor_override = self.cursor.clone();
     }
 
-    fn insert_at_cursor(&mut self, snippet: &str, ensure_newline: bool) {
-        let mut insertion = snippet.to_string();
+    fn insert_at_cursor(&mut self, prefix: &str, suffix: &str, placeholder: &str, ensure_newline: bool) {
+        let (start_char, end_char) = if let Some(range) = &self.cursor {
+            let (a, b) = (range.primary.index, range.secondary.index);
+            (a.min(b), a.max(b))
+        } else {
+            let len = self.text.chars().count();
+            (len, len)
+        };
+
+        let selected = if start_char < end_char {
+            self.text
+                .chars()
+                .skip(start_char)
+                .take(end_char - start_char)
+                .collect::<String>()
+        } else {
+            "".to_string()
+        };
+
+        let mut insertion = format!(
+            "{}{}{}",
+            prefix,
+            if selected.is_empty() { placeholder } else { &selected },
+            suffix
+        );
+
         if ensure_newline {
             if !insertion.ends_with('\n') {
                 insertion.push('\n');
@@ -243,21 +300,12 @@ impl MarkdownEditor {
             if !self.text.ends_with('\n') && !self.text.is_empty() {
                 insertion = format!("\n{insertion}");
             }
-        } else if !self.text.is_empty() && !self.text.ends_with(char::is_whitespace) {
+        } else if !self.text.is_empty()
+            && start_char == end_char
+            && !self.text[..char_to_byte(&self.text, start_char)].ends_with(char::is_whitespace)
+        {
             insertion.insert(0, ' ');
         }
-
-        let (start_char, end_char) = if let Some(range) = &self.cursor {
-            let sorted = if range.is_sorted() {
-                range.clone()
-            } else {
-                CCursorRange::two(range.secondary, range.primary)
-            };
-            (sorted.primary.index, sorted.secondary.index)
-        } else {
-            let len = self.text.chars().count();
-            (len, len)
-        };
 
         let start = char_to_byte(&self.text, start_char);
         let end = char_to_byte(&self.text, end_char);
