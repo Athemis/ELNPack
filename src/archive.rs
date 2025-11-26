@@ -16,10 +16,15 @@ use pulldown_cmark::{Options, Parser, html};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use zip::{CompressionMethod, write::FileOptions};
 
+use crate::utils::{hash_file, sanitize_component};
+
 /// Attachment metadata supplied by the UI to avoid recomputing hashes and MIME.
 #[derive(Clone, Debug)]
 pub struct AttachmentMeta {
+    /// Original filesystem path to the attachment on disk.
     pub path: PathBuf,
+    /// Sanitized filename to use inside the archive (and in RO-Crate metadata).
+    pub sanitized_name: String,
     pub mime: String,
     pub sha256: String,
     pub size: u64,
@@ -27,8 +32,9 @@ pub struct AttachmentMeta {
 
 /// Suggest a safe archive filename from a user-facing title.
 ///
-/// Non-alphanumeric characters become `_`, sequences are collapsed, and a
-/// default of `eln-entry.eln` is returned when the title is empty.
+/// Uses [`sanitize_component`] for the base name and lowercases it, then
+/// appends the `.eln` extension. Falls back to `eln_entry.eln` when the
+/// sanitized title is empty.
 pub fn suggested_archive_name(title: &str) -> String {
     let base = sanitize_component(title).to_ascii_lowercase();
     let final_base = if base.is_empty() { "eln_entry" } else { &base };
@@ -109,14 +115,23 @@ pub fn build_and_write_archive(
         .context("Failed to create experiment directory in archive")?;
 
     let mut file_nodes = Vec::new();
-    for (idx, meta) in attachments.iter().enumerate() {
-        let raw_name = meta
-            .path
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| format!("attachment-{}.bin", idx + 1));
+    for meta in attachments.iter() {
+        // Verify attachment integrity: rehash and compare with stored hash
+        if meta.sha256 != "unavailable" {
+            let current_hash = hash_file(&meta.path)
+                .with_context(|| format!("Failed to rehash attachment {:?}", meta.path))?;
 
-        let display_name = sanitize_component(&raw_name);
+            if current_hash != meta.sha256 {
+                anyhow::bail!(
+                    "Attachment modified since it was added:\n  {:?}\n  expected sha256 {}\n  found sha256 {}",
+                    meta.path,
+                    meta.sha256,
+                    current_hash,
+                );
+            }
+        }
+
+        let display_name = &meta.sanitized_name;
         let archive_path = format!("{}{}", experiment_dir, display_name);
         let id = format!("./experiment/{}", display_name);
 
@@ -168,9 +183,12 @@ pub fn build_and_write_archive(
         "author": { "@id": org_id },
         "genre": genre.as_str(),
         "keywords": keywords,
-        "hasPart": file_nodes.iter().map(|node| {
-            serde_json::json!({"@id": node["@id"].as_str().unwrap_or("./experiment/") })
-        }).collect::<Vec<_>>(),
+        "hasPart": file_nodes
+            .iter()
+            .map(|node| {
+                serde_json::json!({"@id": node["@id"].as_str().unwrap_or("./experiment/") })
+            })
+            .collect::<Vec<_>>(),
     });
 
     let root_node = serde_json::json!({
@@ -214,101 +232,6 @@ pub fn build_and_write_archive(
     Ok(())
 }
 
-/// Produce a filesystem-safe path component.
-///
-/// # Steps
-/// - Transliterate Unicode to ASCII with `deunicode` (e.g., "Å" → "A").
-/// - Allow ASCII alphanumerics plus `-`, `_`, and `.`; treat other characters as `_`.
-/// - Collapse runs of `_` and `.`; trim trailing dots/spaces.
-/// - Guard against reserved/empty names and clamp to a safe length.
-///
-/// This keeps multi-part extensions intact (for example `data.v1.2.tar.gz`
-/// stays `data.v1.2.tar.gz`) while remaining extractor-friendly on
-/// Windows and Unix.
-///
-/// # Examples
-/// ```ignore
-/// let name = sanitize_component("Café (draft).md");
-/// assert_eq!(name, "Cafe_draft.md");
-/// ```
-fn sanitize_component(value: &str) -> String {
-    // Step 1: transliterate to ASCII to avoid multi-byte surprises when clamping.
-    let transliterated = deunicode::deunicode(value);
-    let mut out = String::with_capacity(transliterated.len());
-    let mut last: Option<char> = None;
-
-    // Step 2: map characters into the allowed set and collapse runs of `_` and `.`.
-    for ch in transliterated.chars() {
-        let mapped = if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.' {
-            ch
-        } else if ch.is_whitespace() || ch == '/' || ch == '\\' {
-            '_'
-        } else {
-            '_'
-        };
-
-        match mapped {
-            '_' => {
-                if last != Some('_') {
-                    out.push('_');
-                    last = Some('_');
-                }
-            }
-            '.' => {
-                if last != Some('.') {
-                    out.push('.');
-                    last = Some('.');
-                }
-            }
-            c => {
-                out.push(c);
-                last = Some(c);
-            }
-        }
-    }
-
-    // Additional cleanup: avoid a stray underscore immediately before a dot.
-    while let Some(pos) = out.find("_.") {
-        out.remove(pos);
-    }
-
-    // Step 3: trim trailing dots/spaces which can be problematic on Windows.
-    while out.ends_with('.') || out.ends_with(' ') {
-        out.pop();
-    }
-
-    // Step 4: fallback for empty or special dot-only names.
-    if out.is_empty() || out == "." || out == ".." {
-        return "eln_entry".to_string();
-    }
-
-    // Step 5: protect against Windows reserved device names for the basename.
-    let (basename, ext) = match out.rsplit_once('.') {
-        Some((base, ext)) if !base.is_empty() => (base.to_string(), Some(ext.to_string())),
-        _ => (out.clone(), None),
-    };
-
-    let upper = basename.to_ascii_uppercase();
-    let is_reserved = matches!(
-        upper.as_str(),
-        "CON" | "PRN" | "AUX" | "NUL"
-            | "COM1" | "COM2" | "COM3" | "COM4" | "COM5" | "COM6" | "COM7" | "COM8" | "COM9"
-            | "LPT1" | "LPT2" | "LPT3" | "LPT4" | "LPT5" | "LPT6" | "LPT7" | "LPT8" | "LPT9"
-    );
-
-    if is_reserved {
-        let mut new_base = basename;
-        new_base.push('_');
-        out = if let Some(ext) = ext {
-            format!("{new_base}.{ext}")
-        } else {
-            new_base
-        };
-    }
-
-    out
-}
-
 /// Render markdown to sanitized HTML for embedding in RO-Crate metadata.
 fn markdown_to_html(body: &str) -> String {
     let mut options = Options::empty();
@@ -323,56 +246,11 @@ fn markdown_to_html(body: &str) -> String {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
-    // SystemTime kept for potential temp-file helpers; silence unused warning until reintroduced.
-    #[allow(unused_imports)]
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::ArchiveGenre;
     use super::ensure_extension;
     use super::markdown_to_html;
-    use super::sanitize_component;
     use super::suggested_archive_name;
-
-    // Sanitization should transliterate accents and preserve dots/extension.
-    #[test]
-    fn sanitize_component_transliterates_and_preserves_extension_with_dots() {
-        let result = sanitize_component("Café (draft).md");
-        assert_eq!(result, "Cafe_draft.md");
-    }
-
-    // Whitespace and separators must collapse to single underscores.
-    #[test]
-    fn sanitize_component_collapses_whitespace_and_separators() {
-        let result = sanitize_component("Ångström data 2025/11/25");
-        assert_eq!(result, "Angstrom_data_2025_11_25");
-    }
-
-    // Dots are deduplicated while multi-part extensions remain intact.
-    #[test]
-    fn sanitize_component_deduplicates_dots_and_keeps_multi_part_extensions() {
-        let result = sanitize_component("data..v1...2.tar..gz");
-        assert_eq!(result, "data.v1.2.tar.gz");
-    }
-
-    // Trailing dots are trimmed for better Windows compatibility.
-    #[test]
-    fn sanitize_component_trims_trailing_dots() {
-        let result = sanitize_component("name.");
-        assert_eq!(result, "name");
-    }
-
-    // Reserved Windows device names in the basename get a suffix.
-    #[test]
-    fn sanitize_component_appends_suffix_for_windows_reserved_basenames() {
-        assert_eq!(sanitize_component("CON"), "CON_");
-        assert_eq!(sanitize_component("NUL.txt"), "NUL_.txt");
-    }
-
-    // Pure dots fall back to the default name.
-    #[test]
-    fn sanitize_component_falls_back_for_dot_only_names() {
-        assert_eq!(sanitize_component("..."), "eln_entry");
-    }
 
     #[test]
     fn suggested_archive_name_reuses_sanitizer_and_lowercases() {

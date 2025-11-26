@@ -1,18 +1,20 @@
 //! Attachments panel handling selection, listing, and thumbnail previews.
 
 use std::collections::{HashMap, HashSet};
-use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use eframe::egui;
 use egui_extras::image::load_svg_bytes_with_size;
-use sha2::{Digest, Sha256};
 use usvg::Options;
 
-/// User-selected attachment with display name and filesystem path.
+use crate::utils::{hash_file, sanitize_component};
+
+/// User-selected attachment with original path and sanitized display name.
 pub struct AttachmentItem {
-    pub name: String,
+    /// Original filesystem path to the attachment.
     pub path: PathBuf,
+    /// Sanitized filename used for display and inside the archive.
+    pub sanitized_name: String,
     pub mime: String,
     pub sha256: String,
     pub size: u64,
@@ -25,6 +27,8 @@ pub struct AttachmentsPanel {
     thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
     thumbnail_failures: HashSet<PathBuf>,
     hashes: HashSet<String>,
+    editing_index: Option<usize>,
+    editing_buffer: String,
 }
 
 impl AttachmentsPanel {
@@ -84,13 +88,17 @@ impl AttachmentsPanel {
     ///
     /// Returns true if the file was added, false if it was a duplicate.
     fn add_attachment(&mut self, path: PathBuf) -> bool {
-        let name = path
+        let original_name = path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| format!("attachment-{}", self.attachments.len() + 1));
+        let sanitized_name = sanitize_component(&original_name);
 
         let mime = guess_mime(&path);
-        let sha256 = hash_file(&path).unwrap_or_else(|| "unavailable".into());
+        let sha256 = match hash_file(&path) {
+            Ok(hash) => hash,
+            Err(_) => "unavailable".to_string(),
+        };
         let size = path.metadata().map(|m| m.len()).unwrap_or(0);
 
         if sha256 != "unavailable" && self.hashes.contains(&sha256) {
@@ -101,8 +109,8 @@ impl AttachmentsPanel {
             self.hashes.insert(sha256.clone());
         }
         self.attachments.push(AttachmentItem {
-            name,
             path,
+            sanitized_name,
             mime,
             sha256,
             size,
@@ -112,12 +120,19 @@ impl AttachmentsPanel {
 
     fn render_attachment_list(&mut self, ui: &mut egui::Ui) -> Option<String> {
         let mut to_remove = None;
+        let mut status = None;
 
         for index in 0..self.attachments.len() {
-            let (name, path, mime, sha, size) = {
+            let (sanitized_name, original_name, path, mime, sha, size) = {
                 let item = &self.attachments[index];
+                let original_name = item
+                    .path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| format!("attachment-{}", index + 1));
                 (
-                    item.name.clone(),
+                    item.sanitized_name.clone(),
+                    original_name,
                     item.path.clone(),
                     item.mime.clone(),
                     item.sha256.clone(),
@@ -136,7 +151,44 @@ impl AttachmentsPanel {
                 };
 
                 ui.vertical(|ui| {
-                    ui.label(&name);
+                    ui.horizontal(|ui| {
+                        if self.editing_index == Some(index) {
+                            if let Some(msg) = self.render_editing_filename(ui, index) {
+                                status = Some(msg);
+                            }
+                        } else {
+                            // Optional warning icon if sanitized != original.
+                            if sanitized_name != original_name {
+                                ui.label(
+                                    egui::RichText::new(egui_phosphor::regular::WARNING)
+                                        .color(egui::Color32::from_rgb(232, 89, 12)),
+                                )
+                                .on_hover_cursor(egui::CursorIcon::Help)
+                                .on_hover_text(format!(
+                                    "Filename sanitized:\n{} {} {}",
+                                    original_name,
+                                    egui_phosphor::regular::ARROW_RIGHT,
+                                    sanitized_name
+                                ));
+                            }
+
+                            // Filename label (always shown the same way).
+                            ui.label(sanitized_name.clone());
+
+                            // Single edit button (always shown).
+                            if ui
+                                .button(
+                                    egui::RichText::new(egui_phosphor::regular::PENCIL_SIMPLE)
+                                        .color(egui::Color32::from_gray(140)),
+                                )
+                                .on_hover_text("Edit filename")
+                                .clicked()
+                            {
+                                self.editing_index = Some(index);
+                                self.editing_buffer = sanitized_name.clone();
+                            }
+                        }
+                    });
                     ui.label(
                         egui::RichText::new(path.to_string_lossy())
                             .small()
@@ -182,7 +234,73 @@ impl AttachmentsPanel {
             return Some("Attachment removed".to_string());
         }
 
+        status
+    }
+
+    /// Render inline editing controls for a filename.
+    ///
+    /// Returns a status message if validation fails or succeeds.
+    fn render_editing_filename(&mut self, ui: &mut egui::Ui, index: usize) -> Option<String> {
+        let response = ui.add(
+            egui::TextEdit::singleline(&mut self.editing_buffer)
+                .hint_text("Edit filename")
+                .desired_width(180.0),
+        );
+
+        let commit_via_keyboard = response.lost_focus()
+            && ui.input(|inp| {
+                inp.key_pressed(egui::Key::Enter) || inp.key_pressed(egui::Key::Tab)
+            });
+
+        if commit_via_keyboard {
+            return self.commit_filename_edit(index);
+        }
+
+        if ui.button(egui_phosphor::regular::CHECK).on_hover_text("Save").clicked() {
+            return self.commit_filename_edit(index);
+        }
+
+        if ui.button(egui_phosphor::regular::X).on_hover_text("Cancel").clicked() {
+            self.editing_index = None;
+            self.editing_buffer.clear();
+        }
+
         None
+    }
+
+    /// Commit an inline filename edit with validation and sanitization.
+    ///
+    /// Returns a status message if validation fails or succeeds.
+    fn commit_filename_edit(&mut self, index: usize) -> Option<String> {
+        let raw = self.editing_buffer.trim();
+        if raw.is_empty() {
+            return Some("Filename cannot be empty.".into());
+        }
+
+        // Always run through sanitizer to keep names filesystem-safe.
+        let sanitized = sanitize_component(raw);
+        if sanitized.is_empty() {
+            return Some("Filename is invalid after sanitization.".into());
+        }
+
+        // Avoid two attachments ending up with the same archive path.
+        let duplicate = self
+            .attachments
+            .iter()
+            .enumerate()
+            .any(|(i, item)| i != index && item.sanitized_name == sanitized);
+        if duplicate {
+            return Some("Another attachment already uses this filename in the archive.".into());
+        }
+
+        if let Some(item) = self.attachments.get_mut(index) {
+            item.sanitized_name = sanitized;
+        }
+
+        self.editing_index = None;
+        self.editing_buffer.clear();
+
+        Some("Attachment filename updated.".into())
     }
 
     /// Lazily load or reuse a thumbnail texture for an attachment path.
@@ -247,13 +365,6 @@ fn guess_mime(path: &Path) -> String {
         .to_string()
 }
 
-fn hash_file(path: &Path) -> Option<String> {
-    let mut file = File::open(path).ok()?;
-    let mut hasher = Sha256::new();
-    std::io::copy(&mut file, &mut hasher).ok()?;
-    Some(format!("{:x}", hasher.finalize()))
-}
-
 fn format_bytes(bytes: u64) -> String {
     const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
     let mut value = bytes as f64;
@@ -295,20 +406,12 @@ fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, String> {
 mod tests {
     use std::fs;
     use std::path::Path;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use eframe::egui::Color32;
     use image::{ImageBuffer, Rgba};
+    use tempfile::TempDir;
 
     use super::{AttachmentsPanel, is_image, load_image_thumbnail};
-
-    fn unique_path(filename: &str) -> std::path::PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
-        std::env::temp_dir().join(format!("elnpack-test-{nanos}-{filename}"))
-    }
 
     // Ensures extension filtering matches documented formats and rejects others.
     #[test]
@@ -321,7 +424,8 @@ mod tests {
     // Raster thumbnails should retain aspect ratio and respect max bounds.
     #[test]
     fn load_image_thumbnail_handles_raster_image() {
-        let path = unique_path("thumb.png");
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("thumb.png");
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
             ImageBuffer::from_pixel(10, 12, Rgba([0, 255, 0, 255]));
         img.save(&path).expect("png saved");
@@ -332,43 +436,39 @@ mod tests {
         let aspect = thumb.size[0] as f32 / thumb.size[1] as f32;
         let expected_aspect = 10.0 / 12.0;
         assert!((aspect - expected_aspect).abs() < 0.05);
-
-        let _ = fs::remove_file(&path);
     }
 
     // SVG input should rasterize successfully within size limits.
     #[test]
     fn load_image_thumbnail_renders_svg() {
-        let path = unique_path("icon.svg");
-        let svg = r#"<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><rect width='16' height='16' fill='red'/></svg>"#;
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("icon.svg");
+        let svg = r"<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16'><rect width='16' height='16' fill='red'/></svg>";
         fs::write(&path, svg).expect("svg saved");
 
         let thumb = load_image_thumbnail(&path).expect("thumbnail created");
 
         assert!(thumb.size[0] <= 256 && thumb.size[1] <= 256);
         assert!(thumb.pixels.iter().any(|p| *p != Color32::TRANSPARENT));
-
-        let _ = fs::remove_file(&path);
     }
 
     // Invalid image data should yield an error instead of panicking.
     #[test]
     fn load_image_thumbnail_errors_on_invalid_image() {
-        let path = unique_path("invalid.png");
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("invalid.png");
         fs::write(&path, b"not an image").expect("file written");
 
         let result = load_image_thumbnail(&path);
 
         assert!(result.is_err());
-
-        let _ = fs::remove_file(&path);
     }
 
     #[test]
     fn add_via_dialog_skips_duplicates_by_hash() {
-        // Prepare two identical temp files.
-        let path1 = unique_path("dup1.bin");
-        let path2 = unique_path("dup2.bin");
+        let tmp = TempDir::new().unwrap();
+        let path1 = tmp.path().join("dup1.bin");
+        let path2 = tmp.path().join("dup2.bin");
         fs::write(&path1, b"same-bytes").unwrap();
         fs::write(&path2, b"same-bytes").unwrap();
 
@@ -382,8 +482,27 @@ mod tests {
             1,
             "duplicate file should be skipped"
         );
+    }
 
-        let _ = fs::remove_file(path1);
-        let _ = fs::remove_file(path2);
+    // Verifies that sanitized_name is computed correctly for various filename patterns.
+    #[test]
+    fn add_attachment_sanitizes_filenames() {
+        let tmp = TempDir::new().unwrap();
+        let path1 = tmp.path().join("Café (draft).md");
+        let path2 = tmp.path().join("file...with..dots.tar.gz");
+        let path3 = tmp.path().join("normal-file_123.txt");
+        fs::write(&path1, b"test1").unwrap();
+        fs::write(&path2, b"test2").unwrap();
+        fs::write(&path3, b"test3").unwrap();
+
+        let mut panel = AttachmentsPanel::default();
+        panel.add_attachment(path1);
+        panel.add_attachment(path2);
+        panel.add_attachment(path3);
+
+        assert_eq!(panel.attachments.len(), 3);
+        assert_eq!(panel.attachments[0].sanitized_name, "Cafe_draft.md");
+        assert_eq!(panel.attachments[1].sanitized_name, "file.with.dots.tar.gz");
+        assert_eq!(panel.attachments[2].sanitized_name, "normal-file_123.txt");
     }
 }

@@ -6,6 +6,7 @@ mod datetime_picker;
 mod editor;
 mod keywords;
 mod ui;
+mod utils;
 
 use eframe::egui;
 use egui_phosphor::Variant;

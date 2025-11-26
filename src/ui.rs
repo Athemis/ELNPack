@@ -297,6 +297,7 @@ impl ElnPackApp {
             .iter()
             .map(|a| AttachmentMeta {
                 path: a.path.clone(),
+                sanitized_name: a.sanitized_name.clone(),
                 mime: a.mime.clone(),
                 sha256: a.sha256.clone(),
                 size: a.size,
@@ -316,7 +317,9 @@ impl ElnPackApp {
                 self.status_text = format!("Archive saved: {}", output_path.display());
             }
             Err(err) => {
-                self.status_text = format!("Error: {}", err);
+                let msg = format!("Failed to save archive:\n\n{}", err);
+                self.status_text = msg.clone();
+                self.error_modal = Some(msg);
             }
         }
     }

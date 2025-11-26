@@ -5,9 +5,10 @@
 - Rust 2024 crate; entry point at `src/main.rs`, which initializes the eframe application (ELNPack).
 - UI shell in `src/ui.rs`; it wires the overall layout and delegates to components.
 - Markdown editor encapsulated in `src/editor.rs`; all toolbar, caret handling, and text editing live here.
-- Attachments panel in `src/attachments.rs`; handles attachment list, thumbnails, and file dialogs.
+- Attachments panel in `src/attachments.rs`; handles attachment list, thumbnails, file dialogs, and computes sanitized filenames when attachments are added. Shows WARNING icon when original and sanitized names differ.
 - Keywords editor in `src/keywords.rs`; manages the keyword list, inline editing, and the add-keywords modal.
 - Date/time picker in `src/datetime_picker.rs`; encapsulates performed-at selection and conversion to `OffsetDateTime`.
+- Filename sanitization utilities in `src/utils.rs`; provides `sanitize_component` function used by attachments and archive modules to ensure cross-platform filename compatibility while preserving extensions.
 - Business logic in `src/archive.rs`; handles RO-Crate archive creation, file operations, and metadata generation.
 - Add new Rust modules under `src/` and integration tests under `tests/` to keep responsibilities clear.
 - No build script needed; egui compiles directly with the Rust code.
@@ -51,10 +52,11 @@
 - **`src/main.rs`**: Application entry point; sets up eframe and launches the UI.
 - **`src/ui.rs`**: UI composition and screens; delegates text editing to `editor`, attachments to `attachments`, keywords to `keywords`, and performed-at selection to `datetime_picker`, and calls `archive` for business operations. When exporting, pass the selected `ArchiveGenre` and the keywords from `KeywordsEditor` into `build_and_write_archive`; default to `ArchiveGenre::Experiment` with an empty keyword list if no input is given.
 - **`src/editor.rs`**: Markdown editor component (toolbar, cursor-aware insertions, text area).
-- **`src/attachments.rs`**: Attachments panel handling list, thumbnails, and file dialogs.
+- **`src/attachments.rs`**: Attachments panel handling list, thumbnails, file dialogs, and inline filename editing. Computes `sanitized_name` for each attachment using `sanitize_component` from `utils` and displays WARNING icon (via `egui_phosphor::regular::WARNING`) when the sanitized name differs from the original filename. Hovering the icon shows the original → sanitized transformation. Users can edit filenames via a pencil button (via `egui_phosphor::regular::PENCIL_SIMPLE`); edited names are sanitized before storage, with validation preventing empty/invalid names and duplicates.
 - **`src/keywords.rs`**: Keywords editor component that manages the keyword list, inline keyword edits, and the add-keywords modal, exposing the final keyword `Vec<String>` to `ui`.
 - **`src/datetime_picker.rs`**: Date/time picker component that encapsulates performed-at selection (date, hour, minute) and conversion to `OffsetDateTime` in UTC.
-- **`src/archive.rs`**: Pure business logic for archive creation, file handling, name sanitization, and RO-Crate metadata generation. `ro-crate-metadata.json` inside archives must conform to RO-Crate 1.2 (https://w3id.org/ro/crate/1.2), and the archive structure follows the ELN File Format specification (https://github.com/TheELNConsortium/TheELNFileFormat/blob/master/SPECIFICATION.md). The RO-Crate `Dataset` for the experiment includes `genre` (via the `ArchiveGenre` enum: `Experiment` or `Resource`) and a string `keywords` array. Filename sanitization transliterates with `deunicode`, then collapses non-alnum/whitespace to single underscores; `suggested_archive_name` must reuse this helper. No UI dependencies.
+- **`src/utils.rs`**: Centralized filename sanitization utilities. The `sanitize_component` function transliterates Unicode with `deunicode`, allows ASCII alphanumerics, hyphens, underscores, and dots (preserving file extensions including multi-part extensions like `.tar.gz`), deduplicates consecutive dots, removes `_.` sequences, trims trailing dots/spaces for Windows compatibility, guards against Windows reserved names (CON/PRN/AUX/NUL/COM1-9/LPT1-9), and falls back to `eln_entry` for empty/invalid names. Includes comprehensive unit tests.
+- **`src/archive.rs`**: Pure business logic for archive creation, file handling, and RO-Crate metadata generation. `ro-crate-metadata.json` inside archives must conform to RO-Crate 1.2 (https://w3id.org/ro/crate/1.2), and the archive structure follows the ELN File Format specification (https://github.com/TheELNConsortium/TheELNFileFormat/blob/master/SPECIFICATION.md). The RO-Crate `Dataset` for the experiment includes `genre` (via the `ArchiveGenre` enum: `Experiment` or `Resource`) and a string `keywords` array. Uses pre-computed `sanitized_name` from `AttachmentMeta` for ZIP paths and RO-Crate File nodes. `suggested_archive_name` uses `sanitize_component` from `utils`. No UI dependencies.
 
 ## Testing Guidelines
 
