@@ -17,6 +17,12 @@ enum ListChoice {
     Ordered,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MathChoice {
+    Inline,
+    Display,
+}
+
 /// Rich-text-like markdown editor state and behaviors.
 pub struct MarkdownEditor {
     text: String,
@@ -25,6 +31,7 @@ pub struct MarkdownEditor {
     cursor_override: Option<CCursorRange>,
     code_choice: CodeChoice,
     list_choice: ListChoice,
+    math_choice: MathChoice,
     table_rows: u8,
     table_cols: u8,
 }
@@ -38,6 +45,7 @@ impl Default for MarkdownEditor {
             cursor_override: None,
             code_choice: CodeChoice::Inline,
             list_choice: ListChoice::Unordered,
+            math_choice: MathChoice::Inline,
             table_rows: 2,
             table_cols: 2,
         }
@@ -226,6 +234,38 @@ impl MarkdownEditor {
                 {
                     self.apply_style("\n---\n", "", "", true);
                 }
+                // Math
+                let math_resp = egui::ComboBox::from_id_salt("math_picker")
+                    .width(40.0)
+                    .selected_text(match self.math_choice {
+                        MathChoice::Inline => format!("{} $", egui_phosphor::regular::FUNCTION),
+                        MathChoice::Display => format!("{} $$", egui_phosphor::regular::FUNCTION),
+                    })
+                    .show_ui(ui, |ui| {
+                        if ui
+                            .selectable_value(
+                                &mut self.math_choice,
+                                MathChoice::Inline,
+                                format!("{} $", egui_phosphor::regular::FUNCTION),
+                            )
+                            .on_hover_text("Inline math")
+                            .clicked()
+                        {
+                            self.apply_style("$", "$", "a+b=c", true);
+                        }
+                        if ui
+                            .selectable_value(
+                                &mut self.math_choice,
+                                MathChoice::Display,
+                                format!("{} $$", egui_phosphor::regular::FUNCTION),
+                            )
+                            .on_hover_text("Display math")
+                            .clicked()
+                        {
+                            self.apply_style("$$", "$$", "a+b=c", true);
+                        }
+                    });
+                math_resp.response.on_hover_text("Math");
             });
 
             ui.add_space(4.0);

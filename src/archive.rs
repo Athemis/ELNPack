@@ -170,7 +170,7 @@ pub fn build_and_write_archive(
     let timestamp = performed_at
         .format(&Rfc3339)
         .map_err(|err| anyhow::anyhow!("Failed to format performed_at timestamp: {}", err))?;
-    let body_html = markdown_to_html(body);
+    let body_html = markdown_to_html(body, false);
     let org_id = "https://elnpack.app/#organization";
 
     let experiment_node = serde_json::json!({
@@ -233,15 +233,26 @@ pub fn build_and_write_archive(
 }
 
 /// Render markdown to sanitized HTML for embedding in RO-Crate metadata.
-fn markdown_to_html(body: &str) -> String {
+///
+/// When `parse_math` is true, this enables pulldown-cmark math extensions and
+/// preserves KaTeX/MathJax-style span classes so that inline and display math
+/// can still be styled by consumers while the HTML is sanitized by Ammonia.
+fn markdown_to_html(body: &str, parse_math: bool) -> String {
+    let mut builder = ammonia::Builder::default();
     let mut options = Options::empty();
     options.insert(Options::ENABLE_FOOTNOTES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
     options.insert(Options::ENABLE_TABLES);
+    if parse_math {
+        options.insert(Options::ENABLE_MATH);
+        // Allow math-related span classes so sanitized HTML retains enough hooks
+        // for inline and display math styling (e.g. KaTeX/MathJax renderers).
+        builder.add_allowed_classes("span", &["math", "math-inline", "math-display"]);
+    }
     let parser = Parser::new_ext(body, options);
     let mut html_output = String::new();
     html::push_html(&mut html_output, parser);
-    ammonia::Builder::default().clean(&html_output).to_string()
+    builder.clean(&html_output).to_string()
 }
 
 #[cfg(test)]
@@ -280,10 +291,18 @@ mod tests {
     // Markdown HTML rendering should sanitize scripts while retaining formatting like strikethrough.
     #[test]
     fn markdown_to_html_sanitizes_and_keeps_formatting() {
-        let html = markdown_to_html("Hello <script>alert('x')</script> ~~gone~~");
+        let html = markdown_to_html("Hello <script>alert('x')</script> ~~gone~~", false);
 
         assert!(html.contains("<del>gone</del>"));
         assert!(!html.contains("script"));
+    }
+
+    #[test]
+    fn markdown_to_html_keeps_math_styles_if_math_parsing_enabled() {
+        let html = markdown_to_html("Hello $\\frac{1}{2}$ world $$\\frac{1}{2}$$", true);
+
+        assert!(html.contains("<span class=\"math math-inline\">"));
+        assert!(html.contains("<span class=\"math math-display\">"));
     }
 
     #[test]
