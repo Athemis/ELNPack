@@ -1,7 +1,6 @@
 //! Markdown editor widget with toolbar helpers for common formatting.
 
 use eframe::egui;
-use egui::RichText;
 use egui::text::{CCursor, CCursorRange};
 use egui::text_edit::TextEditState;
 use egui_phosphor::regular;
@@ -66,7 +65,7 @@ impl MarkdownEditor {
                 // Headings
                 let heading_resp = egui::ComboBox::from_id_salt("heading_picker")
                     .width(40.0)
-                    .selected_text(RichText::new(Self::heading_icon(self.heading_level)))
+                    .selected_text(Self::heading_icon(self.heading_level))
                     .show_ui(ui, |ui| {
                         for lvl in 1..=6u8 {
                             if ui
@@ -86,28 +85,28 @@ impl MarkdownEditor {
 
                 // Inline styles
                 if ui
-                    .button(RichText::new(egui_phosphor::regular::TEXT_BOLDER))
+                    .button(egui_phosphor::regular::TEXT_BOLDER)
                     .on_hover_text("Bold")
                     .clicked()
                 {
                     self.apply_style("**", "**", "bold", false);
                 }
                 if ui
-                    .button(RichText::new(egui_phosphor::regular::TEXT_ITALIC))
+                    .button(egui_phosphor::regular::TEXT_ITALIC)
                     .on_hover_text("Italic")
                     .clicked()
                 {
                     self.apply_style("_", "_", "italic", false);
                 }
                 if ui
-                    .button(RichText::new(egui_phosphor::regular::TEXT_STRIKETHROUGH))
+                    .button(egui_phosphor::regular::TEXT_STRIKETHROUGH)
                     .on_hover_text("Strikethrough")
                     .clicked()
                 {
                     self.apply_style("~~", "~~", "text", false);
                 }
                 if ui
-                    .button(RichText::new(egui_phosphor::regular::TEXT_UNDERLINE))
+                    .button(egui_phosphor::regular::TEXT_UNDERLINE)
                     .on_hover_text("Underline")
                     .clicked()
                 {
@@ -118,15 +117,15 @@ impl MarkdownEditor {
                 let code_resp = egui::ComboBox::from_id_salt("code_picker")
                     .width(40.0)
                     .selected_text(match self.code_choice {
-                        CodeChoice::Inline => RichText::new(egui_phosphor::regular::CODE_SIMPLE),
-                        CodeChoice::Block => RichText::new(egui_phosphor::regular::CODE_BLOCK),
+                        CodeChoice::Inline => egui_phosphor::regular::CODE_SIMPLE,
+                        CodeChoice::Block => egui_phosphor::regular::CODE_BLOCK,
                     })
                     .show_ui(ui, |ui| {
                         if ui
                             .selectable_value(
                                 &mut self.code_choice,
                                 CodeChoice::Inline,
-                                RichText::new(egui_phosphor::regular::CODE_SIMPLE),
+                                egui_phosphor::regular::CODE_SIMPLE,
                             )
                             .on_hover_text("Inline code")
                             .clicked()
@@ -137,7 +136,7 @@ impl MarkdownEditor {
                             .selectable_value(
                                 &mut self.code_choice,
                                 CodeChoice::Block,
-                                RichText::new(egui_phosphor::regular::CODE_BLOCK),
+                                egui_phosphor::regular::CODE_BLOCK,
                             )
                             .on_hover_text("Code block")
                             .clicked()
@@ -151,15 +150,15 @@ impl MarkdownEditor {
                 let list_resp = egui::ComboBox::from_id_salt("list_picker")
                     .width(40.0)
                     .selected_text(match self.list_choice {
-                        ListChoice::Unordered => RichText::new(egui_phosphor::regular::LIST_DASHES),
-                        ListChoice::Ordered => RichText::new(egui_phosphor::regular::LIST_NUMBERS),
+                        ListChoice::Unordered => egui_phosphor::regular::LIST_DASHES,
+                        ListChoice::Ordered => egui_phosphor::regular::LIST_NUMBERS,
                     })
                     .show_ui(ui, |ui| {
                         if ui
                             .selectable_value(
                                 &mut self.list_choice,
                                 ListChoice::Unordered,
-                                RichText::new(egui_phosphor::regular::LIST_DASHES),
+                                egui_phosphor::regular::LIST_DASHES,
                             )
                             .on_hover_text("Bulleted list")
                             .clicked()
@@ -170,7 +169,7 @@ impl MarkdownEditor {
                             .selectable_value(
                                 &mut self.list_choice,
                                 ListChoice::Ordered,
-                                RichText::new(egui_phosphor::regular::LIST_NUMBERS),
+                                egui_phosphor::regular::LIST_NUMBERS,
                             )
                             .on_hover_text("Numbered list")
                             .clicked()
@@ -182,35 +181,35 @@ impl MarkdownEditor {
 
                 // Other inserts
                 if ui
-                    .button(RichText::new(egui_phosphor::regular::LINK_SIMPLE))
+                    .button(egui_phosphor::regular::LINK_SIMPLE)
                     .on_hover_text("Link")
                     .clicked()
                 {
                     self.apply_style("[", "](https://example.com)", "text", false);
                 }
                 if ui
-                    .button(RichText::new(egui_phosphor::regular::QUOTES))
+                    .button(egui_phosphor::regular::QUOTES)
                     .on_hover_text("Quote")
                     .clicked()
                 {
                     self.apply_style("\n> ", "", "quote", true);
                 }
                 if ui
-                    .button(RichText::new(egui_phosphor::regular::IMAGE_SQUARE))
+                    .button(egui_phosphor::regular::IMAGE_SQUARE)
                     .on_hover_text("Image")
                     .clicked()
                 {
                     self.apply_style("![", "](path/to/image.png)", "alt text", false);
                 }
                 if ui
-                    .button(RichText::new(egui_phosphor::regular::TABLE))
+                    .button(egui_phosphor::regular::TABLE)
                     .on_hover_text("Table")
                     .clicked()
                 {
                     self.insert_table_at_cursor();
                 }
                 if ui
-                    .button(RichText::new(egui_phosphor::regular::RULER))
+                    .button(egui_phosphor::regular::RULER)
                     .on_hover_text("Rule")
                     .clicked()
                 {
