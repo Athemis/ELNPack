@@ -203,6 +203,13 @@ impl MarkdownEditor {
                     self.apply_style("![", "](path/to/image.png)", "alt text", false);
                 }
                 if ui
+                    .button(RichText::new(egui_phosphor::regular::TABLE))
+                    .on_hover_text("Table")
+                    .clicked()
+                {
+                    self.insert_table_at_cursor();
+                }
+                if ui
                     .button(RichText::new(egui_phosphor::regular::RULER))
                     .on_hover_text("Rule")
                     .clicked()
@@ -270,6 +277,26 @@ impl MarkdownEditor {
         };
 
         self.apply_style(&format!("{} ", hashes), "\n", content, true);
+    }
+
+    fn default_table_snippet() -> &'static str {
+        "| Column 1 | Column 2 |\n| -------- | -------- |\n| Cell 1   | Cell 2   |\n\n"
+    }
+
+    fn insert_table_at_cursor(&mut self) {
+        let (_, end_char, _) = self.selection();
+
+        let mut insertion = String::new();
+        insertion.push('\n');
+        insertion.push_str(Self::default_table_snippet());
+
+        let insert_byte = char_to_byte(&self.text, end_char);
+        self.text.insert_str(insert_byte, &insertion);
+
+        let new_pos = end_char + insertion.chars().count();
+        let new_range = CCursorRange::one(CCursor::new(new_pos));
+        self.cursor = Some(new_range);
+        self.cursor_override = self.cursor;
     }
 
     fn selection(&self) -> (usize, usize, String) {
