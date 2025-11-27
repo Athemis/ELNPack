@@ -306,6 +306,18 @@ mod tests {
     }
 
     #[test]
+    fn markdown_to_html_leaves_math_raw_when_parsing_disabled() {
+        let html = markdown_to_html("E = mc$^2$ and $$F=ma$$", false);
+
+        assert!(html.contains("E = mc$^2$"), "inline math should remain as raw text");
+        assert!(html.contains("$$F=ma$$"), "display math should remain as raw text");
+        assert!(
+            !html.contains("math-inline") && !html.contains("math-display"),
+            "math classes should not be injected when parsing is disabled"
+        );
+    }
+
+    #[test]
     fn archive_genre_serializes_to_expected_str() {
         assert_eq!(ArchiveGenre::Resource.as_str(), "resource");
         assert_eq!(ArchiveGenre::Experiment.as_str(), "experiment");
