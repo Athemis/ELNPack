@@ -248,19 +248,25 @@ impl AttachmentsPanel {
         );
 
         let commit_via_keyboard = response.lost_focus()
-            && ui.input(|inp| {
-                inp.key_pressed(egui::Key::Enter) || inp.key_pressed(egui::Key::Tab)
-            });
+            && ui.input(|inp| inp.key_pressed(egui::Key::Enter) || inp.key_pressed(egui::Key::Tab));
 
         if commit_via_keyboard {
             return self.commit_filename_edit(index);
         }
 
-        if ui.button(egui_phosphor::regular::CHECK).on_hover_text("Save").clicked() {
+        if ui
+            .button(egui_phosphor::regular::CHECK)
+            .on_hover_text("Save")
+            .clicked()
+        {
             return self.commit_filename_edit(index);
         }
 
-        if ui.button(egui_phosphor::regular::X).on_hover_text("Cancel").clicked() {
+        if ui
+            .button(egui_phosphor::regular::X)
+            .on_hover_text("Cancel")
+            .clicked()
+        {
             self.editing_index = None;
             self.editing_buffer.clear();
         }
