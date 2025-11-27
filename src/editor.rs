@@ -4,6 +4,7 @@ use eframe::egui;
 use egui::RichText;
 use egui::text::{CCursor, CCursorRange};
 use egui::text_edit::TextEditState;
+use egui_phosphor::regular;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum CodeChoice {
@@ -46,6 +47,18 @@ impl MarkdownEditor {
         &self.text
     }
 
+    fn heading_icon(level: u8) -> &'static str {
+        match level {
+            1 => regular::TEXT_H_ONE,
+            2 => regular::TEXT_H_TWO,
+            3 => regular::TEXT_H_THREE,
+            4 => regular::TEXT_H_FOUR,
+            5 => regular::TEXT_H_FIVE,
+            6 => regular::TEXT_H_SIX,
+            _ => regular::TEXT_H,
+        }
+    }
+
     /// Render the toolbar and text area, applying cursor-aware insertions.
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
@@ -53,11 +66,15 @@ impl MarkdownEditor {
                 // Headings
                 let heading_resp = egui::ComboBox::from_id_salt("heading_picker")
                     .width(40.0)
-                    .selected_text(RichText::new(format!("H{}", self.heading_level)).strong())
+                    .selected_text(RichText::new(Self::heading_icon(self.heading_level)))
                     .show_ui(ui, |ui| {
                         for lvl in 1..=6u8 {
                             if ui
-                                .selectable_value(&mut self.heading_level, lvl, format!("H{}", lvl))
+                                .selectable_value(
+                                    &mut self.heading_level,
+                                    lvl,
+                                    Self::heading_icon(lvl),
+                                )
                                 .clicked()
                             {
                                 self.insert_heading_at_cursor(lvl);
