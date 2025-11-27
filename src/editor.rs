@@ -25,6 +25,8 @@ pub struct MarkdownEditor {
     cursor_override: Option<CCursorRange>,
     code_choice: CodeChoice,
     list_choice: ListChoice,
+    table_rows: u8,
+    table_cols: u8,
 }
 
 impl Default for MarkdownEditor {
@@ -36,6 +38,8 @@ impl Default for MarkdownEditor {
             cursor_override: None,
             code_choice: CodeChoice::Inline,
             list_choice: ListChoice::Unordered,
+            table_rows: 2,
+            table_cols: 2,
         }
     }
 }
@@ -201,13 +205,20 @@ impl MarkdownEditor {
                 {
                     self.apply_style("![", "](path/to/image.png)", "alt text", false);
                 }
-                if ui
-                    .button(egui_phosphor::regular::TABLE)
-                    .on_hover_text("Table")
-                    .clicked()
-                {
-                    self.insert_table_at_cursor();
-                }
+                let table_resp = egui::ComboBox::from_id_salt("table_picker")
+                    .width(80.0)
+                    .selected_text(format!(
+                        "{} {}×{}",
+                        egui_phosphor::regular::TABLE,
+                        self.table_rows,
+                        self.table_cols
+                    ))
+                    .show_ui(ui, |ui| {
+                        self.table_size_picker(ui);
+                    });
+                table_resp
+                    .response
+                    .on_hover_text("Insert table (choose size)");
                 if ui
                     .button(egui_phosphor::regular::RULER)
                     .on_hover_text("Rule")
@@ -278,24 +289,122 @@ impl MarkdownEditor {
         self.apply_style(&format!("{} ", hashes), "\n", content, true);
     }
 
-    fn default_table_snippet() -> &'static str {
-        "| Column 1 | Column 2 |\n| -------- | -------- |\n| Cell 1   | Cell 2   |\n\n"
+    fn table_snippet(rows: u8, cols: u8) -> String {
+        let rows = rows.max(1);
+        let cols = cols.max(1);
+
+        let mut s = String::new();
+
+        // Precompute header labels and their individual widths.
+        let mut header_labels = Vec::new();
+        let mut column_widths = Vec::new();
+        for col in 1..=cols {
+            let label = format!("Column {}", col);
+            // One leading space before the label and one trailing space after it.
+            let width = label.len() + 2;
+            header_labels.push(label);
+            column_widths.push(width);
+        }
+
+        // Header row
+        for (label, &width) in header_labels.iter().zip(column_widths.iter()) {
+            s.push('|');
+            // Leading space + label + trailing padding spaces to fill this column's width.
+            s.push(' ');
+            s.push_str(label);
+            let used = 1 + label.len();
+            if width > used {
+                for _ in 0..(width - used) {
+                    s.push(' ');
+                }
+            }
+        }
+        s.push('|');
+        s.push('\n');
+
+        // Separator row
+        for &width in &column_widths {
+            s.push('|');
+            for _ in 0..width {
+                s.push('-');
+            }
+        }
+        s.push('|');
+        s.push('\n');
+
+        // Body rows
+        for _ in 1..=rows {
+            for &width in &column_widths {
+                s.push('|');
+                for _ in 0..width {
+                    s.push(' ');
+                }
+            }
+            s.push('|');
+            s.push('\n');
+        }
+
+        s.push('\n');
+        s
     }
 
-    fn insert_table_at_cursor(&mut self) {
+    fn insert_table_at_cursor(&mut self, rows: u8, cols: u8) {
         let (_, end_char, _) = self.selection();
 
-        let mut insertion = String::new();
-        insertion.push('\n');
-        insertion.push_str(Self::default_table_snippet());
-
         let insert_byte = char_to_byte(&self.text, end_char);
+        let mut insertion = String::new();
+
+        if !self.text.is_empty() && (insert_byte == 0 || !self.text[..insert_byte].ends_with('\n'))
+        {
+            insertion.push('\n');
+        }
+
+        insertion.push_str(&Self::table_snippet(rows, cols));
+
         self.text.insert_str(insert_byte, &insertion);
 
         let new_pos = end_char + insertion.chars().count();
         let new_range = CCursorRange::one(CCursor::new(new_pos));
         self.cursor = Some(new_range);
         self.cursor_override = self.cursor;
+    }
+
+    fn table_size_picker(&mut self, ui: &mut egui::Ui) {
+        const MAX_ROWS: u8 = 100;
+        const MAX_COLS: u8 = 20;
+
+        egui::Grid::new("table_size_grid")
+            .num_columns(2)
+            .spacing(egui::vec2(8.0, 4.0))
+            .show(ui, |ui| {
+                ui.label("Rows");
+                ui.add(
+                    egui::DragValue::new(&mut self.table_rows)
+                        .range(1..=MAX_ROWS)
+                        .speed(0.2),
+                );
+                ui.end_row();
+
+                ui.label("Columns");
+                ui.add(
+                    egui::DragValue::new(&mut self.table_cols)
+                        .range(1..=MAX_COLS)
+                        .speed(0.2),
+                );
+                ui.end_row();
+            });
+
+        if ui
+            .button(format!("{} Insert table", egui_phosphor::regular::PLUS))
+            .clicked()
+        {
+            let rows = self.table_rows.max(1).min(MAX_ROWS);
+            let cols = self.table_cols.max(1).min(MAX_COLS);
+            self.insert_table_at_cursor(rows, cols);
+            self.table_rows = rows;
+            self.table_cols = cols;
+            ui.close();
+        }
     }
 
     fn selection(&self) -> (usize, usize, String) {
