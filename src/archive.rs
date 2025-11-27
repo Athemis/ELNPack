@@ -6,6 +6,7 @@
 //! - Provide lightweight helpers for MIME guessing and markdown rendering.
 
 use std::{
+    collections::HashSet,
     fs::{self, File},
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -92,6 +93,17 @@ pub fn build_and_write_archive(
     {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create output directory {:?}", parent))?;
+    }
+
+    // Guard against duplicate archive paths before writing anything.
+    let mut seen_names = HashSet::new();
+    for meta in attachments {
+        if !seen_names.insert(meta.sanitized_name.clone()) {
+            anyhow::bail!(
+                "Duplicate attachment filename in archive: {}. Please rename one of the files.",
+                meta.sanitized_name
+            );
+        }
     }
 
     let root_folder = sanitize_component(
@@ -260,9 +272,12 @@ mod tests {
     use std::path::PathBuf;
 
     use super::ArchiveGenre;
+    use super::AttachmentMeta;
+    use super::build_and_write_archive;
     use super::ensure_extension;
     use super::markdown_to_html;
     use super::suggested_archive_name;
+    use time::OffsetDateTime;
 
     #[test]
     fn suggested_archive_name_reuses_sanitizer_and_lowercases() {
@@ -315,6 +330,48 @@ mod tests {
             !html.contains("math-inline") && !html.contains("math-display"),
             "math classes should not be injected when parsing is disabled"
         );
+    }
+
+    #[test]
+    fn build_and_write_archive_rejects_duplicate_sanitized_names() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        let out = tmp.path().join("test.eln");
+        let file1 = tmp.path().join("a.txt");
+        let file2 = tmp.path().join("a..txt"); // same sanitized name
+        fs::write(&file1, b"one").unwrap();
+        fs::write(&file2, b"two").unwrap();
+
+        let attachments = vec![
+            AttachmentMeta {
+                path: file1.clone(),
+                sanitized_name: "a.txt".into(),
+                mime: "text/plain".into(),
+                sha256: "unavailable".into(),
+                size: 3,
+            },
+            AttachmentMeta {
+                path: file2.clone(),
+                sanitized_name: "a.txt".into(),
+                mime: "text/plain".into(),
+                sha256: "unavailable".into(),
+                size: 3,
+            },
+        ];
+
+        let result = build_and_write_archive(
+            &out,
+            "Title",
+            "Body",
+            &attachments,
+            OffsetDateTime::from_unix_timestamp(0).unwrap(),
+            ArchiveGenre::Experiment,
+            &[],
+        );
+
+        assert!(result.is_err(), "duplicate names should be rejected");
     }
 
     #[test]

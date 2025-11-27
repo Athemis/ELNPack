@@ -94,6 +94,15 @@ impl AttachmentsPanel {
             .unwrap_or_else(|| format!("attachment-{}", self.attachments.len() + 1));
         let sanitized_name = sanitize_component(&original_name);
 
+        // Prevent two attachments from resolving to the same archive path.
+        if self
+            .attachments
+            .iter()
+            .any(|item| item.sanitized_name == sanitized_name)
+        {
+            return false;
+        }
+
         let mime = guess_mime(&path);
         let sha256 = match hash_file(&path) {
             Ok(hash) => hash,
@@ -488,6 +497,24 @@ mod tests {
             1,
             "duplicate file should be skipped"
         );
+    }
+
+    // Sanitized filename collisions should be rejected to avoid archive path clashes.
+    #[test]
+    fn add_attachment_rejects_sanitized_name_collision() {
+        let tmp = TempDir::new().unwrap();
+        let path1 = tmp.path().join("report.txt");
+        let path2 = tmp.path().join("report..txt"); // sanitizes to same name
+        fs::write(&path1, b"a").unwrap();
+        fs::write(&path2, b"b").unwrap();
+
+        let mut panel = AttachmentsPanel::default();
+        assert!(panel.add_attachment(path1));
+        assert!(
+            !panel.add_attachment(path2),
+            "second attachment with same sanitized name should be skipped"
+        );
+        assert_eq!(panel.attachments.len(), 1);
     }
 
     // Verifies that sanitized_name is computed correctly for various filename patterns.
