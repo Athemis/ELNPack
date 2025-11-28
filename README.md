@@ -1,5 +1,7 @@
-<!-- SPDX-License-Identifier: MIT -->
-<!-- SPDX-FileCopyrightText: 2025 Alexander Minges -->
+<!--
+SPDX-License-Identifier: MIT
+SPDX-FileCopyrightText: 2025 Alexander Minges
+-->
 
 # ELNPack
 
