@@ -113,10 +113,12 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
                         path,
                         _retry: false,
                     }),
-                    AttachmentsCommand::LoadThumbnail { path } => cmds.push(Command::LoadThumbnail {
-                        path,
-                        _retry: false,
-                    }),
+                    AttachmentsCommand::LoadThumbnail { path } => {
+                        cmds.push(Command::LoadThumbnail {
+                            path,
+                            _retry: false,
+                        })
+                    }
                 }
             }
         }
@@ -142,10 +144,12 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
                         path,
                         _retry: false,
                     }),
-                    AttachmentsCommand::LoadThumbnail { path } => cmds.push(Command::LoadThumbnail {
-                        path,
-                        _retry: false,
-                    }),
+                    AttachmentsCommand::LoadThumbnail { path } => {
+                        cmds.push(Command::LoadThumbnail {
+                            path,
+                            _retry: false,
+                        })
+                    }
                 }
             }
         }
@@ -188,10 +192,12 @@ pub fn run_command(cmd: Command) -> Msg {
                 mime,
             })
         }
-        Command::LoadThumbnail { path, _retry: _ } => match attachments::load_image_thumbnail(&path) {
-            Ok(image) => Msg::ThumbnailDecoded { path, image },
-            Err(_) => Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path }),
-        },
+        Command::LoadThumbnail { path, _retry: _ } => {
+            match attachments::load_image_thumbnail(&path) {
+                Ok(image) => Msg::ThumbnailDecoded { path, image },
+                Err(_) => Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path }),
+            }
+        }
         Command::SaveArchive(payload) => {
             let res = build_and_write_archive(
                 &payload.output,

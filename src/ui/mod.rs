@@ -8,7 +8,7 @@ pub mod components;
 
 use eframe::egui;
 
-use crate::logic::eln::{ensure_extension, suggested_archive_name, ArchiveGenre};
+use crate::logic::eln::{ArchiveGenre, ensure_extension, suggested_archive_name};
 use crate::mvu::{self, AppModel, Command, Msg};
 use crate::ui::components::{attachments, datetime_picker, keywords, markdown};
 
