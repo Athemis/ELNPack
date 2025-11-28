@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Alexander Minges
+
 //! Application entry point wiring egui/eframe to launch the ELNPack UI.
 
 use crate::ui::ElnPackApp;

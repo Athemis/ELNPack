@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Alexander Minges
+
 use std::fs::File;
 use std::io;
 use std::path::Path;

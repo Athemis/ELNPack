@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Alexander Minges
+
 //! Root Model-View-Update kernel wiring component state, messages, and commands.
 
 use std::path::PathBuf;

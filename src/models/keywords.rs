@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Alexander Minges
+
 //! Keyword collection domain helper.
 
 /// Simple wrapper to keep keyword normalization in one place.

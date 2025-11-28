@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Alexander Minges
+
 //! Attachment domain model and validation helpers (UI-agnostic).
 
 use std::collections::HashSet;

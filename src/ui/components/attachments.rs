@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Alexander Minges
+
 //! Attachments panel refactored for MVU-style updates.
 
 use std::collections::{HashMap, HashSet};

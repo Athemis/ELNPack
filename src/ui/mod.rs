@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Alexander Minges
+
 //! Top-level egui application shell for composing an ELN entry.
 //! Handles layout, form controls, and wiring to archive creation.
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Alexander Minges
+
 //! Keywords editor refactored to an MVU-friendly shape.
 
 use eframe::egui;

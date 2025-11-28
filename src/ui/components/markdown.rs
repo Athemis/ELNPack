@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Alexander Minges
+
 //! Markdown editor rewritten for MVU-style updates.
 
 use eframe::egui;

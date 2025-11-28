@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Alexander Minges
+
 //! Produce filesystem-safe path components shared across the app.
 
 /// Produce a filesystem-safe path component.

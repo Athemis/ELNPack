@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 Alexander Minges
+
 //! DateTime picker converted to MVU-style model/update/view.
 
 use chrono::{Datelike, Local, NaiveDate, TimeZone, Timelike, Utc};
