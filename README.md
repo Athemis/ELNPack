@@ -5,6 +5,8 @@ SPDX-FileCopyrightText: 2025 Alexander Minges
 
 # ELNPack
 
+[![CI](https://github.com/Athemis/ELNPack/actions/workflows/ci.yml/badge.svg)](https://github.com/Athemis/ELNPack/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Athemis/ELNPack/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Athemis/ELNPack/actions/workflows/github-code-scanning/codeql)
 [![REUSE status](https://api.reuse.software/badge/github.com/Athemis/ELNPack)](https://api.reuse.software/info/github.com/Athemis/ELNPack)
 
 A lightweight electronic lab notebook (ELN) entry packager built with [Rust](https://rust-lang.org), [egui](https://www.egui.rs), and [RO-Crate](https://www.researchobject.org/ro-crate) metadata. Users can write Markdown notes, attach files, add keywords, and export a `.eln` archive (see [The ELN Consortium](https://the.elnconsortium.org)) containing the experiment text plus attachments and RO-Crate metadata. `.eln` archives can be imported into a wide range of ELNs, the current focus of ELNPack is however compatibility with [eLabFTW](https://www.elabftw.net).
