@@ -1,0 +1,7 @@
+version = 1
+
+[[annotations]]
+path = "**.lock"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025 Alexander Minges"
+SPDX-License-Identifier = "MIT"
