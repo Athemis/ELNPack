@@ -146,7 +146,10 @@ impl ElnPackApp {
 
     fn render_save_button(&mut self, ui: &mut egui::Ui) {
         let save_enabled = !self.model.entry_title.trim().is_empty();
-        let button = egui::Button::new("Save archive");
+        let button = egui::Button::new(format!(
+            "{} Save ELN archive",
+            egui_phosphor::regular::FLOPPY_DISK
+        ));
 
         if ui
             .add_enabled(save_enabled, button)
