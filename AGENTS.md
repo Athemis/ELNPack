@@ -3,18 +3,12 @@
 ## Project Structure & Module Organization
 
 - Rust 2024 crate; entry point at `src/main.rs`, which calls `app::run()` to start eframe/egui. SPDX headers on sources: `SPDX-License-Identifier: MIT` plus one or more `SPDX-FileCopyrightText` lines naming actual authors (add additional lines for significant contributors).
-- License text duplicated for REUSE: root `LICENSE.md` plus `LICENSES/MIT.txt` (SPDX MIT identifier).
-- `src/app/`: app bootstrap (`run`) and eframe setup (fonts/options).
-- `src/mvu/`: MVU kernel (`AppModel`, `Msg`, `Command`, `update`, `run_command`).
-- `src/ui/`: top-level UI composition; wires worker messages to `mvu::update`.
-- `src/ui/components/`: UI components with their own `Model/Msg/update/view` (markdown, attachments, keywords, datetime picker).
-- `src/logic/eln.rs`: ELN/RO-Crate business logic (build/write archive, suggested names).
-- `src/models/`: pure data + validation (`attachment`, `keywords`).
-- `src/utils/`: helpers (`sanitize_component`, `hash_file`).
-- Integration tests live under `tests/` (none yet); unit tests colocated with modules.
+- License text duplicated for REUSE: root `LICENSE` plus `LICENSES/MIT.txt` (SPDX MIT identifier).
+- See "Module Responsibilities" below for detailed module-level responsibilities and file layout.
 - No build script needed; egui compiles directly with the Rust code.
 
 ### MVU paradigm & layering
+
 - **Model**: `mvu::AppModel` plus per-component models (`MarkdownModel`, `DateTimeModel`, `KeywordsModel`, `AttachmentsModel`).
 - **View**: Component `view(...) -> Vec<Msg>` in `ui/components/*`; `ui::ElnPackApp` composes and wraps into `mvu::Msg`.
 - **Update**: `mvu::update` routes messages to reducers, validates save requests, and enqueues `Command`s. `run_command` performs side-effects and emits follow-up messages.
@@ -52,7 +46,7 @@
 - UI strings live directly in `src/ui.rs` within the egui code; prefer short, actionable labels.
 - Validate user input in business logic before reflecting it in the UI to avoid inconsistent state.
 - Use English language within the codebase.
-- Separate UI concerns (`src/ui.rs`) from business logic (`src/archive.rs`) for maintainability and testability.
+- Separate UI concerns (`src/ui.rs`) from business logic (`src/logic/eln.rs`) for maintainability and testability.
 - Code comments: use sparingly to explain intent, invariants, or non-obvious control flow; avoid restating what the code already makes clear.
 - Phosphor icons: the font is registered in `src/main.rs`; use `egui_phosphor::regular::NAME` (via `RichText` or button labels) instead of embedding SVGs. Keep icon+text buttons short (`format!("{} Label", icon)`) and reuse the helpers already in `src/ui.rs` where possible.
 
@@ -73,7 +67,7 @@
 
 - Use `cargo test` for unit and integration coverage; colocate simple unit tests with modules and broader scenarios under `tests/`.
 - Name tests after behavior (e.g., `submits_trimmed_input`) and keep them deterministic.
-- Test business logic in `archive.rs` independently of UI; mock file system operations where appropriate.
+- Test business logic in `src/logic/eln.rs` independently of UI; mock file system operations where appropriate.
 - UI testing can focus on state management and callback logic without rendering.
 
 ## Commit & Pull Request Guidelines

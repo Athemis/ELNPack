@@ -1,38 +1,28 @@
 # ELNPack
 
-A lightweight electronic lab notebook (ELN) entry packager built with Rust, eframe/egui, and RO-Crate metadata. Users can write Markdown notes, attach files, preview thumbnails, and export a `.eln` archive containing the experiment text plus attachments and RO-Crate metadata.
+A lightweight electronic lab notebook (ELN) entry packager built with [Rust](https://rust-lang.org), [egui](https://www.egui.rs), and [RO-Crate](https://www.researchobject.org/ro-crate) metadata. Users can write Markdown notes, attach files, add keywords, and export a `.eln` archive (see [The ELN Consortium](https://the.elnconsortium.org)) containing the experiment text plus attachments and RO-Crate metadata. `.eln` archives can be imported into a wide range of ELNs, the current focus of ELNPack is however compatibility with [eLabFTW](https://www.elabftw.net).
 
 ## Features
 
-- Markdown editor with quick-insert toolbar (headings, inline/block code, lists, links, quotes, images, strike/underline, rules) and caret-aware insertion.
-- Attachments panel with image thumbnails, SHA-256 duplicate detection, sanitized filenames (with warning indicator), inline rename, and MIME/size display.
-- Keywords editor with inline chips and add-keywords modal (comma-split with duplicate filtering).
-- Date/time picker with local-time selection stored as UTC.
-- Save flow that enforces `.eln` extension, surfaces cancel/success/errors, and background command tracking.
-- RO-Crate 1.2 metadata + ZIP-based `.eln` archive output (experiment text, attachments, keywords, genre).
+- Simple **Markdown** editor with quick-insert toolbar
+- **Attachments** panel with image thumbnails, duplicate detection and filename sanitization
+- Keywords editor, supporting mass import of comma-separated keywords
 
 ## Filename Sanitization & Editing
 
-When you attach files, ELNPack automatically sanitizes filenames to ensure cross-platform compatibility while preserving file extensions (including multi-part extensions like `.tar.gz`). The sanitization process:
+When you attach files, ELNPack automatically sanitizes filenames to ensure cross-platform compatibility. The sanitization process:
 
 1. Transliterates Unicode characters (e.g., `Café` → `Cafe`)
 2. Replaces separators and special characters with underscores
-3. Preserves dots in extensions while deduplicating consecutive dots
-4. Trims trailing dots and spaces for Windows compatibility
-5. Guards against Windows reserved names (e.g., `CON`, `PRN`, `AUX`)
-6. Falls back to `eln_entry` for empty or invalid names
+3. Guards against Windows reserved names (e.g., `CON`, `PRN`, `AUX`)
 
 When a filename is sanitized, the attachments panel displays a **⚠ WARNING** icon next to the sanitized name. Hover over the icon to see the original → sanitized transformation.
 
 ### Editing Filenames
 
-You can edit attachment filenames by clicking the **pencil button** (🖊) next to any filename. The inline editor allows you to:
+You can edit attachment filenames by clicking the **pencil button** (🖊) next to any filename. The inline editor allows you to rename files before creating the archive
 
-- Rename files before creating the archive
-- Use Enter/Tab to save or click the ✔ button
-- Cancel with the ✕ button
-
-All edited filenames are automatically sanitized using the same rules above, ensuring filesystem safety. Duplicate filenames are prevented, and validation errors are shown in the status bar.
+All edited filenames are automatically sanitized using the same rules above. Duplicate filenames are prevented, and validation errors are shown in the status bar.
 
 ## Project Layout
 
