@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2025 Alexander Minges
+set -euo pipefail
+
+msg_file="$1"
+msg=$(head -n1 "$msg_file")
+
+# Conventional Commits pattern (type[!][scope]: subject)
+regex='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?(!)?: .+'
+if [[ ! $msg =~ $regex ]]; then
+  echo "commit message must follow Conventional Commits, e.g., 'feat: add feature'" >&2
+  exit 1
+fi
+
+exit 0

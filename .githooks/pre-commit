@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2025 Alexander Minges
+set -euo pipefail
+
+if [[ ${SKIP_PRE_COMMIT:-0} == 1 ]]; then
+  echo "[pre-commit] skipped via SKIP_PRE_COMMIT"
+  exit 0
+fi
+
+echo "[pre-commit] cargo fmt"
+cargo fmt
+
+echo "[pre-commit] cargo clippy --all-targets --all-features -- -D warnings"
+cargo clippy --all-targets --all-features -- -D warnings
+
+echo "[pre-commit] cargo test"
+cargo test
+
+echo "[pre-commit] ok"

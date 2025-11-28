@@ -81,3 +81,7 @@ This repository follows the [REUSE Software](https://reuse.software/) specificat
 ## Contributing
 
 We welcome issues and PRs! See [CONTRIBUTING](CONTRIBUTING.md) for coding standards, testing checklist, and commit conventions.
+
+### Git hooks
+
+Repository hooks live in `.githooks`. Run `./scripts/install-git-hooks.sh` once to point `core.hooksPath` there. Hooks enforce Conventional Commits and run `fmt` (writes changes), `clippy`, and `test` before each commit (set `SKIP_PRE_COMMIT=1` to bypass locally).
