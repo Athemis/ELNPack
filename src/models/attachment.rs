@@ -11,14 +11,20 @@ use anyhow::{Result, anyhow};
 /// Sanitized attachment metadata used for archive creation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Attachment {
+    /// Original absolute path on disk.
     pub path: PathBuf,
+    /// Filename already sanitized for archive storage.
     pub sanitized_name: String,
+    /// Detected MIME type.
     pub mime: String,
+    /// SHA-256 hash of the file contents or `"unavailable"` if hashing failed.
     pub sha256: String,
+    /// File size in bytes.
     pub size: u64,
 }
 
 impl Attachment {
+    /// Construct a new attachment with pre-sanitized metadata.
     pub fn new(
         path: PathBuf,
         sanitized_name: String,

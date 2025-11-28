@@ -18,15 +18,25 @@ use crate::ui::components::markdown::{MarkdownModel, MarkdownMsg};
 /// Top-level application state.
 #[derive(Default)]
 pub struct AppModel {
+    /// User-facing entry title.
     pub entry_title: String,
+    /// Selected archive genre for metadata.
     pub archive_genre: ArchiveGenre,
+    /// How the body should be stored (raw markdown or rendered HTML).
     pub body_format: crate::logic::eln::BodyFormat,
+    /// Markdown editor state.
     pub markdown: MarkdownModel,
+    /// Attachment picker state.
     pub attachments: AttachmentsModel,
+    /// Keywords editor state.
     pub keywords: KeywordsModel,
+    /// Date/time picker state.
     pub datetime: DateTimeModel,
+    /// Latest status message to display.
     pub status: Option<String>,
+    /// Latest error message to display in modal.
     pub error: Option<String>,
+    /// Count of queued background commands.
     pub pending_commands: usize,
 }
 
@@ -63,13 +73,21 @@ pub enum Command {
 
 /// Captured, validated data for saving.
 pub struct SavePayload {
+    /// Final archive path on disk (with `.eln` extension enforced).
     pub output: PathBuf,
+    /// Entry title.
     pub title: String,
+    /// Markdown text from the editor.
     pub body: String,
+    /// Attachment metadata (already sanitized and hashed).
     pub attachments: Vec<Attachment>,
+    /// Timestamp for when the entry was performed.
     pub performed_at: time::OffsetDateTime,
+    /// Selected archive genre.
     pub genre: ArchiveGenre,
+    /// Normalized keywords.
     pub keywords: Vec<String>,
+    /// Stored body format (HTML or Markdown).
     pub body_format: crate::logic::eln::BodyFormat,
 }
 
@@ -202,6 +220,7 @@ pub fn run_command(cmd: Command) -> Msg {
     }
 }
 
+/// Update status/error fields consistently for user feedback.
 fn surface_event(model: &mut AppModel, message: String, is_error: bool) {
     if is_error {
         model.error = Some(message.clone());
@@ -209,6 +228,7 @@ fn surface_event(model: &mut AppModel, message: String, is_error: bool) {
     model.status = Some(message);
 }
 
+/// Validate model state and build the payload required to save an archive.
 fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePayload, String> {
     let title = model.entry_title.trim().to_string();
     if title.is_empty() {

@@ -32,7 +32,9 @@ pub enum KeywordsMsg {
 /// User-facing feedback surfaced to the status bar or error modal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeywordsEvent {
+    /// Text shown in the status bar/modal.
     pub message: String,
+    /// Whether the message represents an error.
     pub is_error: bool,
 }
 
@@ -140,6 +142,7 @@ pub fn view(ui: &mut egui::Ui, ctx: &egui::Context, model: &KeywordsModel) -> Ve
     msgs
 }
 
+/// Display keywords in a responsive grid, wiring chip actions into messages.
 fn render_keywords_grid(ui: &mut egui::Ui, model: &KeywordsModel, msgs: &mut Vec<KeywordsMsg>) {
     let available = ui.available_width();
     let approx_chip_width = 180.0;
@@ -185,6 +188,7 @@ fn render_keywords_grid(ui: &mut egui::Ui, model: &KeywordsModel, msgs: &mut Vec
         });
 }
 
+/// Render a single keyword chip with inline delete/edit affordances.
 fn render_keyword_chip(
     ui: &mut egui::Ui,
     index: usize,
@@ -215,6 +219,7 @@ fn render_keyword_chip(
     }
 }
 
+/// Render the inline editing UI for a keyword row.
 fn render_editing_keyword(ui: &mut egui::Ui, model: &KeywordsModel, msgs: &mut Vec<KeywordsMsg>) {
     let mut buffer = model.editing_buffer.clone();
     let response = ui.add(
@@ -243,6 +248,7 @@ fn render_editing_keyword(ui: &mut egui::Ui, model: &KeywordsModel, msgs: &mut V
     }
 }
 
+/// Show the add-keywords modal window when requested.
 fn render_modal(ctx: &egui::Context, model: &KeywordsModel, msgs: &mut Vec<KeywordsMsg>) {
     let mut input = model.modal_input.clone();
 
@@ -274,6 +280,7 @@ fn render_modal(ctx: &egui::Context, model: &KeywordsModel, msgs: &mut Vec<Keywo
         });
 }
 
+/// Split modal input on commas, add unique keywords, and return a status message plus added flag.
 fn process_modal_input(model: &mut KeywordsModel) -> (String, bool) {
     let mut added_count = 0usize;
     let mut dup_count = 0usize;
@@ -321,6 +328,7 @@ fn process_modal_input(model: &mut KeywordsModel) -> (String, bool) {
     (message, added_count > 0)
 }
 
+/// Validate and commit an inline keyword edit, returning a feedback event on error.
 fn commit_edit(model: &mut KeywordsModel) -> Option<KeywordsEvent> {
     let Some(index) = model.editing_index else {
         return None;

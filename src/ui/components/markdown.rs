@@ -8,34 +8,47 @@ use egui::text::{CCursor, CCursorRange};
 use egui::text_edit::TextEditState;
 use egui_phosphor::regular;
 
+/// Code insertion style preference.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CodeChoice {
     Inline,
     Block,
 }
 
+/// List insertion style preference.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ListChoice {
     Unordered,
     Ordered,
 }
 
+/// Math insertion style preference.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MathChoice {
     Inline,
     Display,
 }
 
+/// Editor state for the markdown component, including cursor selection metadata.
 #[derive(Clone, Debug)]
 pub struct MarkdownModel {
+    /// Raw markdown content.
     pub text: String,
+    /// Current heading level for insertions (1-6).
     pub heading_level: u8,
+    /// Current cursor selection from egui.
     pub cursor: Option<CCursorRange>,
+    /// Explicit cursor override applied after mutations.
     pub cursor_override: Option<CCursorRange>,
+    /// Preferred code insertion style.
     pub code_choice: CodeChoice,
+    /// Preferred list insertion style.
     pub list_choice: ListChoice,
+    /// Preferred math insertion style.
     pub math_choice: MathChoice,
+    /// Rows to use when inserting a table.
     pub table_rows: u8,
+    /// Columns to use when inserting a table.
     pub table_cols: u8,
 }
 
@@ -57,22 +70,37 @@ impl Default for MarkdownModel {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StyleKind {
+    /// Apply bold formatting.
     Bold,
+    /// Apply italic formatting.
     Italic,
+    /// Apply strikethrough formatting.
     Strikethrough,
+    /// Apply underline formatting.
     Underline,
+    /// Insert a link template.
     Link,
+    /// Prefix selection with a quote block.
     Quote,
+    /// Insert an image template.
     Image,
+    /// Insert a horizontal rule.
     Rule,
+    /// Apply inline code formatting.
     CodeInline,
+    /// Insert a fenced code block.
     CodeBlock,
+    /// Insert an unordered list item.
     ListUnordered,
+    /// Insert an ordered list item.
     ListOrdered,
+    /// Insert inline math delimiters.
     MathInline,
+    /// Insert display math delimiters.
     MathDisplay,
 }
 
+/// Messages emitted by the markdown view to mutate state.
 #[derive(Clone, Debug)]
 pub enum MarkdownMsg {
     SetText(String),
@@ -357,6 +385,7 @@ pub fn view(model: &MarkdownModel, ui: &mut egui::Ui) -> Vec<MarkdownMsg> {
     msgs
 }
 
+/// Map a heading level to its phosphor icon glyph.
 fn heading_icon(level: u8) -> &'static str {
     match level {
         1 => regular::TEXT_H_ONE,
@@ -369,6 +398,7 @@ fn heading_icon(level: u8) -> &'static str {
     }
 }
 
+/// Insert a Markdown heading at the current selection, normalizing content.
 fn insert_heading(model: &mut MarkdownModel, level: u8) {
     let level = level.clamp(1, 6);
     model.heading_level = level;
@@ -388,6 +418,7 @@ fn insert_heading(model: &mut MarkdownModel, level: u8) {
     apply_style(model, &format!("{} ", hashes), "\n", content, true);
 }
 
+/// Dispatch a style action into a concrete insertion around the selection.
 fn apply_style_kind(model: &mut MarkdownModel, kind: StyleKind) {
     match kind {
         StyleKind::Bold => apply_style(model, "**", "**", "bold", false),
@@ -407,6 +438,7 @@ fn apply_style_kind(model: &mut MarkdownModel, kind: StyleKind) {
     }
 }
 
+/// UI control for choosing table dimensions before insertion.
 fn table_size_picker(ui: &mut egui::Ui, model: &MarkdownModel, msgs: &mut Vec<MarkdownMsg>) {
     const MAX_ROWS: u8 = 100;
     const MAX_COLS: u8 = 20;
@@ -455,6 +487,7 @@ fn table_size_picker(ui: &mut egui::Ui, model: &MarkdownModel, msgs: &mut Vec<Ma
     }
 }
 
+/// Build a Markdown table snippet with padded headers for readability.
 fn table_snippet(rows: u8, cols: u8) -> String {
     let rows = rows.max(1);
     let cols = cols.max(1);
@@ -514,6 +547,7 @@ fn table_snippet(rows: u8, cols: u8) -> String {
     s
 }
 
+/// Insert a generated table at the current cursor and update selection metadata.
 fn insert_table_at_cursor(model: &mut MarkdownModel, rows: u8, cols: u8) {
     let (_, end_char, _) = selection(model);
 
@@ -534,6 +568,7 @@ fn insert_table_at_cursor(model: &mut MarkdownModel, rows: u8, cols: u8) {
     model.cursor_override = model.cursor;
 }
 
+/// Return (start, end, selected text) for the current cursor range.
 fn selection(model: &MarkdownModel) -> (usize, usize, String) {
     let (start_char, end_char) = if let Some(range) = &model.cursor {
         let (a, b) = (range.primary.index, range.secondary.index);
@@ -557,6 +592,7 @@ fn selection(model: &MarkdownModel) -> (usize, usize, String) {
     (start_char, end_char, selected)
 }
 
+/// Apply a prefix/suffix insertion around the current selection, updating cursor placement.
 fn apply_style(
     model: &mut MarkdownModel,
     prefix: &str,
@@ -604,6 +640,7 @@ fn apply_style(
 }
 
 /// Convert a character index to a byte index, clamping to the end when out of bounds.
+/// Convert a character index to a byte index, clamping to the string end.
 fn char_to_byte(text: &str, char_idx: usize) -> usize {
     if char_idx == text.chars().count() {
         return text.len();

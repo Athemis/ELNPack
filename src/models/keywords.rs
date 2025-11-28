@@ -10,6 +10,7 @@ pub struct Keywords {
 }
 
 impl Keywords {
+    /// Create a keyword collection, normalizing duplicates case-insensitively.
     pub fn new(items: Vec<String>) -> Self {
         let mut kw = Self { items };
         kw.normalize();
@@ -17,10 +18,12 @@ impl Keywords {
     }
 
     #[allow(dead_code)]
+    /// Borrow the normalized keyword slice.
     pub fn items(&self) -> &[String] {
         &self.items
     }
 
+    /// Consume the wrapper and return the owned vector.
     pub fn into_vec(self) -> Vec<String> {
         self.items
     }

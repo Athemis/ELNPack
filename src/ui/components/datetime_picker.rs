@@ -15,8 +15,11 @@ fn format_two(n: i32) -> String {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DateTimeModel {
+    /// Selected calendar date (local).
     pub date: NaiveDate,
+    /// Selected hour (0-23).
     pub hour: i32,
+    /// Selected minute (0-59).
     pub minute: i32,
 }
 
@@ -35,12 +38,17 @@ impl Default for DateTimeModel {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DateTimeMsg {
+    /// Update the date field.
     SetDate(NaiveDate),
+    /// Update the hour field.
     SetHour(i32),
+    /// Update the minute field.
     SetMinute(i32),
+    /// Set the picker to the current local time.
     SetNow,
 }
 
+/// Apply a message to the date/time model.
 pub fn update(model: &mut DateTimeModel, msg: DateTimeMsg) {
     match msg {
         DateTimeMsg::SetDate(date) => model.date = date,
@@ -50,6 +58,7 @@ pub fn update(model: &mut DateTimeModel, msg: DateTimeMsg) {
     }
 }
 
+/// Render the picker controls and return any triggered messages.
 pub fn view(model: &DateTimeModel, ui: &mut egui::Ui) -> Vec<DateTimeMsg> {
     let mut msgs = Vec::new();
 
@@ -133,6 +142,7 @@ pub fn to_offset_datetime(model: &DateTimeModel) -> Result<OffsetDateTime, Strin
     Ok(utc_dt)
 }
 
+/// Update the model fields to the current local date and time.
 fn set_to_now(model: &mut DateTimeModel) {
     let now = Local::now();
     model.date = now.date_naive();

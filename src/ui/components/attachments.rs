@@ -19,8 +19,11 @@ pub struct AttachmentItem {
     pub path: PathBuf,
     /// Sanitized filename used for display and inside the archive.
     pub sanitized_name: String,
+    /// Detected MIME type.
     pub mime: String,
+    /// SHA-256 digest of the file contents or `"unavailable"` on failure.
     pub sha256: String,
+    /// File size in bytes.
     pub size: u64,
 }
 
@@ -37,6 +40,7 @@ impl AttachmentItem {
     }
 }
 
+/// MVU state for the attachments picker and thumbnail cache.
 #[derive(Default)]
 pub struct AttachmentsModel {
     attachments: Vec<AttachmentItem>,
@@ -80,9 +84,12 @@ pub enum AttachmentsCommand {
     LoadThumbnail { path: PathBuf },
 }
 
+/// User-facing events for status/error surfaces.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AttachmentsEvent {
+    /// Message text to display.
     pub message: String,
+    /// Whether the message represents an error.
     pub is_error: bool,
 }
 
@@ -213,6 +220,7 @@ pub fn view(ui: &mut egui::Ui, model: &AttachmentsModel) -> Vec<AttachmentsMsg> 
     msgs
 }
 
+/// Render the list of attachments with thumbnails and controls.
 fn render_attachment_list(
     ui: &mut egui::Ui,
     model: &AttachmentsModel,
@@ -316,6 +324,7 @@ fn render_attachment_list(
     }
 }
 
+/// Inline filename edit UI with save/cancel controls.
 fn render_editing_filename(
     ui: &mut egui::Ui,
     model: &AttachmentsModel,
@@ -357,6 +366,7 @@ fn render_editing_filename(
     }
 }
 
+/// Insert a new attachment if it does not collide by sanitized name or hash.
 fn add_attachment_with_meta(
     model: &mut AttachmentsModel,
     path: PathBuf,
@@ -395,6 +405,7 @@ fn add_attachment_with_meta(
     true
 }
 
+/// Remove an attachment and associated cache entries safely.
 fn remove_attachment(model: &mut AttachmentsModel, index: usize) {
     if let Some(removed) = model.attachments.get(index) {
         model.thumbnail_cache.remove(&removed.path);
@@ -408,6 +419,7 @@ fn remove_attachment(model: &mut AttachmentsModel, index: usize) {
     }
 }
 
+/// Validate and commit a sanitized filename edit, returning a feedback event.
 fn commit_filename_edit(model: &mut AttachmentsModel) -> Option<AttachmentsEvent> {
     let Some(index) = model.editing_index else {
         return None;
@@ -455,6 +467,7 @@ fn commit_filename_edit(model: &mut AttachmentsModel) -> Option<AttachmentsEvent
 }
 
 /// Return true when the path extension is a supported raster or SVG image.
+/// Return true when the path extension is a supported raster or SVG image.
 fn is_image(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
@@ -466,6 +479,7 @@ fn is_image(path: &Path) -> bool {
         })
 }
 
+/// Return true when the path extension is SVG.
 /// Return true when the path extension is SVG.
 fn is_svg(path: &Path) -> bool {
     path.extension()
@@ -480,6 +494,7 @@ pub(crate) fn guess_mime(path: &Path) -> String {
         .to_string()
 }
 
+/// Human-readable formatting for byte sizes with binary units.
 fn format_bytes(bytes: u64) -> String {
     const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
     let mut value = bytes as f64;
