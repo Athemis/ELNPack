@@ -2,16 +2,24 @@
 
 ## Project Structure & Module Organization
 
-- Rust 2024 crate; entry point at `src/main.rs`, which initializes the eframe application (ELNPack).
-- UI shell in `src/ui.rs`; it wires the overall layout and delegates to components.
-- Markdown editor encapsulated in `src/editor.rs`; all toolbar, caret handling, and text editing live here.
-- Attachments panel in `src/attachments.rs`; handles attachment list, thumbnails, file dialogs, and computes sanitized filenames when attachments are added. Shows WARNING icon when original and sanitized names differ.
-- Keywords editor in `src/keywords.rs`; manages the keyword list, inline editing, and the add-keywords modal.
-- Date/time picker in `src/datetime_picker.rs`; encapsulates performed-at selection and conversion to `OffsetDateTime`.
-- Filename sanitization utilities in `src/utils.rs`; provides `sanitize_component` function used by attachments and archive modules to ensure cross-platform filename compatibility while preserving extensions.
-- Business logic in `src/archive.rs`; handles RO-Crate archive creation, file operations, and metadata generation.
-- Add new Rust modules under `src/` and integration tests under `tests/` to keep responsibilities clear.
+- Rust 2024 crate; entry point at `src/main.rs`, which calls `app::run()` to start eframe/egui.
+- `src/app/`: app bootstrap (`run`) and eframe setup (fonts/options).
+- `src/mvu/`: MVU kernel (`AppModel`, `Msg`, `Command`, `update`, `run_command`).
+- `src/ui/`: top-level UI composition; wires worker messages to `mvu::update`.
+- `src/ui/components/`: UI components with their own `Model/Msg/update/view` (markdown, attachments, keywords, datetime picker).
+- `src/logic/eln.rs`: ELN/RO-Crate business logic (build/write archive, suggested names).
+- `src/models/`: pure data + validation (`attachment`, `keywords`).
+- `src/utils/`: helpers (`sanitize_component`, `hash_file`).
+- Integration tests live under `tests/` (none yet); unit tests colocated with modules.
 - No build script needed; egui compiles directly with the Rust code.
+
+### MVU paradigm & layering
+- **Model**: `mvu::AppModel` plus per-component models (`MarkdownModel`, `DateTimeModel`, `KeywordsModel`, `AttachmentsModel`).
+- **View**: Component `view(...) -> Vec<Msg>` in `ui/components/*`; `ui::ElnPackApp` composes and wraps into `mvu::Msg`.
+- **Update**: `mvu::update` routes messages to reducers, validates save requests, and enqueues `Command`s. `run_command` performs side-effects and emits follow-up messages.
+- **Commands**: `PickFiles`, `HashFile`, `LoadThumbnail`, `SaveArchive`. Results feed back as messages (`AttachmentsMsg::FilesPicked/HashComputed/ThumbnailReady`, `Msg::SaveCompleted`).
+- **Flow**: UI event → component `Msg` → `mvu::update` mutates model/enqueues commands → `run_command` performs IO → resulting `Msg` goes back into `update` → views re-render from `AppModel`.
+- **Data vs UI**: Pure data in `src/models/`; business/format logic in `src/logic/eln.rs`; MVU kernel in `src/mvu/`; UI composition in `src/ui/`; components in `src/ui/components/`; utilities in `src/utils/`.
 
 ## Build, Test, and Development Commands
 
@@ -49,14 +57,16 @@
 
 ## Module Responsibilities
 
-- **`src/main.rs`**: Application entry point; sets up eframe and launches the UI.
-- **`src/ui.rs`**: UI composition and screens; delegates text editing to `editor`, attachments to `attachments`, keywords to `keywords`, and performed-at selection to `datetime_picker`, and calls `archive` for business operations. When exporting, pass the selected `ArchiveGenre` and the keywords from `KeywordsEditor` into `build_and_write_archive`; default to `ArchiveGenre::Experiment` with an empty keyword list if no input is given.
-- **`src/editor.rs`**: Markdown editor component (toolbar, cursor-aware insertions, text area).
-- **`src/attachments.rs`**: Attachments panel handling list, thumbnails, file dialogs, and inline filename editing. Computes `sanitized_name` for each attachment using `sanitize_component` from `utils` and displays WARNING icon (via `egui_phosphor::regular::WARNING`) when the sanitized name differs from the original filename. Hovering the icon shows the original → sanitized transformation. Users can edit filenames via a pencil button (via `egui_phosphor::regular::PENCIL_SIMPLE`); edited names are sanitized before storage, with validation preventing empty/invalid names and duplicates.
-- **`src/keywords.rs`**: Keywords editor component that manages the keyword list, inline keyword edits, and the add-keywords modal, exposing the final keyword `Vec<String>` to `ui`.
-- **`src/datetime_picker.rs`**: Date/time picker component that encapsulates performed-at selection (date, hour, minute) and conversion to `OffsetDateTime` in UTC.
-- **`src/utils.rs`**: Centralized filename sanitization utilities. The `sanitize_component` function transliterates Unicode with `deunicode`, allows ASCII alphanumerics, hyphens, underscores, and dots (preserving file extensions including multi-part extensions like `.tar.gz`), deduplicates consecutive dots, removes `_.` sequences, trims trailing dots/spaces for Windows compatibility, guards against Windows reserved names (CON/PRN/AUX/NUL/COM1-9/LPT1-9), and falls back to `eln_entry` for empty/invalid names. Includes comprehensive unit tests.
-- **`src/archive.rs`**: Pure business logic for archive creation, file handling, and RO-Crate metadata generation. `ro-crate-metadata.json` inside archives must conform to RO-Crate 1.2 (https://w3id.org/ro/crate/1.2), and the archive structure follows the ELN File Format specification (https://github.com/TheELNConsortium/TheELNFileFormat/blob/master/SPECIFICATION.md). The RO-Crate `Dataset` for the experiment includes `genre` (via the `ArchiveGenre` enum: `Experiment` or `Resource`) and a string `keywords` array. Uses pre-computed `sanitized_name` from `AttachmentMeta` for ZIP paths and RO-Crate File nodes. `suggested_archive_name` uses `sanitize_component` from `utils`. No UI dependencies.
+- **`src/main.rs`**: Entry; loads modules and calls `app::run()`.
+- **`src/app/`**: eframe bootstrap and font/theme setup.
+- **`src/ui/`**: UI composition and screens; collects component messages and feeds them into `mvu::update`/`run_command`. Save flow: opens file dialog, dispatches `Msg::SaveRequested`; kernel validates and calls logic.
+- **`src/ui/components/markdown.rs`**: Markdown editor (toolbar, cursor-aware insertions, text area).
+- **`src/ui/components/attachments.rs`**: Attachments panel (list, thumbnails, inline filename editing). Computes `sanitized_name` using `sanitize_component`; shows WARNING icon on sanitized mismatch; emits commands for file picking/hashing/thumbnails; edited names are sanitized/deduped.
+- **`src/ui/components/keywords.rs`**: Keywords editor with inline edits and add-keywords modal.
+- **`src/ui/components/datetime_picker.rs`**: Date/time picker; converts to `OffsetDateTime`.
+- **`src/utils/`**: Helpers (`sanitize_component`, `hash_file`).
+- **`src/models/`**: Pure data/validation (`attachment`, `keywords`).
+- **`src/logic/eln.rs`**: ELN RO-Crate build/write, metadata, suggested archive name. Conforms to RO-Crate 1.2 and ELN File Format spec; uses pre-sanitized names from attachments. No UI deps.
 
 ## Testing Guidelines
 

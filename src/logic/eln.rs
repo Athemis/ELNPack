@@ -5,31 +5,17 @@
 //! - Package experiment content and attachments into a ZIP with RO-Crate metadata.
 //! - Provide lightweight helpers for MIME guessing and markdown rendering.
 
-use std::{
-    collections::HashSet,
-    fs::{self, File},
-    io::{Read, Write},
-    path::{Path, PathBuf},
-};
+use std::fs::{self, File};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use pulldown_cmark::{Options, Parser, html};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use zip::{CompressionMethod, write::FileOptions};
 
+use crate::models::attachment::{Attachment, assert_unique_sanitized_names};
 use crate::utils::{hash_file, sanitize_component};
-
-/// Attachment metadata supplied by the UI to avoid recomputing hashes and MIME.
-#[derive(Clone, Debug)]
-pub struct AttachmentMeta {
-    /// Original filesystem path to the attachment on disk.
-    pub path: PathBuf,
-    /// Sanitized filename to use inside the archive (and in RO-Crate metadata).
-    pub sanitized_name: String,
-    pub mime: String,
-    pub sha256: String,
-    pub size: u64,
-}
 
 /// Suggest a safe archive filename from a user-facing title.
 ///
@@ -47,6 +33,12 @@ pub fn suggested_archive_name(title: &str) -> String {
 pub enum ArchiveGenre {
     Experiment,
     Resource,
+}
+
+impl Default for ArchiveGenre {
+    fn default() -> Self {
+        ArchiveGenre::Experiment
+    }
 }
 
 impl ArchiveGenre {
@@ -82,7 +74,7 @@ pub fn build_and_write_archive(
     output: &Path,
     title: &str,
     body: &str,
-    attachments: &[AttachmentMeta],
+    attachments: &[Attachment],
     performed_at: OffsetDateTime,
     genre: ArchiveGenre,
     keywords: &[String],
@@ -96,15 +88,7 @@ pub fn build_and_write_archive(
     }
 
     // Guard against duplicate archive paths before writing anything.
-    let mut seen_names = HashSet::new();
-    for meta in attachments {
-        if !seen_names.insert(meta.sanitized_name.clone()) {
-            anyhow::bail!(
-                "Duplicate attachment filename in archive: {}. Please rename one of the files.",
-                meta.sanitized_name
-            );
-        }
-    }
+    assert_unique_sanitized_names(attachments)?;
 
     let root_folder = sanitize_component(
         output
@@ -272,11 +256,11 @@ mod tests {
     use std::path::PathBuf;
 
     use super::ArchiveGenre;
-    use super::AttachmentMeta;
     use super::build_and_write_archive;
     use super::ensure_extension;
     use super::markdown_to_html;
     use super::suggested_archive_name;
+    use crate::models::attachment::Attachment;
     use time::OffsetDateTime;
 
     #[test]
@@ -324,8 +308,14 @@ mod tests {
     fn markdown_to_html_leaves_math_raw_when_parsing_disabled() {
         let html = markdown_to_html("E = mc$^2$ and $$F=ma$$", false);
 
-        assert!(html.contains("E = mc$^2$"), "inline math should remain as raw text");
-        assert!(html.contains("$$F=ma$$"), "display math should remain as raw text");
+        assert!(
+            html.contains("E = mc$^2$"),
+            "inline math should remain as raw text"
+        );
+        assert!(
+            html.contains("$$F=ma$$"),
+            "display math should remain as raw text"
+        );
         assert!(
             !html.contains("math-inline") && !html.contains("math-display"),
             "math classes should not be injected when parsing is disabled"
@@ -345,20 +335,20 @@ mod tests {
         fs::write(&file2, b"two").unwrap();
 
         let attachments = vec![
-            AttachmentMeta {
-                path: file1.clone(),
-                sanitized_name: "a.txt".into(),
-                mime: "text/plain".into(),
-                sha256: "unavailable".into(),
-                size: 3,
-            },
-            AttachmentMeta {
-                path: file2.clone(),
-                sanitized_name: "a.txt".into(),
-                mime: "text/plain".into(),
-                sha256: "unavailable".into(),
-                size: 3,
-            },
+            Attachment::new(
+                file1.clone(),
+                "a.txt".into(),
+                "text/plain".into(),
+                "unavailable".into(),
+                3,
+            ),
+            Attachment::new(
+                file2.clone(),
+                "a.txt".into(),
+                "text/plain".into(),
+                "unavailable".into(),
+                3,
+            ),
         ];
 
         let result = build_and_write_archive(

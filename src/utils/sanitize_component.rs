@@ -1,27 +1,4 @@
-//! Utility helpers shared across the application.
-//!
-//! Provides filename sanitization and file hashing utilities used across
-//! the attachment and archive modules.
-
-use std::fs::File;
-use std::io;
-use std::path::Path;
-
-use anyhow::{Context, Result};
-use sha2::{Digest, Sha256};
-
-/// Compute the SHA-256 hash of a file.
-///
-/// Returns the hexadecimal string representation of the hash.
-/// Fails if the file cannot be opened or read.
-pub fn hash_file(path: &Path) -> Result<String> {
-    let mut file =
-        File::open(path).with_context(|| format!("Failed to open file for hashing: {:?}", path))?;
-    let mut hasher = Sha256::new();
-    io::copy(&mut file, &mut hasher)
-        .with_context(|| format!("Failed to read file for hashing: {:?}", path))?;
-    Ok(format!("{:x}", hasher.finalize()))
-}
+//! Produce filesystem-safe path components shared across the app.
 
 /// Produce a filesystem-safe path component.
 ///
@@ -34,14 +11,6 @@ pub fn hash_file(path: &Path) -> Result<String> {
 /// This keeps multi-part extensions intact (for example `data.v1.2.tar.gz`
 /// stays `data.v1.2.tar.gz`) while remaining extractor-friendly on
 /// Windows and Unix.
-///
-/// # Examples
-/// ```ignore
-/// use elnpack::utils::sanitize_component;
-///
-/// let name = sanitize_component("Café (draft).md");
-/// assert_eq!(name, "Cafe_draft.md");
-/// ```
 pub fn sanitize_component(value: &str) -> String {
     // Step 1: transliterate to ASCII to avoid multi-byte surprises.
     let transliterated = deunicode::deunicode(value);
