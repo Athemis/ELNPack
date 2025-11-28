@@ -43,6 +43,7 @@ impl Default for ElnPackApp {
         Self {
             model: AppModel {
                 archive_genre: ArchiveGenre::Experiment,
+                body_format: crate::logic::eln::BodyFormat::Html,
                 ..Default::default()
             },
             inbox: Vec::new(),
@@ -95,6 +96,8 @@ impl eframe::App for ElnPackApp {
                     self.render_theme_controls(ui);
                     ui.separator();
                     self.render_save_button(ui);
+                    ui.separator();
+                    self.render_body_format_toggle(ui);
                 });
             });
             ui.add_space(4.0);
@@ -189,10 +192,34 @@ impl ElnPackApp {
 
     /// Render the markdown editor field and toolbar.
     fn render_description_input(&mut self, ui: &mut egui::Ui) {
-        ui.label("Main Text (Markdown)");
+        ui.label("Main Text");
+        ui.label(
+            egui::RichText::new("Use Markdown to format text.")
+                .small()
+                .color(egui::Color32::from_gray(110)),
+        );
         ui.add_space(4.0);
         let md_msgs = markdown::view(&self.model.markdown, ui);
         self.inbox.extend(md_msgs.into_iter().map(Msg::Markdown));
+    }
+    fn render_body_format_toggle(&mut self, ui: &mut egui::Ui) {
+        let mut choice = self.model.body_format;
+        ui.horizontal(|ui| {
+            let md_label = format!("{} Markdown", egui_phosphor::regular::MARKDOWN_LOGO);
+            ui.selectable_value(
+                &mut choice,
+                crate::logic::eln::BodyFormat::Markdown,
+                md_label,
+            )
+            .on_hover_text("Store the raw markdown in the archive metadata");
+            let html_label = format!("{} HTML", egui_phosphor::regular::FILE_HTML);
+            ui.selectable_value(&mut choice, crate::logic::eln::BodyFormat::Html, html_label)
+                .on_hover_text("Convert markdown to HTML in the archive metadata");
+            ui.label("Export as");
+        });
+        if choice != self.model.body_format {
+            self.inbox.push(Msg::SetBodyFormat(choice));
+        }
     }
 
     /// Grouped metadata block with entry type and performed-at controls.

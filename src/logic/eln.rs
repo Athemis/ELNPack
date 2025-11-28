@@ -38,6 +38,19 @@ pub enum ArchiveGenre {
     Resource,
 }
 
+/// How to store the main body in the RO-Crate metadata.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BodyFormat {
+    Html,
+    Markdown,
+}
+
+impl Default for BodyFormat {
+    fn default() -> Self {
+        BodyFormat::Html
+    }
+}
+
 impl Default for ArchiveGenre {
     fn default() -> Self {
         ArchiveGenre::Experiment
@@ -81,6 +94,7 @@ pub fn build_and_write_archive(
     performed_at: OffsetDateTime,
     genre: ArchiveGenre,
     keywords: &[String],
+    body_format: BodyFormat,
 ) -> Result<()> {
     // Ensure parent exists so the archive can be written without IO errors.
     if let Some(parent) = output.parent()
@@ -169,14 +183,18 @@ pub fn build_and_write_archive(
     let timestamp = performed_at
         .format(&Rfc3339)
         .map_err(|err| anyhow::anyhow!("Failed to format performed_at timestamp: {}", err))?;
-    let body_html = markdown_to_html(body, false);
+    let (body_text, encoding_format) = match body_format {
+        BodyFormat::Html => (markdown_to_html(body, false), "text/html"),
+        BodyFormat::Markdown => (body.to_string(), "text/markdown"),
+    };
     let org_id = "https://elnpack.app/#organization";
 
     let experiment_node = serde_json::json!({
         "@id": "./experiment/",
         "@type": "Dataset",
         "name": title,
-        "text": body_html,
+        "encodingFormat": encoding_format,
+        "text": body_text,
         "dateCreated": timestamp,
         "dateModified": timestamp,
         "author": { "@id": org_id },
@@ -259,6 +277,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::ArchiveGenre;
+    use super::BodyFormat;
     use super::build_and_write_archive;
     use super::ensure_extension;
     use super::markdown_to_html;
@@ -362,6 +381,7 @@ mod tests {
             OffsetDateTime::from_unix_timestamp(0).unwrap(),
             ArchiveGenre::Experiment,
             &[],
+            BodyFormat::Html,
         );
 
         assert!(result.is_err(), "duplicate names should be rejected");

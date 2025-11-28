@@ -20,6 +20,7 @@ use crate::ui::components::markdown::{MarkdownModel, MarkdownMsg};
 pub struct AppModel {
     pub entry_title: String,
     pub archive_genre: ArchiveGenre,
+    pub body_format: crate::logic::eln::BodyFormat,
     pub markdown: MarkdownModel,
     pub attachments: AttachmentsModel,
     pub keywords: KeywordsModel,
@@ -33,6 +34,7 @@ pub struct AppModel {
 pub enum Msg {
     EntryTitleChanged(String),
     SetGenre(ArchiveGenre),
+    SetBodyFormat(crate::logic::eln::BodyFormat),
     SaveRequested(PathBuf),
     SaveCancelled,
     SaveCompleted(Result<PathBuf, String>),
@@ -68,6 +70,7 @@ pub struct SavePayload {
     pub performed_at: time::OffsetDateTime,
     pub genre: ArchiveGenre,
     pub keywords: Vec<String>,
+    pub body_format: crate::logic::eln::BodyFormat,
 }
 
 /// Update the application model and enqueue commands.
@@ -75,6 +78,7 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
     match msg {
         Msg::EntryTitleChanged(text) => model.entry_title = text,
         Msg::SetGenre(genre) => model.archive_genre = genre,
+        Msg::SetBodyFormat(format) => model.body_format = format,
         Msg::DismissError => model.error = None,
         Msg::Markdown(m) => {
             crate::ui::components::markdown::update(&mut model.markdown, m);
@@ -190,6 +194,7 @@ pub fn run_command(cmd: Command) -> Msg {
                 payload.performed_at,
                 payload.genre,
                 &payload.keywords,
+                payload.body_format,
             )
             .map(|_| payload.output.clone());
             Msg::SaveCompleted(res.map_err(|e| e.to_string()))
@@ -234,6 +239,7 @@ fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePaylo
         performed_at,
         genre: model.archive_genre,
         keywords: keywords.into_vec(),
+        body_format: model.body_format,
     })
 }
 
