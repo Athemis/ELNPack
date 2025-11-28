@@ -330,9 +330,7 @@ fn process_modal_input(model: &mut KeywordsModel) -> (String, bool) {
 
 /// Validate and commit an inline keyword edit, returning a feedback event on error.
 fn commit_edit(model: &mut KeywordsModel) -> Option<KeywordsEvent> {
-    let Some(index) = model.editing_index else {
-        return None;
-    };
+    let index = model.editing_index?;
     let new_kw = model.editing_buffer.trim();
     if new_kw.is_empty() {
         return Some(KeywordsEvent {
@@ -364,6 +362,8 @@ fn commit_edit(model: &mut KeywordsModel) -> Option<KeywordsEvent> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::field_reassign_with_default)]
+
     use super::*;
 
     #[test]

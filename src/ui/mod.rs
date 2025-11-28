@@ -8,10 +8,9 @@ pub mod components;
 
 use eframe::egui;
 
-use crate::logic::eln::{ArchiveGenre, ensure_extension, suggested_archive_name};
+use crate::logic::eln::{ensure_extension, suggested_archive_name, ArchiveGenre};
 use crate::mvu::{self, AppModel, Command, Msg};
 use crate::ui::components::{attachments, datetime_picker, keywords, markdown};
-use crossbeam_channel;
 
 /// Stateful egui application for building and exporting ELN entries.
 pub struct ElnPackApp {

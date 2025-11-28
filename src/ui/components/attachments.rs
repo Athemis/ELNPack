@@ -160,10 +160,10 @@ pub fn update(
         }
         AttachmentsMsg::Remove(index) => {
             remove_attachment(model, index);
-            return Some(AttachmentsEvent {
+            Some(AttachmentsEvent {
                 message: "Attachment removed".to_string(),
                 is_error: false,
-            });
+            })
         }
         AttachmentsMsg::StartEdit(index) => {
             model.editing_index = Some(index);
@@ -421,9 +421,7 @@ fn remove_attachment(model: &mut AttachmentsModel, index: usize) {
 
 /// Validate and commit a sanitized filename edit, returning a feedback event.
 fn commit_filename_edit(model: &mut AttachmentsModel) -> Option<AttachmentsEvent> {
-    let Some(index) = model.editing_index else {
-        return None;
-    };
+    let index = model.editing_index?;
 
     let raw = model.editing_buffer.trim();
     if raw.is_empty() {

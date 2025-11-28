@@ -66,8 +66,8 @@ pub enum Msg {
 /// Commands represent side-effects executed between frames.
 pub enum Command {
     PickFiles,
-    HashFile { path: PathBuf, retry: bool },
-    LoadThumbnail { path: PathBuf, retry: bool },
+    HashFile { path: PathBuf, _retry: bool },
+    LoadThumbnail { path: PathBuf, _retry: bool },
     SaveArchive(SavePayload),
 }
 
@@ -109,12 +109,14 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
             for c in att_cmds {
                 match c {
                     AttachmentsCommand::PickFiles => cmds.push(Command::PickFiles),
-                    AttachmentsCommand::HashFile { path } => {
-                        cmds.push(Command::HashFile { path, retry: false })
-                    }
-                    AttachmentsCommand::LoadThumbnail { path } => {
-                        cmds.push(Command::LoadThumbnail { path, retry: false })
-                    }
+                    AttachmentsCommand::HashFile { path } => cmds.push(Command::HashFile {
+                        path,
+                        _retry: false,
+                    }),
+                    AttachmentsCommand::LoadThumbnail { path } => cmds.push(Command::LoadThumbnail {
+                        path,
+                        _retry: false,
+                    }),
                 }
             }
         }
@@ -136,12 +138,14 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
             for c in att_cmds {
                 match c {
                     AttachmentsCommand::PickFiles => cmds.push(Command::PickFiles),
-                    AttachmentsCommand::HashFile { path } => {
-                        cmds.push(Command::HashFile { path, retry: false })
-                    }
-                    AttachmentsCommand::LoadThumbnail { path } => {
-                        cmds.push(Command::LoadThumbnail { path, retry: false })
-                    }
+                    AttachmentsCommand::HashFile { path } => cmds.push(Command::HashFile {
+                        path,
+                        _retry: false,
+                    }),
+                    AttachmentsCommand::LoadThumbnail { path } => cmds.push(Command::LoadThumbnail {
+                        path,
+                        _retry: false,
+                    }),
                 }
             }
         }
@@ -173,17 +177,8 @@ pub fn run_command(cmd: Command) -> Msg {
                 .unwrap_or_default();
             Msg::Attachments(AttachmentsMsg::FilesPicked(files))
         }
-        Command::HashFile { path, retry } => {
-            let sha256 = match crate::utils::hash_file(&path) {
-                Ok(h) => h,
-                Err(_) => {
-                    if retry {
-                        "unavailable".to_string()
-                    } else {
-                        "unavailable".to_string()
-                    }
-                }
-            };
+        Command::HashFile { path, _retry: _ } => {
+            let sha256 = crate::utils::hash_file(&path).unwrap_or_else(|_| "unavailable".into());
             let size = path.metadata().map(|m| m.len()).unwrap_or(0);
             let mime = attachments::guess_mime(&path);
             Msg::Attachments(AttachmentsMsg::HashComputed {
@@ -193,15 +188,9 @@ pub fn run_command(cmd: Command) -> Msg {
                 mime,
             })
         }
-        Command::LoadThumbnail { path, retry } => match attachments::load_image_thumbnail(&path) {
+        Command::LoadThumbnail { path, _retry: _ } => match attachments::load_image_thumbnail(&path) {
             Ok(image) => Msg::ThumbnailDecoded { path, image },
-            Err(_) => {
-                if retry {
-                    Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path })
-                } else {
-                    Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path })
-                }
-            }
+            Err(_) => Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path }),
         },
         Command::SaveArchive(payload) => {
             let res = build_and_write_archive(
@@ -265,6 +254,8 @@ fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePaylo
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::field_reassign_with_default)]
+
     use super::*;
     use std::path::PathBuf;
     use tempfile::TempDir;
@@ -340,9 +331,8 @@ mod tests {
 
         assert_eq!(cmds.len(), 1);
         match cmds.pop().unwrap() {
-            Command::LoadThumbnail { path: p, retry } => {
+            Command::LoadThumbnail { path: p, _retry } => {
                 assert_eq!(p, path);
-                assert!(!retry);
             }
             _ => panic!("unexpected command"),
         }

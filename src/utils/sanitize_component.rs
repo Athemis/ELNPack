@@ -24,8 +24,6 @@ pub fn sanitize_component(value: &str) -> String {
     for ch in transliterated.chars() {
         let mapped = if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.' {
             ch
-        } else if ch.is_whitespace() || ch == '/' || ch == '\\' {
-            '_'
         } else {
             '_'
         };

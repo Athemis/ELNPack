@@ -32,29 +32,19 @@ pub fn suggested_archive_name(title: &str) -> String {
 }
 
 /// Allowed archive genres for RO-Crate metadata.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum ArchiveGenre {
+    #[default]
     Experiment,
     Resource,
 }
 
 /// How to store the main body in the RO-Crate metadata.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum BodyFormat {
+    #[default]
     Html,
     Markdown,
-}
-
-impl Default for BodyFormat {
-    fn default() -> Self {
-        BodyFormat::Html
-    }
-}
-
-impl Default for ArchiveGenre {
-    fn default() -> Self {
-        ArchiveGenre::Experiment
-    }
 }
 
 impl ArchiveGenre {
@@ -86,6 +76,7 @@ pub fn ensure_extension(mut path: PathBuf, extension: &str) -> PathBuf {
 /// Creates directories inside the archive, copies attachments with sanitized names,
 /// emits RO-Crate JSON-LD metadata, and writes the final ZIP to `output`.
 /// Parent directories for `output` are created if missing.
+#[allow(clippy::too_many_arguments)]
 pub fn build_and_write_archive(
     output: &Path,
     title: &str,

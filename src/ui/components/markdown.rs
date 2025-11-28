@@ -130,8 +130,8 @@ pub fn update(model: &mut MarkdownModel, msg: MarkdownMsg) {
         MarkdownMsg::SetMathChoice(choice) => model.math_choice = choice,
         MarkdownMsg::ApplyStyle(kind) => apply_style_kind(model, kind),
         MarkdownMsg::InsertTable { rows, cols } => insert_table_at_cursor(model, rows, cols),
-        MarkdownMsg::SetTableRows(rows) => model.table_rows = rows.max(1).min(100),
-        MarkdownMsg::SetTableCols(cols) => model.table_cols = cols.max(1).min(20),
+        MarkdownMsg::SetTableRows(rows) => model.table_rows = rows.clamp(1, 100),
+        MarkdownMsg::SetTableCols(cols) => model.table_cols = cols.clamp(1, 20),
     }
 }
 
@@ -480,8 +480,8 @@ fn table_size_picker(ui: &mut egui::Ui, model: &MarkdownModel, msgs: &mut Vec<Ma
         .button(format!("{} Insert table", egui_phosphor::regular::PLUS))
         .clicked()
     {
-        let rows = rows.max(1).min(MAX_ROWS);
-        let cols = cols.max(1).min(MAX_COLS);
+        let rows = rows.clamp(1, MAX_ROWS);
+        let cols = cols.clamp(1, MAX_COLS);
         msgs.push(MarkdownMsg::InsertTable { rows, cols });
         ui.close();
     }
