@@ -3,6 +3,7 @@
 ## Project Structure & Module Organization
 
 - Rust 2024 crate; entry point at `src/main.rs`, which calls `app::run()` to start eframe/egui. SPDX headers on sources: `SPDX-License-Identifier: MIT` plus one or more `SPDX-FileCopyrightText` lines naming actual authors (add additional lines for significant contributors).
+- License text duplicated for REUSE: root `LICENSE.md` plus `LICENSES/MIT.txt` (SPDX MIT identifier).
 - `src/app/`: app bootstrap (`run`) and eframe setup (fonts/options).
 - `src/mvu/`: MVU kernel (`AppModel`, `Msg`, `Command`, `update`, `run_command`).
 - `src/ui/`: top-level UI composition; wires worker messages to `mvu::update`.

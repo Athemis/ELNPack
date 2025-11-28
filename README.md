@@ -3,6 +3,7 @@
 A lightweight electronic lab notebook (ELN) entry packager built with Rust, eframe/egui, and RO-Crate metadata. Users can write Markdown notes, attach files, preview thumbnails, and export a `.eln` archive containing the experiment text plus attachments and RO-Crate metadata.
 
 ## Features
+
 - Markdown editor with quick-insert toolbar (headings, inline/block code, lists, links, quotes, images, strike/underline, rules) and caret-aware insertion.
 - Attachments panel with image thumbnails, SHA-256 duplicate detection, sanitized filenames (with warning indicator), inline rename, and MIME/size display.
 - Keywords editor with inline chips and add-keywords modal (comma-split with duplicate filtering).
@@ -11,6 +12,7 @@ A lightweight electronic lab notebook (ELN) entry packager built with Rust, efra
 - RO-Crate 1.2 metadata + ZIP-based `.eln` archive output (experiment text, attachments, keywords, genre).
 
 ## Filename Sanitization & Editing
+
 When you attach files, ELNPack automatically sanitizes filenames to ensure cross-platform compatibility while preserving file extensions (including multi-part extensions like `.tar.gz`). The sanitization process:
 
 1. Transliterates Unicode characters (e.g., `Café` → `Cafe`)
@@ -23,7 +25,9 @@ When you attach files, ELNPack automatically sanitizes filenames to ensure cross
 When a filename is sanitized, the attachments panel displays a **⚠ WARNING** icon next to the sanitized name. Hover over the icon to see the original → sanitized transformation.
 
 ### Editing Filenames
+
 You can edit attachment filenames by clicking the **pencil button** (🖊) next to any filename. The inline editor allows you to:
+
 - Rename files before creating the archive
 - Use Enter/Tab to save or click the ✔ button
 - Cancel with the ✕ button
@@ -31,6 +35,7 @@ You can edit attachment filenames by clicking the **pencil button** (🖊) next 
 All edited filenames are automatically sanitized using the same rules above, ensuring filesystem safety. Duplicate filenames are prevented, and validation errors are shown in the status bar.
 
 ## Project Layout
+
 - `src/main.rs` — entry; calls `app::run()` to launch eframe/egui.
 - `src/app/` — app bootstrap and font/options setup.
 - `src/mvu/` — MVU kernel (`AppModel`, `Msg`, `Command`, `update`, `run_command`).
@@ -42,6 +47,7 @@ All edited filenames are automatically sanitized using the same rules above, ens
 - Tests: colocated unit tests plus integration tests under `tests/` (if added).
 
 ## Development
+
 - Run: `cargo run`
 - Check: `cargo check`
 - Lint: `cargo clippy --all-targets --all-features`
@@ -49,16 +55,26 @@ All edited filenames are automatically sanitized using the same rules above, ens
 - Test: `cargo test`
 
 ## Building Release
+
 ```
 cargo build --release
 ```
 
 ## License
+
 This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md).
 
 Source files include SPDX headers:
+
 ```
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 <Actual Author Name>
 ```
+
 Add additional `SPDX-FileCopyrightText` lines for significant contributors.
+
+This repository follows the [REUSE Software](https://reuse.software/) specification:
+
+- License terms are defined centrally in `LICENSE`.
+- Source files carry SPDX headers as shown above, so tools can automatically detect license and copyright.
+- If additional licenses are needed in the future, the corresponding texts will be placed under a `LICENSES/` directory according to REUSE conventions.
