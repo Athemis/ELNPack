@@ -7,7 +7,10 @@ SPDX-FileCopyrightText: 2025 Alexander Minges
 
 ## Project Structure & Module Organization
 
+<!-- REUSE-IgnoreStart -->
+
 - Rust 2024 crate; entry point at `src/main.rs`, which calls `app::run()` to start eframe/egui. SPDX headers on sources: `SPDX-License-Identifier: MIT` plus one or more `SPDX-FileCopyrightText` lines naming actual authors (add additional lines for significant contributors).
+<!-- REUSE-IgnoreEnd -->
 - License text duplicated for REUSE: root `LICENSE` plus `LICENSES/MIT.txt` (SPDX MIT identifier).
 - See "Module Responsibilities" below for detailed module-level responsibilities and file layout.
 - No build script needed; egui compiles directly with the Rust code.
