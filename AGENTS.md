@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2025 Alexander Minges
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization
