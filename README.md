@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!-- SPDX-FileCopyrightText: 2025 Alexander Minges -->
+
 # ELNPack
 
 A lightweight electronic lab notebook (ELN) entry packager built with [Rust](https://rust-lang.org), [egui](https://www.egui.rs), and [RO-Crate](https://www.researchobject.org/ro-crate) metadata. Users can write Markdown notes, attach files, add keywords, and export a `.eln` archive (see [The ELN Consortium](https://the.elnconsortium.org)) containing the experiment text plus attachments and RO-Crate metadata. `.eln` archives can be imported into a wide range of ELNs, the current focus of ELNPack is however compatibility with [eLabFTW](https://www.elabftw.net).
@@ -52,7 +55,7 @@ cargo build --release
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md).
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 Source files include SPDX headers:
 
@@ -68,3 +71,13 @@ This repository follows the [REUSE Software](https://reuse.software/) specificat
 - License terms are defined centrally in `LICENSE`.
 - Source files carry SPDX headers as shown above, so tools can automatically detect license and copyright.
 - If additional licenses are needed in the future, the corresponding texts will be placed under a `LICENSES/` directory according to REUSE conventions.
+
+## Security & Privacy
+
+- ELNPack runs locally and does not make outbound network requests.
+- File dialogs use native OS pickers; archives are written only to user-selected locations.
+- Please avoid adding network I/O without prior discussion (see [CONTRIBUTING](CONTRIBUTING.md)).
+
+## Contributing
+
+We welcome issues and PRs! See [CONTRIBUTING](CONTRIBUTING.md) for coding standards, testing checklist, and commit conventions.

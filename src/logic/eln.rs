@@ -22,7 +22,7 @@ use crate::utils::{hash_file, sanitize_component};
 
 /// Suggest a safe archive filename from a user-facing title.
 ///
-/// Uses [`sanitize_component`] for the base name and lowercases it, then
+/// Uses [`crate::utils::sanitize_component()`] for the base name and lowercases it, then
 /// appends the `.eln` extension. Falls back to `eln_entry.eln` when the
 /// sanitized title is empty.
 pub fn suggested_archive_name(title: &str) -> String {
