@@ -82,7 +82,6 @@ This repository follows the [REUSE Software](https://reuse.software/) specificat
 
 - ELNPack runs locally and does not make outbound network requests.
 - File dialogs use native OS pickers; archives are written only to user-selected locations.
-- Please avoid adding network I/O without prior discussion (see [CONTRIBUTING](CONTRIBUTING.md)).
 
 ## Contributing
 
@@ -91,3 +90,22 @@ We welcome issues and PRs! See [CONTRIBUTING](CONTRIBUTING.md) for coding standa
 ### Git hooks
 
 Repository hooks live in `.githooks`. Run `./scripts/install-git-hooks.sh` once to point `core.hooksPath` there. Hooks enforce Conventional Commits and run `fmt` (writes changes), `clippy`, and `test` before each commit (set `SKIP_PRE_COMMIT=1` to bypass locally).
+
+## FAQ
+
+- **Why is there a AGENTS.md? Is ELNPack AI created?**
+
+  Short answer: No, ELNPack is not AI created. However, I'd like to use available AI tools
+  to provide support in e.g. bug solving, quality control and documentation. AGENTS.md is read and
+  understood by most of these tools.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
+
+Source files include SPDX headers:
+
+```
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2025 <Actual Author Name>
+```
