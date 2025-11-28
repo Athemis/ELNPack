@@ -1,0 +1,5 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+
+Files: *.lock
+Copyright: 2025 Alexander Minges
+License: MIT
