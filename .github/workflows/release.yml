@@ -116,6 +116,10 @@ jobs:
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: Strip binary (Linux)
+        if: matrix.linux
+        run: strip --strip-unneeded target/$TARGET/release/elnpack
+
       - name: Package artifact (Linux)
         if: matrix.archive == 'tar.gz'
         run: |
