@@ -101,7 +101,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Build release
-        run: cargo build --release --target $TARGET
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package artifact (Linux)
         if: matrix.archive == 'tar.gz'
