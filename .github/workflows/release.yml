@@ -107,13 +107,23 @@ jobs:
           Invoke-WebRequest -Uri $url -OutFile "rust9x.7z"
 
           $installDir = "$env:USERPROFILE\rust9x"
+          if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir }
           New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 
           # 7-Zip is available on windows-latest; if not, you would need to install it beforehand
           & 7z x "rust9x.7z" "-o$installDir" | Out-Null
 
+          # Determine toolchain root (archive may contain nested rust9x/)
+          $toolchainDir = $installDir
+          if (Test-Path (Join-Path $installDir "rust9x/lib")) {
+            $toolchainDir = Join-Path $installDir "rust9x"
+          }
+          elseif (-not (Test-Path (Join-Path $installDir "lib"))) {
+            throw "rust9x archive layout unexpected; lib/ not found"
+          }
+
           # Register toolchain under the name 'rust9x'
-          rustup toolchain link rust9x $installDir
+          rustup toolchain link rust9x $toolchainDir
 
           # Sanity check
           rustc +rust9x -V
