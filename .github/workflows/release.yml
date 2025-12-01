@@ -74,7 +74,6 @@ jobs:
             rustflags: "-C panic=abort"
             linux: false
             rust9x: true
-            rust9x_tag: rust9x-1.85-beta-v2
     runs-on: ${{ matrix.runner }}
     env:
       TARGET: ${{ matrix.target }}
@@ -93,29 +92,30 @@ jobs:
       - name: Install rust9x toolchain
         if: ${{ matrix.rust9x }}
         shell: pwsh
+        env:
+          # Tag der gewünschten rust9x-Version – bei Bedarf anpassen
+          RUST9X_DIST_TAG: rust9x-1.76-beta-v5
         run: |
           $ErrorActionPreference = "Stop"
-          $repoDir = Join-Path $env:RUNNER_TEMP "rust9x-src"
 
-          Write-Host "Cloning rust9x sources into $repoDir"
-          git clone --branch rust9x --depth 1 https://github.com/rust9x/rust.git $repoDir
-          Set-Location $repoDir
-          git fetch --tags
-          $tag = "${{ matrix.rust9x_tag }}"
-          git checkout $tag
+          $tag = $env:RUST9X_DIST_TAG
+          # Note: the binary releases typically use a single file "rust9x.7z"
+          # e.g. https://github.com/rust9x/rust/releases/download/rust9x-1.76-beta-v1/rust9x.7z
+          $url = "https://github.com/rust9x/rust/releases/download/$tag/rust9x.7z"
 
-          Copy-Item config.rust9x.toml config.toml -Force
+          Write-Host "Downloading Rust9x toolchain from $url"
+          Invoke-WebRequest -Uri $url -OutFile "rust9x.7z"
 
-          Write-Host "Building rust9x stage1 toolchain (this can take a while)"
-          python x.py build --config config.rust9x.toml --stage 1
+          $installDir = "$env:USERPROFILE\rust9x"
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 
-          $toolchainDir = Join-Path $repoDir "build/x86_64-pc-windows-msvc/stage1"
-          if (-not (Test-Path $toolchainDir)) {
-            throw "Expected toolchain path not found: $toolchainDir"
-          }
+          # 7-Zip is available on windows-latest; if not, you would need to install it beforehand
+          & 7z x "rust9x.7z" "-o$installDir" | Out-Null
 
-          rustup toolchain link rust9x $toolchainDir
+          # Register toolchain under the name 'rust9x'
+          rustup toolchain link rust9x $installDir
 
+          # Sanity check
           rustc +rust9x -V
 
       - name: Install Linux build deps
