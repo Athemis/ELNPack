@@ -57,11 +57,6 @@ jobs:
       matrix:
         include:
           - runner: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            archive: tar.gz
-            rustflags: -C target-feature=-crt-static -Clink-arg=-lm
-            linux: true
-          - runner: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             archive: tar.gz
             rustflags: ""
@@ -94,13 +89,6 @@ jobs:
             libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
             libgl1-mesa-dev libasound2-dev libudev-dev \
             libwayland-dev libxkbcommon-dev
-          if [ "${TARGET}" = "x86_64-unknown-linux-musl" ]; then
-            sudo apt-get install -y musl-tools musl-dev
-          fi
-
-      - name: Configure musl linker
-        if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
 
       - name: Cache cargo
         uses: actions/cache@v4
