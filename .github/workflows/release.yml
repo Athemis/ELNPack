@@ -35,8 +35,9 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e
         with:
+          toolchain: stable
           components: rustfmt, clippy
 
       - name: Cargo fmt
@@ -58,31 +59,44 @@ jobs:
           - runner: ubuntu-latest
             target: x86_64-unknown-linux-musl
             archive: tar.gz
+            rustflags: -C target-feature=-crt-static
+            linux: true
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+            rustflags: ""
+            linux: true
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             archive: zip
+            rustflags: ""
+            linux: false
     runs-on: ${{ matrix.runner }}
     env:
       TARGET: ${{ matrix.target }}
-      RUSTFLAGS: -C target-feature=+crt-static
+      RUSTFLAGS: ${{ matrix.rustflags }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@7b1c307e0dcbda6122208f10795a713336a9b35a
         with:
+          toolchain: stable
           target: ${{ matrix.target }}
 
-      - name: Install musl toolchain and native deps
-        if: matrix.target == 'x86_64-unknown-linux-musl'
+      - name: Install Linux build deps
+        if: matrix.linux
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            musl-tools musl-dev pkg-config \
+            pkg-config \
             libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
             libgl1-mesa-dev libasound2-dev libudev-dev \
             libwayland-dev libxkbcommon-dev
+          if [ "${TARGET}" = "x86_64-unknown-linux-musl" ]; then
+            sudo apt-get install -y musl-tools musl-dev
+          fi
 
       - name: Cache cargo
         uses: actions/cache@v4
