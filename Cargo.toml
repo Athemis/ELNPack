@@ -28,3 +28,8 @@ deunicode = "1.6"
 
 [dev-dependencies]
 tempfile = "3.14"
+
+[profile.release]
+lto = true
+panic = "abort"
+strip = "debuginfo"
