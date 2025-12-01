@@ -4,12 +4,12 @@
 set -euo pipefail
 
 if [[ ${SKIP_PRE_COMMIT:-0} == 1 ]]; then
-  echo "[pre-commit] skipped via SKIP_PRE_COMMIT"
-  exit 0
+    echo "[pre-commit] skipped via SKIP_PRE_COMMIT"
+    exit 0
 fi
 
 echo "[pre-commit] cargo fmt"
-cargo fmt
+cargo fmt -- --check
 
 echo "[pre-commit] cargo clippy --all-targets --all-features -- -D warnings"
 cargo clippy --all-targets --all-features -- -D warnings
