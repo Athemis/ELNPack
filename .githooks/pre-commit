@@ -8,7 +8,7 @@ if [[ ${SKIP_PRE_COMMIT:-0} == 1 ]]; then
     exit 0
 fi
 
-echo "[pre-commit] cargo fmt"
+echo "[pre-commit] cargo fmt -- --check"
 cargo fmt -- --check
 
 echo "[pre-commit] cargo clippy --all-targets --all-features -- -D warnings"
