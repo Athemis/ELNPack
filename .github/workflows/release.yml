@@ -61,11 +61,19 @@ jobs:
             archive: tar.gz
             rustflags: ""
             linux: true
+            rust9x: false
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             archive: zip
             rustflags: ""
             linux: false
+            rust9x: false
+          - runner: windows-latest
+            target: i586-rust9x-windows-msvc
+            archive: zip
+            rustflags: "-C panic=abort"
+            linux: false
+            rust9x: true
     runs-on: ${{ matrix.runner }}
     env:
       TARGET: ${{ matrix.target }}
@@ -75,10 +83,40 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Install stable toolchain
+        if: ${{ !matrix.rust9x }}
         uses: dtolnay/rust-toolchain@7b1c307e0dcbda6122208f10795a713336a9b35a
         with:
           toolchain: stable
           target: ${{ matrix.target }}
+
+      - name: Install rust9x toolchain
+        if: ${{ matrix.rust9x }}
+        shell: pwsh
+        env:
+          # Tag der gewünschten rust9x-Version – bei Bedarf anpassen
+          RUST9X_DIST_TAG: rust9x-1.76-beta-v5
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $tag = $env:RUST9X_DIST_TAG
+          # Note: the binary releases typically use a single file "rust9x.7z"
+          # e.g. https://github.com/rust9x/rust/releases/download/rust9x-1.76-beta-v1/rust9x.7z
+          $url = "https://github.com/rust9x/rust/releases/download/$tag/rust9x.7z"
+
+          Write-Host "Downloading Rust9x toolchain from $url"
+          Invoke-WebRequest -Uri $url -OutFile "rust9x.7z"
+
+          $installDir = "$env:USERPROFILE\rust9x"
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+          # 7-Zip is available on windows-latest; if not, you would need to install it beforehand
+          & 7z x "rust9x.7z" "-o$installDir" | Out-Null
+
+          # Register toolchain under the name 'rust9x'
+          rustup toolchain link rust9x $installDir
+
+          # Sanity check
+          rustc +rust9x -V
 
       - name: Install Linux build deps
         if: matrix.linux
@@ -101,8 +139,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Build release
+      - name: Build release (normal)
+        if: ${{ !matrix.rust9x }}
         run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Build release (rust9x)
+        if: ${{ matrix.rust9x }}
+        run: cargo +rust9x build --release --target ${{ matrix.target }}
 
       - name: Strip binary (Linux)
         if: matrix.linux
