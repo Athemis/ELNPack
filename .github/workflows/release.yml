@@ -54,6 +54,7 @@ jobs:
     name: Build ${{ matrix.target }}
     needs: checks
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner: ubuntu-latest
