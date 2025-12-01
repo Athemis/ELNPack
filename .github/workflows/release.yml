@@ -1,0 +1,148 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2025 Alexander Minges
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  checks:
+    name: Lint & Test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: Cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Cargo test
+        run: cargo test --all
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: checks
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            archive: tar.gz
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+    runs-on: ${{ matrix.runner }}
+    env:
+      TARGET: ${{ matrix.target }}
+      RUSTFLAGS: -C target-feature=+crt-static
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          profile: minimal
+          override: true
+
+      - name: Install musl toolchain and native deps
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            musl-tools musl-dev pkg-config \
+            libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
+            libgl1-mesa-dev libasound2-dev libudev-dev \
+            libwayland-dev libxkbcommon-dev
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build release
+        run: cargo build --release --target $TARGET
+
+      - name: Package artifact (Linux)
+        if: matrix.archive == 'tar.gz'
+        run: |
+          bin_path=target/$TARGET/release/elnpack
+          pkg_dir=package-linux
+          mkdir -p "$pkg_dir"
+          cp "$bin_path" "$pkg_dir/"
+          cp README.md LICENSE "$pkg_dir/"
+          tar -czf elnpack-${{ github.ref_name }}-$TARGET.tar.gz -C "$pkg_dir" .
+
+      - name: Package artifact (Windows)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $binPath = "target/${env:TARGET}/release/elnpack.exe"
+          $pkgDir = "package-windows"
+          New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
+          Copy-Item $binPath "$pkgDir/"
+          Copy-Item "README.md","LICENSE" "$pkgDir/"
+          Compress-Archive -Path "$pkgDir/*" -DestinationPath "elnpack-${{ github.ref_name }}-${env:TARGET}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: elnpack-${{ github.ref_name }}-${{ matrix.target }}
+          path: |
+            elnpack-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.archive }}
+
+  publish:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: List artifacts
+        run: ls -R dist
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          find . -maxdepth 2 -type f \( -name "*.tar.gz" -o -name "*.zip" \) | xargs sha256sum > SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist/**/*
+          draft: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
