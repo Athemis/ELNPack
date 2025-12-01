@@ -143,6 +143,13 @@ jobs:
         if: ${{ !matrix.rust9x }}
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: Downgrade edition for rust9x
+        if: ${{ matrix.rust9x }}
+        shell: pwsh
+        run: |
+          Write-Host "Temporarily setting edition to 2021 for rust9x toolchain"
+          (Get-Content Cargo.toml) -replace 'edition = "2024"', 'edition = "2021"' | Set-Content Cargo.toml
+
       - name: Build release (rust9x)
         if: ${{ matrix.rust9x }}
         run: cargo +rust9x build --release --target ${{ matrix.target }}
