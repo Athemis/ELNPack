@@ -314,6 +314,25 @@ fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePaylo
                 ));
             }
         }
+
+        if matches!(field.kind, ExtraFieldKind::Number)
+            && !field.value.trim().is_empty()
+            && field.value.trim().parse::<f64>().is_err()
+        {
+            return Err(format!("Field '{}' must be a valid number.", field.label));
+        }
+
+        if matches!(
+            field.kind,
+            ExtraFieldKind::Items | ExtraFieldKind::Experiments | ExtraFieldKind::Users
+        ) && !field.value.trim().is_empty()
+            && field.value.trim().parse::<i64>().is_err()
+        {
+            return Err(format!(
+                "Field '{}' must be a valid integer ID.",
+                field.label
+            ));
+        }
     }
 
     Ok(SavePayload {
@@ -474,6 +493,60 @@ mod tests {
         assert!(res.is_ok());
     }
 
+    #[test]
+    fn validate_rejects_invalid_number_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has number".into();
+        model.markdown.text = "Body".into();
+
+        add_typed_field(&mut model, ExtraFieldKind::Number, "abc");
+
+        match validate_for_save(&model, PathBuf::from("/tmp/out.eln")) {
+            Err(err) => assert!(err.contains("valid number")),
+            Ok(_) => panic!("validation should fail for invalid number"),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_valid_number_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has number".into();
+        model.markdown.text = "Body".into();
+
+        add_typed_field(&mut model, ExtraFieldKind::Number, "42.5");
+
+        let res = validate_for_save(&model, PathBuf::from("/tmp/out.eln"));
+
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_invalid_integer_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has int".into();
+        model.markdown.text = "Body".into();
+
+        add_typed_field(&mut model, ExtraFieldKind::Items, "12.3");
+
+        match validate_for_save(&model, PathBuf::from("/tmp/out.eln")) {
+            Err(err) => assert!(err.contains("valid integer ID")),
+            Ok(_) => panic!("validation should fail for invalid integer"),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_valid_integer_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has int".into();
+        model.markdown.text = "Body".into();
+
+        add_typed_field(&mut model, ExtraFieldKind::Users, "12345");
+
+        let res = validate_for_save(&model, PathBuf::from("/tmp/out.eln"));
+
+        assert!(res.is_ok());
+    }
+
     fn add_url_field(model: &mut AppModel, value: &str) {
         let mut cmds = Vec::new();
 
@@ -509,6 +582,44 @@ mod tests {
         assert!(
             cmds.is_empty(),
             "URL field setup should not enqueue commands"
+        );
+    }
+
+    fn add_typed_field(model: &mut AppModel, kind: ExtraFieldKind, value: &str) {
+        let mut cmds = Vec::new();
+
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::StartAddField { group_id: None }),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::DraftLabelChanged("Field".into())),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::DraftKindChanged(kind)),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::CommitFieldModal),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::EditValue {
+                index: 0,
+                value: value.into(),
+            }),
+            &mut cmds,
+        );
+
+        assert!(
+            cmds.is_empty(),
+            "typed field setup should not enqueue commands"
         );
     }
 }
