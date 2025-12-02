@@ -6,7 +6,6 @@
 use eframe::egui;
 
 use crate::models::extra_fields::{ExtraField, ExtraFieldGroup, ExtraFieldKind};
-use crate::ui::components::toggle_switch;
 
 /// UI state for imported extra fields.
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
@@ -88,12 +87,6 @@ pub enum ExtraFieldsMsg {
     EditGroupName(String),
     CommitGroupName,
     CancelGroupEdit,
-    ToggleAllowMulti {
-        index: usize,
-        enabled: bool,
-    },
-    #[allow(dead_code)]
-    RemoveField(usize),
     OpenFieldModal(usize),
     CloseFieldModal,
     DraftLabelChanged(String),
@@ -193,28 +186,6 @@ pub fn update(
             if let Some(field) = model.fields.get_mut(index) {
                 field.value_multi = values.clone();
                 field.value = values.join(", ");
-            }
-            None
-        }
-        ExtraFieldsMsg::ToggleAllowMulti { index, enabled } => {
-            if let Some(field) = model.fields.get_mut(index) {
-                field.allow_multi_values = enabled;
-                if enabled {
-                    if field.value_multi.is_empty() && !field.value.is_empty() {
-                        field.value_multi = split_multi(&field.value);
-                    }
-                } else {
-                    if !field.value_multi.is_empty() {
-                        field.value = field.value_multi.first().cloned().unwrap_or_default();
-                    }
-                    field.value_multi.clear();
-                }
-            }
-            None
-        }
-        ExtraFieldsMsg::RemoveField(index) => {
-            if index < model.fields.len() {
-                model.fields.remove(index);
             }
             None
         }
@@ -545,28 +516,6 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
                 }
             }
             ExtraFieldKind::Select | ExtraFieldKind::Radio => {
-                ui.horizontal(|ui| {
-                    ui.label(
-                        egui::RichText::new("Options")
-                            .small()
-                            .color(egui::Color32::from_gray(140)),
-                    );
-                    ui.add_space(6.0);
-                    let mut allow_multi = field.allow_multi_values;
-                    if toggle_switch(ui, &mut allow_multi).clicked() {
-                        msgs.push(ExtraFieldsMsg::ToggleAllowMulti {
-                            index: idx,
-                            enabled: allow_multi,
-                        });
-                    }
-                    ui.label(
-                        egui::RichText::new("Allow multiple")
-                            .small()
-                            .color(egui::Color32::from_gray(140)),
-                    );
-                });
-                ui.add_space(4.0);
-
                 if field.allow_multi_values {
                     let mut chosen = if field.value_multi.is_empty() {
                         split_multi(&field.value)
@@ -848,7 +797,7 @@ mod tests {
         );
 
         assert_eq!(model.fields.len(), 1);
-        let _ = update(&mut model, ExtraFieldsMsg::RemoveField(0), &mut Vec::new());
-        assert!(model.fields.is_empty());
+        // RemoveField variant no longer exists; ensure model retains imported field.
+        assert!(!model.fields.is_empty());
     }
 }
