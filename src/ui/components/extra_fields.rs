@@ -672,7 +672,7 @@ fn render_group_header(
 
 fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Vec<ExtraFieldsMsg>) {
     let missing_required = field.required && field.value.trim().is_empty();
-    let frame = egui::Frame::group(ui.style()).stroke(if missing_required {
+    let mut frame = egui::Frame::group(ui.style()).stroke(if missing_required {
         egui::Stroke::new(1.0, egui::Color32::from_rgb(200, 80, 80))
     } else {
         egui::Stroke::new(
@@ -680,6 +680,18 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
             ui.style().visuals.widgets.noninteractive.bg_stroke.color,
         )
     });
+    if missing_required {
+        // Use a translucent overlay that adapts to theme.
+        let base = ui.style().visuals.extreme_bg_color; // typically background
+        let tint = egui::Color32::from_rgb(200, 80, 80);
+        let overlay = egui::Color32::from_rgba_unmultiplied(
+            ((base.r() as u16 + tint.r() as u16) / 2) as u8,
+            ((base.g() as u16 + tint.g() as u16) / 2) as u8,
+            ((base.b() as u16 + tint.b() as u16) / 2) as u8,
+            30,
+        );
+        frame = frame.fill(overlay);
+    }
 
     frame.show(ui, |ui| {
         ui.horizontal(|ui| {
