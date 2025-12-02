@@ -59,6 +59,7 @@ impl ExtraFieldsModel {
 /// Messages produced by the extra fields view.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ExtraFieldsMsg {
+    RemoveField(usize),
     ImportRequested,
     ImportCancelled,
     ImportLoaded {
@@ -286,6 +287,12 @@ pub fn update(
             }
             None
         }
+        ExtraFieldsMsg::RemoveField(index) => {
+            if index < model.fields.len() {
+                model.fields.remove(index);
+            }
+            None
+        }
         ExtraFieldsMsg::CommitFieldModal => {
             if let (Some(idx), Some(draft)) = (model.editing_field, model.modal_draft.take())
                 && let Some(f) = model.fields.get_mut(idx)
@@ -492,6 +499,13 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
                     .clicked()
                 {
                     msgs.push(ExtraFieldsMsg::OpenFieldModal(idx));
+                }
+                if ui
+                    .button(egui_phosphor::regular::TRASH)
+                    .on_hover_text("Remove field")
+                    .clicked()
+                {
+                    msgs.push(ExtraFieldsMsg::RemoveField(idx));
                 }
             });
         });
@@ -797,7 +811,7 @@ mod tests {
         );
 
         assert_eq!(model.fields.len(), 1);
-        // RemoveField variant no longer exists; ensure model retains imported field.
-        assert!(!model.fields.is_empty());
+        let _ = update(&mut model, ExtraFieldsMsg::RemoveField(0), &mut Vec::new());
+        assert!(model.fields.is_empty());
     }
 }
