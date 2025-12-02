@@ -549,8 +549,6 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
                 // Header controls inside the collapsible header area.
                 render_group_header(ui, group, msgs, model);
                 ui.add_space(4.0);
-
-                // Body: fields
                 if group_fields.is_empty() {
                     ui.label(
                         egui::RichText::new("No fields in this group yet.")
@@ -588,19 +586,25 @@ fn render_group_header(
     msgs: &mut Vec<ExtraFieldsMsg>,
     model: &ExtraFieldsModel,
 ) {
-    ui.horizontal(|ui| {
-        let is_editing = model
-            .editing_group
-            .map(|idx| {
-                model
-                    .groups
-                    .get(idx)
-                    .map(|g| g.id == group.id)
-                    .unwrap_or(false)
-            })
-            .unwrap_or(false);
+    let is_editing = model
+        .editing_group
+        .map(|idx| {
+            model
+                .groups
+                .get(idx)
+                .map(|g| g.id == group.id)
+                .unwrap_or(false)
+        })
+        .unwrap_or(false);
 
+    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
         if is_editing {
+            if ui.button(egui_phosphor::regular::X).clicked() {
+                msgs.push(ExtraFieldsMsg::CancelGroupEdit);
+            }
+            if ui.button(egui_phosphor::regular::CHECK).clicked() {
+                msgs.push(ExtraFieldsMsg::CommitGroupName);
+            }
             let mut text = model.editing_group_buffer.clone();
             if ui
                 .add(egui::TextEdit::singleline(&mut text).hint_text("Group name"))
@@ -608,33 +612,24 @@ fn render_group_header(
             {
                 msgs.push(ExtraFieldsMsg::EditGroupName(text));
             }
-            if ui.button(egui_phosphor::regular::CHECK).clicked() {
-                msgs.push(ExtraFieldsMsg::CommitGroupName);
-            }
-            if ui.button(egui_phosphor::regular::X).clicked() {
-                msgs.push(ExtraFieldsMsg::CancelGroupEdit);
-            }
         } else {
-            ui.horizontal(|ui| {
-                ui.heading(&group.name);
-                if ui
-                    .button(egui_phosphor::regular::PENCIL_SIMPLE)
-                    .on_hover_text("Rename group")
+            if model.groups.len() > 1
+                && ui
+                    .button(egui_phosphor::regular::TRASH)
+                    .on_hover_text("Remove group")
                     .clicked()
-                    && let Some(idx) = model.groups.iter().position(|g| g.id == group.id)
-                {
-                    msgs.push(ExtraFieldsMsg::StartEditGroup(idx));
-                }
-                if model.groups.len() > 1
-                    && ui
-                        .button(egui_phosphor::regular::TRASH)
-                        .on_hover_text("Remove group")
-                        .clicked()
-                    && let Some(idx) = model.groups.iter().position(|g| g.id == group.id)
-                {
-                    msgs.push(ExtraFieldsMsg::RemoveGroup(idx));
-                }
-            });
+                && let Some(idx) = model.groups.iter().position(|g| g.id == group.id)
+            {
+                msgs.push(ExtraFieldsMsg::RemoveGroup(idx));
+            }
+            if ui
+                .button(egui_phosphor::regular::PENCIL_SIMPLE)
+                .on_hover_text("Rename group")
+                .clicked()
+                && let Some(idx) = model.groups.iter().position(|g| g.id == group.id)
+            {
+                msgs.push(ExtraFieldsMsg::StartEditGroup(idx));
+            }
         }
     });
 }
