@@ -5,5 +5,6 @@
 
 pub mod attachments;
 pub mod datetime_picker;
+pub mod extra_fields;
 pub mod keywords;
 pub mod markdown;
