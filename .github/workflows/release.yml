@@ -96,10 +96,13 @@ jobs:
       TARGET: ${{ matrix.target }}
       RUSTFLAGS: ${{ matrix.rustflags }}
       PKG_CONFIG_LIBDIR: ${{ matrix.pkg_config_libdir }}
-      SAFE_REF: ${{ replace(github.ref_name, '/', '-') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Set safe ref name
+        shell: bash
+        run: echo "SAFE_REF=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_ENV"
 
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@7b1c307e0dcbda6122208f10795a713336a9b35a
@@ -154,7 +157,7 @@ jobs:
           mkdir -p "$pkg_dir"
           cp "$bin_path" "$pkg_dir/"
           cp README.md LICENSE "$pkg_dir/"
-          tar -czf elnpack-${{ env.SAFE_REF }}-$TARGET.tar.gz -C "$pkg_dir" .
+          tar -czf "elnpack-$SAFE_REF-$TARGET.tar.gz" -C "$pkg_dir" .
 
       - name: Package artifact (Windows)
         if: matrix.archive == 'zip'
@@ -165,7 +168,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
           Copy-Item $binPath "$pkgDir/"
           Copy-Item "README.md","LICENSE" "$pkgDir/"
-          Compress-Archive -Path "$pkgDir/*" -DestinationPath "elnpack-${{ env:SAFE_REF }}-${env:TARGET}.zip"
+          $safeRef = $env:SAFE_REF
+          Compress-Archive -Path "$pkgDir/*" -DestinationPath "elnpack-$safeRef-${env:TARGET}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
