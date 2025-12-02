@@ -6,11 +6,12 @@ set -euo pipefail
 # Pre-push hook to validate that all commits being pushed follow Conventional Commits
 # This prevents malformed commits that may have bypassed commit-msg hook during rebases
 
+# Source shared validation logic
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/validate-commit-msg.sh"
+
 remote="$1"
 url="$2"
-
-# Conventional Commits pattern (type[!][scope]: subject)
-regex='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?(!)?: .+'
 
 has_errors=0
 
@@ -31,21 +32,9 @@ while read local_ref local_sha remote_ref remote_sha; do
 
   # Get all commit messages in the range
   while IFS= read -r commit_msg; do
-    # Skip merge commits
-    if [[ "$commit_msg" =~ ^Merge ]]; then
-      continue
-    fi
-
-    # Check if commit message follows Conventional Commits
-    if [[ ! "$commit_msg" =~ $regex ]]; then
-      echo "ERROR: Invalid commit message format:" >&2
-      echo "  '$commit_msg'" >&2
+    if ! validate_commit_msg "$commit_msg"; then
+      print_error "$commit_msg"
       echo >&2
-      echo "Commit messages must follow Conventional Commits specification." >&2
-      echo "Example: feat: add new feature" >&2
-      echo "         fix(ui): correct button alignment" >&2
-      echo >&2
-      echo "Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert" >&2
       has_errors=1
     fi
   done < <(git log --format=%s "$range")
