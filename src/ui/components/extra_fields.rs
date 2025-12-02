@@ -91,6 +91,7 @@ pub enum ExtraFieldsMsg {
     CommitGroupName,
     CancelGroupEdit,
     RemoveGroup(usize),
+    AddGroup,
     StartAddField,
     OpenFieldModal(usize),
     CloseFieldModal,
@@ -382,6 +383,15 @@ pub fn update(
             }
             None
         }
+        ExtraFieldsMsg::AddGroup => {
+            let next_id = model.groups.iter().map(|g| g.id).max().unwrap_or(0) + 1;
+            model.groups.push(ExtraFieldGroup {
+                id: next_id,
+                name: format!("Group {}", next_id),
+                position: model.groups.len() as i32,
+            });
+            None
+        }
         ExtraFieldsMsg::EditGroupName(name) => {
             model.editing_group_buffer = name;
             None
@@ -427,6 +437,15 @@ pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> 
             ui.horizontal(|ui| {
                 if ui
                     .add(egui::Button::new(format!(
+                        "{} Add group",
+                        egui_phosphor::regular::FOLDER_PLUS
+                    )))
+                    .clicked()
+                {
+                    msgs.push(ExtraFieldsMsg::AddGroup);
+                }
+                if ui
+                    .add(egui::Button::new(format!(
                         "{} Add field",
                         egui_phosphor::regular::PLUS
                     )))
@@ -465,13 +484,12 @@ pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> 
 }
 
 fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<ExtraFieldsMsg>) {
-    if model.fields.is_empty() {
+    if model.fields.is_empty() && model.groups.is_empty() {
         ui.label(
-            egui::RichText::new("No metadata imported yet.")
+            egui::RichText::new("No metadata yet. Add a group or import JSON to begin.")
                 .italics()
                 .color(egui::Color32::from_gray(110)),
         );
-        return;
     }
 
     // Render grouped fields in group order, then any ungrouped.
@@ -482,14 +500,19 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
             .enumerate()
             .filter(|(_, f)| f.group_id == Some(group.id))
             .collect();
-        if group_fields.is_empty() {
-            continue;
-        }
         render_group_header(ui, group, msgs, model);
         ui.add_space(4.0);
-        for (idx, field) in group_fields {
-            render_field(ui, field, idx, msgs);
-            ui.add_space(6.0);
+        if group_fields.is_empty() {
+            ui.label(
+                egui::RichText::new("No fields in this group yet.")
+                    .italics()
+                    .color(egui::Color32::from_gray(120)),
+            );
+        } else {
+            for (idx, field) in group_fields {
+                render_field(ui, field, idx, msgs);
+                ui.add_space(6.0);
+            }
         }
         ui.add_space(10.0);
     }
