@@ -4,6 +4,7 @@
 //! UI component for importing and editing eLabFTW extra fields metadata.
 
 use eframe::egui;
+use url::Url;
 
 use crate::models::extra_fields::{ExtraField, ExtraFieldGroup, ExtraFieldKind};
 
@@ -57,10 +58,8 @@ impl ExtraFieldsModel {
         &self.groups
     }
 
-    pub fn has_missing_required(&self) -> bool {
-        self.fields
-            .iter()
-            .any(|f| f.required && f.value.trim().is_empty())
+    pub fn has_invalid_fields(&self) -> bool {
+        self.fields.iter().any(field_invalid)
     }
 }
 
@@ -650,8 +649,8 @@ fn render_group_header(
 }
 
 fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Vec<ExtraFieldsMsg>) {
-    let missing_required = field.required && field.value.trim().is_empty();
-    let mut frame = egui::Frame::group(ui.style()).stroke(if missing_required {
+    let invalid = field_invalid(field);
+    let mut frame = egui::Frame::group(ui.style()).stroke(if invalid {
         egui::Stroke::new(1.0, egui::Color32::from_rgb(200, 80, 80))
     } else {
         egui::Stroke::new(
@@ -659,7 +658,7 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
             ui.style().visuals.widgets.noninteractive.bg_stroke.color,
         )
     });
-    if missing_required {
+    if invalid {
         // Use a translucent overlay that adapts to theme.
         let base = ui.style().visuals.extreme_bg_color; // typically background
         let tint = egui::Color32::from_rgb(200, 80, 80);
@@ -812,6 +811,7 @@ fn field_hint(kind: &ExtraFieldKind) -> &'static str {
         ExtraFieldKind::Url => "https://example.com",
         ExtraFieldKind::Email => "name@example.com",
         ExtraFieldKind::Number => "Number",
+        ExtraFieldKind::Items | ExtraFieldKind::Experiments | ExtraFieldKind::Users => "Numeric ID",
         _ => "",
     }
 }
@@ -870,6 +870,29 @@ fn name_conflict(model: &ExtraFieldsModel, label: &str, editing: Option<usize>) 
     model.fields.iter().enumerate().any(|(idx, f)| {
         idx != editing.unwrap_or(usize::MAX) && f.label.trim().eq_ignore_ascii_case(&key)
     })
+}
+
+fn field_invalid(field: &ExtraField) -> bool {
+    let value = field.value.trim();
+
+    if field.required && value.is_empty() {
+        return true;
+    }
+
+    match field.kind {
+        ExtraFieldKind::Url => {
+            !value.is_empty()
+                && Url::parse(value)
+                    .ok()
+                    .filter(|u| matches!(u.scheme(), "http" | "https") && u.host_str().is_some())
+                    .is_none()
+        }
+        ExtraFieldKind::Number => !value.is_empty() && value.parse::<f64>().is_err(),
+        ExtraFieldKind::Items | ExtraFieldKind::Experiments | ExtraFieldKind::Users => {
+            !value.is_empty() && value.parse::<i64>().is_err()
+        }
+        _ => false,
+    }
 }
 
 fn render_field_modal(
@@ -1087,6 +1110,75 @@ mod tests {
         assert_eq!(model.fields.len(), 1);
         assert!(event.message.contains("Imported 1 field"));
         assert!(!event.is_error);
+    }
+
+    #[test]
+    fn required_empty_marks_invalid() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "Req".into(),
+            kind: ExtraFieldKind::Text,
+            value: String::new(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: true,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        assert!(model.has_invalid_fields());
+    }
+
+    #[test]
+    fn invalid_number_marks_invalid() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "Num".into(),
+            kind: ExtraFieldKind::Number,
+            value: "abc".into(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        assert!(model.has_invalid_fields());
+    }
+
+    #[test]
+    fn valid_integer_id_is_accepted() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "ID".into(),
+            kind: ExtraFieldKind::Users,
+            value: "123".into(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        assert!(!model.has_invalid_fields());
     }
 
     #[test]

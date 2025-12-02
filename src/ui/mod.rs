@@ -151,7 +151,7 @@ impl ElnPackApp {
 
     fn render_save_button(&mut self, ui: &mut egui::Ui) {
         let save_enabled = !self.model.entry_title.trim().is_empty()
-            && !self.model.extra_fields.has_missing_required();
+            && !self.model.extra_fields.has_invalid_fields();
         let button = egui::Button::new(format!(
             "{} Save ELN archive",
             egui_phosphor::regular::FLOPPY_DISK
@@ -159,7 +159,7 @@ impl ElnPackApp {
 
         if ui
             .add_enabled(save_enabled, button)
-            .on_disabled_hover_text("Please enter a title and fill required fields")
+            .on_disabled_hover_text("Please enter a title and fix required/invalid fields")
             .clicked()
         {
             let default_name = suggested_archive_name(&self.model.entry_title);
