@@ -1145,6 +1145,33 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
+    fn make_field(label: &str, kind: ExtraFieldKind) -> ExtraField {
+        ExtraField {
+            label: label.into(),
+            kind,
+            value: String::new(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        }
+    }
+
+    fn make_group(id: i32, name: &str) -> ExtraFieldGroup {
+        ExtraFieldGroup {
+            id,
+            name: name.into(),
+            position: 0,
+        }
+    }
+
     #[test]
     fn import_loaded_populates_model() {
         let mut model = ExtraFieldsModel::default();
@@ -1180,22 +1207,9 @@ mod tests {
     #[test]
     fn required_empty_marks_invalid() {
         let mut model = ExtraFieldsModel::default();
-        model.fields.push(ExtraField {
-            label: "Req".into(),
-            kind: ExtraFieldKind::Text,
-            value: String::new(),
-            value_multi: Vec::new(),
-            options: vec![],
-            unit: None,
-            units: vec![],
-            position: None,
-            required: true,
-            description: None,
-            allow_multi_values: false,
-            blank_value_on_duplicate: false,
-            group_id: None,
-            readonly: false,
-        });
+        let mut f = make_field("Req", ExtraFieldKind::Text);
+        f.required = true;
+        model.fields.push(f);
 
         assert!(model.has_invalid_fields());
     }
@@ -1203,22 +1217,9 @@ mod tests {
     #[test]
     fn invalid_number_marks_invalid() {
         let mut model = ExtraFieldsModel::default();
-        model.fields.push(ExtraField {
-            label: "Num".into(),
-            kind: ExtraFieldKind::Number,
-            value: "abc".into(),
-            value_multi: Vec::new(),
-            options: vec![],
-            unit: None,
-            units: vec![],
-            position: None,
-            required: false,
-            description: None,
-            allow_multi_values: false,
-            blank_value_on_duplicate: false,
-            group_id: None,
-            readonly: false,
-        });
+        let mut f = make_field("Num", ExtraFieldKind::Number);
+        f.value = "abc".into();
+        model.fields.push(f);
 
         assert!(model.has_invalid_fields());
     }
@@ -1226,22 +1227,9 @@ mod tests {
     #[test]
     fn valid_integer_id_is_accepted() {
         let mut model = ExtraFieldsModel::default();
-        model.fields.push(ExtraField {
-            label: "ID".into(),
-            kind: ExtraFieldKind::Users,
-            value: "123".into(),
-            value_multi: Vec::new(),
-            options: vec![],
-            unit: None,
-            units: vec![],
-            position: None,
-            required: false,
-            description: None,
-            allow_multi_values: false,
-            blank_value_on_duplicate: false,
-            group_id: None,
-            readonly: false,
-        });
+        let mut f = make_field("ID", ExtraFieldKind::Users);
+        f.value = "123".into();
+        model.fields.push(f);
 
         assert!(!model.has_invalid_fields());
     }
@@ -1249,11 +1237,7 @@ mod tests {
     #[test]
     fn group_display_name_falls_back_to_id() {
         let mut model = ExtraFieldsModel::default();
-        model.groups.push(ExtraFieldGroup {
-            id: 1,
-            name: "One".into(),
-            position: 0,
-        });
+        model.groups.push(make_group(1, "One"));
 
         assert_eq!(model.display_group_name(Some(1)), "One");
         assert_eq!(model.display_group_name(Some(99)), "Default");
@@ -1262,11 +1246,7 @@ mod tests {
     #[test]
     fn add_field_uses_existing_group_when_present() {
         let mut model = ExtraFieldsModel::default();
-        model.groups.push(ExtraFieldGroup {
-            id: 10,
-            name: "Group 1".into(),
-            position: 0,
-        });
+        model.groups.push(make_group(10, "Group 1"));
 
         let mut cmds = Vec::new();
         let _ = update(
