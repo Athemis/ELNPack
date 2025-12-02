@@ -422,21 +422,7 @@ pub fn update(
 
                 if let Some(idx) = model.editing_field {
                     if let Some(f) = model.fields.get_mut(idx) {
-                        let label = draft.label.trim();
-                        if !label.is_empty() {
-                            f.label = label.to_string();
-                        }
-                        f.description = trimmed_or_none(&draft.description);
-                        f.required = draft.required;
-                        f.allow_multi_values = draft.allow_multi_values;
-                        f.group_id = draft.group_id;
-                        if matches!(f.kind, ExtraFieldKind::Select | ExtraFieldKind::Radio) {
-                            f.options = draft.options.clone();
-                        }
-                        if matches!(f.kind, ExtraFieldKind::Number) {
-                            f.units = draft.units.clone();
-                            f.unit = trimmed_or_none(&draft.unit);
-                        }
+                        apply_draft_to_field(&draft, f);
                     }
                 } else {
                     let label = draft.label.trim().to_string();
@@ -444,22 +430,23 @@ pub fn update(
                         let mut draft = draft;
                         let preferred = model.preferred_group_id();
                         draft.group_id = draft.group_id.or(Some(preferred));
-                        let new_field = ExtraField {
+                        let mut new_field = ExtraField {
                             label,
-                            kind: draft.kind,
+                            kind: draft.kind.clone(),
                             value: String::new(),
                             value_multi: Vec::new(),
-                            options: draft.options,
-                            unit: trimmed_or_none(&draft.unit),
-                            units: draft.units,
+                            options: Vec::new(),
+                            unit: None,
+                            units: Vec::new(),
                             position: Some(model.fields.len() as i32),
-                            required: draft.required,
-                            description: trimmed_or_none(&draft.description),
-                            allow_multi_values: draft.allow_multi_values,
+                            required: false,
+                            description: None,
+                            allow_multi_values: false,
                             blank_value_on_duplicate: false,
                             group_id: draft.group_id,
                             readonly: false,
                         };
+                        apply_draft_to_field(&draft, &mut new_field);
                         model.fields.push(new_field);
                     }
                 }
@@ -933,6 +920,26 @@ fn trimmed_or_none(input: &str) -> Option<String> {
         None
     } else {
         Some(trimmed.to_string())
+    }
+}
+
+fn apply_draft_to_field(draft: &FieldDraft, field: &mut ExtraField) {
+    let label = draft.label.trim();
+    if !label.is_empty() {
+        field.label = label.to_string();
+    }
+    field.description = trimmed_or_none(&draft.description);
+    field.required = draft.required;
+    field.allow_multi_values = draft.allow_multi_values;
+    field.group_id = draft.group_id;
+
+    if matches!(field.kind, ExtraFieldKind::Select | ExtraFieldKind::Radio) {
+        field.options = draft.options.clone();
+    }
+
+    if matches!(field.kind, ExtraFieldKind::Number) {
+        field.units = draft.units.clone();
+        field.unit = trimmed_or_none(&draft.unit);
     }
 }
 
