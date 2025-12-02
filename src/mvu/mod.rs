@@ -298,7 +298,7 @@ fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePaylo
         .map_err(|e| e.to_string())?;
 
     for field in model.extra_fields.fields() {
-        if let Some(err) = crate::ui::components::extra_fields::validate_field(field) {
+        if let Some(err) = crate::models::extra_fields::validate_field(field) {
             let msg = match err {
                 "required" => format!("Field '{}' is required.", field.label),
                 "invalid_url" => format!("Field '{}' must be a valid http/https URL.", field.label),

@@ -4,9 +4,8 @@
 //! UI component for importing and editing eLabFTW extra fields metadata.
 
 use eframe::egui;
-use url::Url;
 
-use crate::models::extra_fields::{ExtraField, ExtraFieldGroup, ExtraFieldKind};
+use crate::models::extra_fields::{ExtraField, ExtraFieldGroup, ExtraFieldKind, validate_field};
 
 /// UI state for imported extra fields.
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
@@ -75,7 +74,7 @@ impl ExtraFieldsModel {
         next_id
     }
 
-    pub fn preferred_group_id(&mut self) -> i32 {
+    pub fn lowest_position_group_id(&mut self) -> i32 {
         if self.groups.is_empty() {
             return self.ensure_default_group();
         }
@@ -166,49 +165,6 @@ pub enum ExtraFieldsCommand {
 pub struct ExtraFieldsEvent {
     pub message: String,
     pub is_error: bool,
-}
-
-/// Pure validation of a single field. Returns `Some(reason)` when invalid.
-pub fn validate_field(field: &ExtraField) -> Option<&'static str> {
-    let value = field.value.trim();
-
-    if field.required && value.is_empty() {
-        return Some("required");
-    }
-
-    match field.kind {
-        ExtraFieldKind::Url => {
-            if value.is_empty() {
-                return None;
-            }
-            Url::parse(value)
-                .ok()
-                .filter(|u| matches!(u.scheme(), "http" | "https") && u.host_str().is_some())
-                .map(|_| None)
-                .unwrap_or(Some("invalid_url"))
-        }
-        ExtraFieldKind::Number => {
-            if value.is_empty() {
-                return None;
-            }
-            if value.parse::<f64>().is_ok() {
-                None
-            } else {
-                Some("invalid_number")
-            }
-        }
-        ExtraFieldKind::Items | ExtraFieldKind::Experiments | ExtraFieldKind::Users => {
-            if value.is_empty() {
-                return None;
-            }
-            if value.parse::<i64>().is_ok() {
-                None
-            } else {
-                Some("invalid_integer")
-            }
-        }
-        _ => None,
-    }
 }
 
 /// Update the model based on a message.
@@ -398,7 +354,7 @@ pub fn update(
             model.modal_open = true;
             model.editing_field = None;
             let mut draft = FieldDraft::default();
-            let preferred = model.preferred_group_id();
+            let preferred = model.lowest_position_group_id();
             draft.group_id = group_id.or(Some(preferred));
             model.modal_draft = Some(draft);
             None
@@ -428,7 +384,7 @@ pub fn update(
                     let label = draft.label.trim().to_string();
                     if !label.is_empty() {
                         let mut draft = draft;
-                        let preferred = model.preferred_group_id();
+                        let preferred = model.lowest_position_group_id();
                         draft.group_id = draft.group_id.or(Some(preferred));
                         let mut new_field = ExtraField {
                             label,
