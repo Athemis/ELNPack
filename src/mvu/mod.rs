@@ -102,7 +102,18 @@ pub struct SavePayload {
     pub body_format: crate::logic::eln::BodyFormat,
 }
 
-/// Update the application model and enqueue commands.
+/// Apply a `Msg` to the top-level `AppModel` and append any resulting `Command`s.
+///
+/// This mutates `model` to reflect the message and pushes zero or more commands onto `cmds` for later execution.
+///
+/// # Examples
+///
+/// ```
+/// let mut model = AppModel::default();
+/// let mut cmds = Vec::new();
+/// update(&mut model, Msg::EntryTitleChanged("New title".into()), &mut cmds);
+/// assert_eq!(model.entry_title, "New title");
+/// ```
 pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
     match msg {
         Msg::EntryTitleChanged(text) => model.entry_title = text,
@@ -193,7 +204,26 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
     }
 }
 
-/// Execute a command synchronously (single-threaded for now) and return a resulting message.
+/// Run a `Command` and produce the corresponding `Msg`.
+///
+/// This executes the side-effect described by `cmd` (file dialogs, file IO,
+/// hashing, thumbnail loading, archive writing, etc.) and returns the message
+/// that represents the outcome of that command.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::PathBuf;
+/// // Example: compute hash for a file path (tests should create the file first)
+/// let cmd = crate::mvu::Command::HashFile { path: PathBuf::from("example.txt"), _retry: 0 };
+/// let msg = crate::mvu::run_command(cmd);
+/// match msg {
+///     crate::mvu::Msg::Attachments(crate::attachments::AttachmentsMsg::HashComputed { path, .. }) => {
+///         assert_eq!(path, PathBuf::from("example.txt"));
+///     }
+///     _ => panic!("unexpected message"),
+/// }
+/// ```
 pub fn run_command(cmd: Command) -> Msg {
     match cmd {
         Command::PickFiles => {
@@ -274,7 +304,29 @@ fn surface_event(model: &mut AppModel, message: String, is_error: bool) {
     model.status = Some(message);
 }
 
-/// Validate model state and build the payload required to save an archive.
+/// Validate the current application model and construct a `SavePayload` for writing an archive.
+///
+/// Performs these checks and conversions:
+/// - Ensures the entry title is non-empty.
+/// - Trims body text and collects normalized keywords.
+/// - Converts the datetime picker value to an `OffsetDateTime`.
+/// - Converts attachments to domain metadata and enforces unique sanitized filenames.
+/// - Validates each extra field and returns a field-specific user-facing error message on failure.
+///
+/// # Returns
+///
+/// `Ok(SavePayload)` containing the assembled data required to save an archive on success, `Err(String)` with a user-facing error message describing the first validation failure otherwise.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// // Given a populated `model: AppModel` and an output path:
+/// let payload = validate_for_save(&model, std::path::PathBuf::from("entry.eln"));
+/// match payload {
+///     Ok(p) => println!("Ready to save to {:?}", p.output),
+///     Err(msg) => eprintln!("Validation failed: {}", msg),
+/// }
+/// ```
 fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePayload, String> {
     let title = model.entry_title.trim().to_string();
     if title.is_empty() {
@@ -510,6 +562,21 @@ mod tests {
         }
     }
 
+    /// Ensures that a `Users` extra field containing a valid integer string passes save validation.
+    ///
+    /// This test sets a title and body, adds a `Users`-typed extra field with the value `"12345"`,
+    /// and asserts that `validate_for_save` returns `Ok`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut model = AppModel::default();
+    /// model.entry_title = "Has int".into();
+    /// model.markdown.text = "Body".into();
+    /// add_typed_field(&mut model, ExtraFieldKind::Users, "12345");
+    /// let res = validate_for_save(&model, PathBuf::from("/tmp/out.eln"));
+    /// assert!(res.is_ok());
+    /// ```
     #[test]
     fn validate_accepts_valid_integer_field() {
         let mut model = AppModel::default();
@@ -523,6 +590,24 @@ mod tests {
         assert!(res.is_ok());
     }
 
+    /// Adds a new extra field of kind `Url` via the extra-fields editor flow and sets its value.
+    ///
+    /// The function simulates the editor interactions required to create a URL-typed extra field:
+    /// it starts an add-field modal, sets the label to "URL", switches the kind to URL, commits the
+    /// field, and then writes `value` into the newly created field.
+    ///
+    /// # Parameters
+    ///
+    /// - `model`: mutable reference to the top-level `AppModel` used to drive the MVU update flow.
+    /// - `value`: the string value to store in the newly created URL field.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// let mut model = AppModel::default_for_tests();
+    /// add_url_field(&mut model, "https://example.com");
+    /// // model.extra_fields now contains a URL field with the provided value
+    /// ```
     fn add_url_field(model: &mut AppModel, value: &str) {
         let mut cmds = Vec::new();
 

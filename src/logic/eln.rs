@@ -72,11 +72,35 @@ pub fn ensure_extension(mut path: PathBuf, extension: &str) -> PathBuf {
     path
 }
 
-/// Build a RO-Crate archive ZIP containing the experiment text, metadata, and attachments.
+/// Build a RO-Crate ZIP archive containing the experiment text, metadata, and attachments.
 ///
-/// Creates directories inside the archive, copies attachments with sanitized names,
-/// emits RO-Crate JSON-LD metadata, and writes the final ZIP to `output`.
-/// Parent directories for `output` are created if missing.
+/// Creates parent directories for `output` if missing, validates attachment integrity,
+/// writes attachments into a sanitized `experiment/` folder inside the archive, and emits
+/// `ro-crate-metadata.json` describing the dataset and files.
+///
+/// Returns `Ok(())` on success or an error with context if writing, hashing, or serialization fails.
+///
+/// # Examples
+///
+/// ```rust
+/// use std::path::Path;
+/// use time::OffsetDateTime;
+///
+/// // Call with no attachments and default parameters
+/// let out = Path::new("example.eln");
+/// let _ = crate::logic::eln::build_and_write_archive(
+///     out,
+///     "Example Title",
+///     "Experiment notes",
+///     &[],                 // attachments
+///     &[],                 // extra_fields
+///     &[],                 // extra_groups
+///     OffsetDateTime::now_utc(),
+///     crate::logic::eln::ArchiveGenre::Experiment,
+///     &[],
+///     crate::logic::eln::BodyFormat::Markdown,
+/// );
+/// ```
 #[allow(clippy::too_many_arguments)]
 pub fn build_and_write_archive(
     output: &Path,

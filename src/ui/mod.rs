@@ -53,6 +53,22 @@ impl Default for ElnPackApp {
 }
 
 impl eframe::App for ElnPackApp {
+    /// Drives a single UI frame: processes incoming messages and commands, updates the model, and renders the top bar, status, and central content panels.
+    ///
+    /// This method:
+    /// - Drains messages produced by background command workers into the app inbox and decrements the pending command counter.
+    /// - Processes inbox messages, converting decoded thumbnails into egui textures and applying other messages to the MVU model, emitting resulting commands to worker threads and incrementing the pending counter for each sent command.
+    /// - Renders the application's top bar (title, theme controls, save button, body-format toggle), a centered error modal when validation errors exist, a bottom status panel, and the scrollable central content (title, metadata, description/editor, keywords, extra fields, and attachments). Subviews may produce additional messages which are appended to the inbox for the next update cycle.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // Typical usage is driven by the eframe runtime; this shows the intended call site.
+    /// // let mut app = ElnPackApp::default();
+    /// // let ctx: egui::Context = /* provided by eframe */ unimplemented!();
+    /// // let mut frame: eframe::Frame = /* provided by eframe */ unimplemented!();
+    /// // app.update(&ctx, &mut frame);
+    /// ```
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.ensure_spacing(ctx);
 
@@ -144,11 +160,47 @@ impl ElnPackApp {
         });
     }
 
+    /// Renders a small spacer followed by the global theme preference switch in the provided UI.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // Called from an egui UI context (e.g. inside `eframe::App::update`).
+    /// # use eframe::egui;
+    /// # fn example(ui: &mut egui::Ui) {
+    /// let mut app = crate::ElnPackApp::default();
+    /// app.render_theme_controls(ui);
+    /// # }
+    /// ```
     fn render_theme_controls(&mut self, ui: &mut egui::Ui) {
         ui.add_space(2.0);
         egui::widgets::global_theme_preference_switch(ui);
     }
 
+    /// Render the "Save ELN archive" button in the top bar and handle the save-file dialog interaction.
+    ///
+    /// The button is enabled only when the entry title is non-empty (after trimming) and no extra fields are invalid.
+    /// When clicked:
+    /// - opens a native save dialog filtered for `.eln` files with a suggested archive name derived from the title,
+    /// - ensures the selected file path has the `.eln` extension,
+    /// - pushes `Msg::SaveRequested(path)` into the app inbox if the user chose a file, or `Msg::SaveCancelled` if the dialog was cancelled.
+    /// When disabled, hovering the button shows "Please enter a title and fix required/invalid fields".
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Illustrates the enabling condition used by the save button.
+    /// let mut app = crate::ElnPackApp::default();
+    /// // initially title is empty -> save disabled
+    /// assert!(app.model.entry_title.trim().is_empty());
+    /// assert!(!app.model.extra_fields.has_invalid_fields());
+    ///
+    /// // set a title -> would enable save (assuming extra fields are valid)
+    /// app.model.entry_title = "My experiment".to_string();
+    /// let save_enabled = !app.model.entry_title.trim().is_empty()
+    ///     && !app.model.extra_fields.has_invalid_fields();
+    /// assert!(save_enabled);
+    /// ```
     fn render_save_button(&mut self, ui: &mut egui::Ui) {
         let save_enabled = !self.model.entry_title.trim().is_empty()
             && !self.model.extra_fields.has_invalid_fields();
@@ -255,7 +307,14 @@ impl ElnPackApp {
         });
     }
 
-    /// Render attachments as a collapsible section in the main column.
+    /// Renders an "Attachments" collapsible section and forwards messages produced by the attachments view into the app inbox as `Msg::Attachments`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // Called from within the app UI code:
+    /// // self.render_attachments_section(ui, &ctx);
+    /// ```
     fn render_attachments_section(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
         egui::CollapsingHeader::new("Attachments")
             .default_open(true)
@@ -266,12 +325,33 @@ impl ElnPackApp {
             });
     }
 
+    /// Renders the "Extra fields" section and forwards any messages it produces into the application's inbox.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let mut app = ElnPackApp::default();
+    /// // In real usage `ui` is provided by egui during the UI pass.
+    /// let mut ui: egui::Ui = unimplemented!();
+    /// app.render_extra_fields_section(&mut ui);
+    /// ```
     fn render_extra_fields_section(&mut self, ui: &mut egui::Ui) {
         let msgs = extra_fields::view(ui, &self.model.extra_fields);
         self.inbox.extend(msgs.into_iter().map(Msg::ExtraFields));
     }
 
-    /// Render entry type selection (segmented buttons).
+    /// Render segmented controls to choose the entry's archive genre.
+    ///
+    /// Displays two side-by-side buttons labeled "Experiment" and "Resource".
+    /// The currently selected genre is highlighted; clicking a button enqueues
+    /// a `Msg::SetGenre` message with the corresponding `ArchiveGenre`.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Inside an egui paint callback with `ui: &mut egui::Ui` and `app: &mut ElnPackApp`:
+    /// app.render_entry_type(ui);
+    /// ```
     fn render_entry_type(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             let exp = egui::Button::new("Experiment")
