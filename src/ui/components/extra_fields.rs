@@ -305,10 +305,19 @@ pub fn update(
         ExtraFieldsMsg::StartAddField { group_id } => {
             model.modal_open = true;
             model.editing_field = None;
-            model.modal_draft = Some(FieldDraft {
-                group_id,
-                ..Default::default()
-            });
+            let mut draft = FieldDraft::default();
+            if group_id.is_some() {
+                draft.group_id = group_id;
+            } else if model.groups.is_empty() {
+                let next_id = 1;
+                model.groups.push(ExtraFieldGroup {
+                    id: next_id,
+                    name: "Default".into(),
+                    position: 0,
+                });
+                draft.group_id = Some(next_id);
+            }
+            model.modal_draft = Some(draft);
             None
         }
         ExtraFieldsMsg::RemoveField(index) => {
