@@ -15,10 +15,36 @@ pub struct ExtraFieldsModel {
     groups: Vec<ExtraFieldGroup>,
     editing_group: Option<usize>,
     editing_group_buffer: String,
-    editing_field_title: Option<usize>,
-    editing_field_title_buffer: String,
-    editing_field_desc: Option<usize>,
-    editing_field_desc_buffer: String,
+    editing_field: Option<usize>,
+    modal_open: bool,
+    modal_draft: Option<FieldDraft>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct FieldDraft {
+    label: String,
+    description: String,
+    required: bool,
+    allow_multi_values: bool,
+    options: Vec<String>,
+    units: Vec<String>,
+    unit: String,
+    kind: ExtraFieldKind,
+}
+
+impl Default for FieldDraft {
+    fn default() -> Self {
+        Self {
+            label: String::new(),
+            description: String::new(),
+            required: false,
+            allow_multi_values: false,
+            options: Vec::new(),
+            units: Vec::new(),
+            unit: String::new(),
+            kind: ExtraFieldKind::Text,
+        }
+    }
 }
 
 impl ExtraFieldsModel {
@@ -68,14 +94,26 @@ pub enum ExtraFieldsMsg {
     },
     #[allow(dead_code)]
     RemoveField(usize),
-    StartEditTitle(usize),
-    EditTitleChanged(String),
-    CommitTitle,
-    CancelTitle,
-    StartEditDesc(usize),
-    EditDescChanged(String),
-    CommitDesc,
-    CancelDesc,
+    OpenFieldModal(usize),
+    CloseFieldModal,
+    DraftLabelChanged(String),
+    DraftDescChanged(String),
+    DraftRequiredToggled(bool),
+    DraftAllowMultiToggled(bool),
+    DraftOptionChanged {
+        index: usize,
+        value: String,
+    },
+    DraftAddOption,
+    DraftRemoveOption(usize),
+    DraftUnitChanged {
+        index: usize,
+        value: String,
+    },
+    DraftAddUnit,
+    DraftRemoveUnit(usize),
+    DraftDefaultUnitChanged(String),
+    CommitFieldModal,
 }
 
 /// Commands that require side effects.
@@ -180,64 +218,133 @@ pub fn update(
             }
             None
         }
-        ExtraFieldsMsg::StartEditTitle(idx) => {
+        ExtraFieldsMsg::OpenFieldModal(idx) => {
             if let Some(f) = model.fields.get(idx) {
-                model.editing_field_title = Some(idx);
-                model.editing_field_title_buffer = f.label.clone();
+                model.modal_open = true;
+                model.editing_field = Some(idx);
+                model.modal_draft = Some(FieldDraft {
+                    label: f.label.clone(),
+                    description: f.description.clone().unwrap_or_default(),
+                    required: f.required,
+                    allow_multi_values: f.allow_multi_values,
+                    options: f.options.clone(),
+                    units: f.units.clone(),
+                    unit: f.unit.clone().unwrap_or_default(),
+                    kind: f.kind.clone(),
+                });
             }
             None
         }
-        ExtraFieldsMsg::EditTitleChanged(text) => {
-            model.editing_field_title_buffer = text;
+        ExtraFieldsMsg::CloseFieldModal => {
+            model.modal_open = false;
+            model.modal_draft = None;
+            model.editing_field = None;
             None
         }
-        ExtraFieldsMsg::CommitTitle => {
-            if let Some(idx) = model.editing_field_title
+        ExtraFieldsMsg::DraftLabelChanged(text) => {
+            if let Some(d) = model.modal_draft.as_mut() {
+                d.label = text;
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftDescChanged(text) => {
+            if let Some(d) = model.modal_draft.as_mut() {
+                d.description = text;
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftRequiredToggled(val) => {
+            if let Some(d) = model.modal_draft.as_mut() {
+                d.required = val;
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftAllowMultiToggled(val) => {
+            if let Some(d) = model.modal_draft.as_mut() {
+                d.allow_multi_values = val;
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftOptionChanged { index, value } => {
+            if let Some(d) = model.modal_draft.as_mut()
+                && index < d.options.len()
+            {
+                d.options[index] = value;
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftAddOption => {
+            if let Some(d) = model.modal_draft.as_mut() {
+                d.options.push(String::new());
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftRemoveOption(i) => {
+            if let Some(d) = model.modal_draft.as_mut()
+                && i < d.options.len()
+            {
+                d.options.remove(i);
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftUnitChanged { index, value } => {
+            if let Some(d) = model.modal_draft.as_mut()
+                && index < d.units.len()
+            {
+                d.units[index] = value;
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftAddUnit => {
+            if let Some(d) = model.modal_draft.as_mut() {
+                d.units.push(String::new());
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftRemoveUnit(i) => {
+            if let Some(d) = model.modal_draft.as_mut()
+                && i < d.units.len()
+            {
+                d.units.remove(i);
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftDefaultUnitChanged(unit) => {
+            if let Some(d) = model.modal_draft.as_mut() {
+                d.unit = unit;
+            }
+            None
+        }
+        ExtraFieldsMsg::CommitFieldModal => {
+            if let (Some(idx), Some(draft)) = (model.editing_field, model.modal_draft.take())
                 && let Some(f) = model.fields.get_mut(idx)
             {
-                let new_label = model.editing_field_title_buffer.trim();
-                if !new_label.is_empty() {
-                    f.label = new_label.to_string();
+                let label = draft.label.trim();
+                if !label.is_empty() {
+                    f.label = label.to_string();
                 }
-            }
-            model.editing_field_title = None;
-            model.editing_field_title_buffer.clear();
-            None
-        }
-        ExtraFieldsMsg::CancelTitle => {
-            model.editing_field_title = None;
-            model.editing_field_title_buffer.clear();
-            None
-        }
-        ExtraFieldsMsg::StartEditDesc(idx) => {
-            if let Some(f) = model.fields.get(idx) {
-                model.editing_field_desc = Some(idx);
-                model.editing_field_desc_buffer = f.description.clone().unwrap_or_default();
-            }
-            None
-        }
-        ExtraFieldsMsg::EditDescChanged(text) => {
-            model.editing_field_desc_buffer = text;
-            None
-        }
-        ExtraFieldsMsg::CommitDesc => {
-            if let Some(idx) = model.editing_field_desc
-                && let Some(f) = model.fields.get_mut(idx)
-            {
-                let text = model.editing_field_desc_buffer.trim();
-                f.description = if text.is_empty() {
+                let desc = draft.description.trim();
+                f.description = if desc.is_empty() {
                     None
                 } else {
-                    Some(text.to_string())
+                    Some(desc.to_string())
                 };
+                f.required = draft.required;
+                f.allow_multi_values = draft.allow_multi_values;
+                if matches!(f.kind, ExtraFieldKind::Select | ExtraFieldKind::Radio) {
+                    f.options = draft.options.clone();
+                }
+                if matches!(f.kind, ExtraFieldKind::Number) {
+                    f.units = draft.units.clone();
+                    f.unit = if draft.unit.trim().is_empty() {
+                        None
+                    } else {
+                        Some(draft.unit.trim().to_string())
+                    };
+                }
             }
-            model.editing_field_desc = None;
-            model.editing_field_desc_buffer.clear();
-            None
-        }
-        ExtraFieldsMsg::CancelDesc => {
-            model.editing_field_desc = None;
-            model.editing_field_desc_buffer.clear();
+            model.modal_open = false;
+            model.editing_field = None;
             None
         }
         ExtraFieldsMsg::StartEditGroup(idx) => {
@@ -299,6 +406,8 @@ pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> 
             render_fields(ui, model, &mut msgs);
         });
 
+    render_field_modal(ui.ctx(), model, &mut msgs);
+
     msgs
 }
 
@@ -326,7 +435,7 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
         render_group_header(ui, group, msgs, model);
         ui.add_space(4.0);
         for (idx, field) in group_fields {
-            render_field(ui, model, field, idx, msgs);
+            render_field(ui, field, idx, msgs);
             ui.add_space(6.0);
         }
         ui.add_space(10.0);
@@ -343,7 +452,7 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
         ui.heading("Other");
         ui.add_space(4.0);
         for (idx, field) in ungrouped {
-            render_field(ui, model, field, idx, msgs);
+            render_field(ui, field, idx, msgs);
             ui.add_space(6.0);
         }
     }
@@ -397,16 +506,32 @@ fn render_group_header(
     });
 }
 
-fn render_field(
-    ui: &mut egui::Ui,
-    model: &ExtraFieldsModel,
-    field: &ExtraField,
-    idx: usize,
-    msgs: &mut Vec<ExtraFieldsMsg>,
-) {
+fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Vec<ExtraFieldsMsg>) {
     ui.group(|ui| {
-        render_field_title_row(ui, model, field, idx, msgs);
-        render_field_desc_row(ui, model, field, idx, msgs);
+        ui.horizontal(|ui| {
+            let mut label = field.label.clone();
+            if field.required {
+                label.push_str(" *");
+            }
+            ui.label(label);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .button(egui_phosphor::regular::PENCIL_SIMPLE)
+                    .on_hover_text("Edit field")
+                    .clicked()
+                {
+                    msgs.push(ExtraFieldsMsg::OpenFieldModal(idx));
+                }
+            });
+        });
+
+        if let Some(desc) = &field.description {
+            ui.label(
+                egui::RichText::new(desc)
+                    .small()
+                    .color(egui::Color32::from_gray(120)),
+            );
+        }
 
         ui.add_space(4.0);
         ui.group(|ui| match field.kind {
@@ -529,88 +654,6 @@ fn render_field(
     });
 }
 
-fn render_field_title_row(
-    ui: &mut egui::Ui,
-    model: &ExtraFieldsModel,
-    field: &ExtraField,
-    idx: usize,
-    msgs: &mut Vec<ExtraFieldsMsg>,
-) {
-    let is_editing = model.editing_field_title == Some(idx);
-
-    if is_editing {
-        let mut text = model.editing_field_title_buffer.clone();
-        let resp = ui.add(egui::TextEdit::singleline(&mut text));
-        if resp.changed() {
-            msgs.push(ExtraFieldsMsg::EditTitleChanged(text));
-        }
-        ui.horizontal(|ui| {
-            if ui.button(egui_phosphor::regular::CHECK).clicked() {
-                msgs.push(ExtraFieldsMsg::CommitTitle);
-            }
-            if ui.button(egui_phosphor::regular::X).clicked() {
-                msgs.push(ExtraFieldsMsg::CancelTitle);
-            }
-        });
-    } else {
-        ui.horizontal(|ui| {
-            let mut label = field.label.clone();
-            if field.required {
-                label.push_str(" *");
-            }
-            ui.label(label);
-            if ui
-                .button(egui_phosphor::regular::PENCIL_SIMPLE)
-                .on_hover_text("Edit title")
-                .clicked()
-            {
-                msgs.push(ExtraFieldsMsg::StartEditTitle(idx));
-            }
-        });
-    }
-}
-
-fn render_field_desc_row(
-    ui: &mut egui::Ui,
-    model: &ExtraFieldsModel,
-    field: &ExtraField,
-    idx: usize,
-    msgs: &mut Vec<ExtraFieldsMsg>,
-) {
-    let is_editing = model.editing_field_desc == Some(idx);
-
-    if is_editing {
-        let mut text = model.editing_field_desc_buffer.clone();
-        let resp = ui.add(egui::TextEdit::multiline(&mut text).desired_rows(2));
-        if resp.changed() {
-            msgs.push(ExtraFieldsMsg::EditDescChanged(text));
-        }
-        ui.horizontal(|ui| {
-            if ui.button(egui_phosphor::regular::CHECK).clicked() {
-                msgs.push(ExtraFieldsMsg::CommitDesc);
-            }
-            if ui.button(egui_phosphor::regular::X).clicked() {
-                msgs.push(ExtraFieldsMsg::CancelDesc);
-            }
-        });
-    } else if let Some(desc) = &field.description {
-        ui.horizontal(|ui| {
-            ui.label(
-                egui::RichText::new(desc)
-                    .small()
-                    .color(egui::Color32::from_gray(120)),
-            );
-            if ui
-                .button(egui_phosphor::regular::PENCIL_SIMPLE)
-                .on_hover_text("Edit description")
-                .clicked()
-            {
-                msgs.push(ExtraFieldsMsg::StartEditDesc(idx));
-            }
-        });
-    }
-}
-
 fn field_hint(kind: &ExtraFieldKind) -> &'static str {
     match kind {
         ExtraFieldKind::Date => "YYYY-MM-DD",
@@ -630,6 +673,112 @@ fn split_multi(value: &str) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect()
+}
+
+fn render_field_modal(
+    ctx: &egui::Context,
+    model: &ExtraFieldsModel,
+    msgs: &mut Vec<ExtraFieldsMsg>,
+) {
+    if !model.modal_open {
+        return;
+    }
+    let Some(draft) = model.modal_draft.clone() else {
+        return;
+    };
+
+    egui::Window::new("Edit field")
+        .collapsible(false)
+        .resizable(true)
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(ctx, |ui| {
+            ui.set_width(ui.available_width().max(420.0));
+
+            ui.label("Title");
+            let mut title = draft.label.clone();
+            if ui.text_edit_singleline(&mut title).changed() {
+                msgs.push(ExtraFieldsMsg::DraftLabelChanged(title));
+            }
+
+            ui.add_space(8.0);
+            ui.label("Description");
+            let mut desc = draft.description.clone();
+            if ui
+                .add(egui::TextEdit::multiline(&mut desc).desired_rows(3))
+                .changed()
+            {
+                msgs.push(ExtraFieldsMsg::DraftDescChanged(desc));
+            }
+
+            ui.add_space(8.0);
+            let mut required = draft.required;
+            if ui.checkbox(&mut required, "Required").changed() {
+                msgs.push(ExtraFieldsMsg::DraftRequiredToggled(required));
+            }
+
+            ui.add_space(8.0);
+            match draft.kind {
+                ExtraFieldKind::Select | ExtraFieldKind::Radio => {
+                    let mut allow_multi = draft.allow_multi_values;
+                    if ui.checkbox(&mut allow_multi, "Allow multiple").changed() {
+                        msgs.push(ExtraFieldsMsg::DraftAllowMultiToggled(allow_multi));
+                    }
+                    ui.add_space(6.0);
+                    ui.label("Options");
+                    for (i, opt) in draft.options.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            let mut v = opt.clone();
+                            if ui.text_edit_singleline(&mut v).changed() {
+                                msgs.push(ExtraFieldsMsg::DraftOptionChanged {
+                                    index: i,
+                                    value: v,
+                                });
+                            }
+                            if ui.button(egui_phosphor::regular::TRASH).clicked() {
+                                msgs.push(ExtraFieldsMsg::DraftRemoveOption(i));
+                            }
+                        });
+                    }
+                    if ui.button(egui_phosphor::regular::PLUS).clicked() {
+                        msgs.push(ExtraFieldsMsg::DraftAddOption);
+                    }
+                }
+                ExtraFieldKind::Number => {
+                    ui.label("Units");
+                    for (i, unit) in draft.units.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            let mut v = unit.clone();
+                            if ui.text_edit_singleline(&mut v).changed() {
+                                msgs.push(ExtraFieldsMsg::DraftUnitChanged { index: i, value: v });
+                            }
+                            if ui.button(egui_phosphor::regular::TRASH).clicked() {
+                                msgs.push(ExtraFieldsMsg::DraftRemoveUnit(i));
+                            }
+                        });
+                    }
+                    if ui.button(egui_phosphor::regular::PLUS).clicked() {
+                        msgs.push(ExtraFieldsMsg::DraftAddUnit);
+                    }
+                    ui.add_space(6.0);
+                    ui.label("Default unit");
+                    let mut unit = draft.unit.clone();
+                    if ui.text_edit_singleline(&mut unit).changed() {
+                        msgs.push(ExtraFieldsMsg::DraftDefaultUnitChanged(unit));
+                    }
+                }
+                _ => {}
+            }
+
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                if ui.button("Save").clicked() {
+                    msgs.push(ExtraFieldsMsg::CommitFieldModal);
+                }
+                if ui.button("Cancel").clicked() {
+                    msgs.push(ExtraFieldsMsg::CloseFieldModal);
+                }
+            });
+        });
 }
 
 #[cfg(test)]
