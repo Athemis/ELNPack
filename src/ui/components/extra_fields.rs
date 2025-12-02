@@ -550,20 +550,13 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
         .filter(|(_, f)| f.group_id.is_none())
         .collect();
 
-    ui.heading("Default");
-    ui.add_space(4.0);
-    for (idx, field) in ungrouped {
-        render_field(ui, field, idx, msgs);
-        ui.add_space(6.0);
-    }
-    if ui
-        .add(egui::Button::new(format!(
-            "{} Add field",
-            egui_phosphor::regular::PLUS
-        )))
-        .clicked()
-    {
-        msgs.push(ExtraFieldsMsg::StartAddField { group_id: None });
+    if !ungrouped.is_empty() {
+        ui.heading("Default");
+        ui.add_space(4.0);
+        for (idx, field) in ungrouped {
+            render_field(ui, field, idx, msgs);
+            ui.add_space(6.0);
+        }
     }
 }
 
