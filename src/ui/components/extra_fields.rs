@@ -62,6 +62,8 @@ pub enum ExtraFieldsMsg {
         index: usize,
         enabled: bool,
     },
+    #[allow(dead_code)]
+    RemoveField(usize),
 }
 
 /// Commands that require side effects.
@@ -157,6 +159,12 @@ pub fn update(
                     }
                     field.value_multi.clear();
                 }
+            }
+            None
+        }
+        ExtraFieldsMsg::RemoveField(index) => {
+            if index < model.fields.len() {
+                model.fields.remove(index);
             }
             None
         }
@@ -319,134 +327,132 @@ fn render_group_header(
 
 fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Vec<ExtraFieldsMsg>) {
     ui.group(|ui| {
-        ui.group(|ui| {
-            ui.horizontal(|ui| {
-                let mut label = field.label.clone();
-                if field.required {
-                    label.push_str(" *");
-                }
-                ui.label(label);
-                if let Some(desc) = &field.description {
-                    ui.label(
-                        egui::RichText::new(desc)
-                            .small()
-                            .color(egui::Color32::from_gray(120)),
-                    );
-                }
-            });
+        ui.horizontal(|ui| {
+            let mut label = field.label.clone();
+            if field.required {
+                label.push_str(" *");
+            }
+            ui.label(label);
+            if let Some(desc) = &field.description {
+                ui.label(
+                    egui::RichText::new(desc)
+                        .small()
+                        .color(egui::Color32::from_gray(120)),
+                );
+            }
+        });
 
-            ui.add_space(4.0);
-            match field.kind {
-                ExtraFieldKind::Checkbox => {
-                    let mut checked = field.value == "on";
-                    if ui.checkbox(&mut checked, "Checked").changed() {
-                        msgs.push(ExtraFieldsMsg::ToggleCheckbox {
-                            index: idx,
-                            checked,
-                        });
-                    }
-                }
-                ExtraFieldKind::Select | ExtraFieldKind::Radio => {
-                    ui.horizontal(|ui| {
-                        ui.label(
-                            egui::RichText::new("Options")
-                                .small()
-                                .color(egui::Color32::from_gray(140)),
-                        );
-                        ui.add_space(6.0);
-                        let mut allow_multi = field.allow_multi_values;
-                        if toggle_switch(ui, &mut allow_multi).clicked() {
-                            msgs.push(ExtraFieldsMsg::ToggleAllowMulti {
-                                index: idx,
-                                enabled: allow_multi,
-                            });
-                        }
-                        ui.label(
-                            egui::RichText::new("Allow multiple")
-                                .small()
-                                .color(egui::Color32::from_gray(140)),
-                        );
+        ui.add_space(4.0);
+        ui.group(|ui| match field.kind {
+            ExtraFieldKind::Checkbox => {
+                let mut checked = field.value == "on";
+                if ui.checkbox(&mut checked, "Checked").changed() {
+                    msgs.push(ExtraFieldsMsg::ToggleCheckbox {
+                        index: idx,
+                        checked,
                     });
-                    ui.add_space(4.0);
-
-                    if field.allow_multi_values {
-                        let mut chosen = if field.value_multi.is_empty() {
-                            split_multi(&field.value)
-                        } else {
-                            field.value_multi.clone()
-                        };
-                        for opt in &field.options {
-                            let mut is_on = chosen.contains(opt);
-                            if ui.checkbox(&mut is_on, opt).changed() {
-                                if is_on {
-                                    chosen.push(opt.clone());
-                                } else {
-                                    chosen.retain(|v| v != opt);
-                                }
-                                msgs.push(ExtraFieldsMsg::UpdateMulti {
-                                    index: idx,
-                                    values: chosen.clone(),
-                                });
-                            }
-                        }
-                    } else {
-                        let mut current = field.value.clone();
-                        for opt in &field.options {
-                            if ui.radio_value(&mut current, opt.clone(), opt).clicked() {
-                                msgs.push(ExtraFieldsMsg::EditValue {
-                                    index: idx,
-                                    value: opt.clone(),
-                                });
-                            }
-                        }
-                    }
                 }
-                ExtraFieldKind::Number => {
-                    let mut val = field.value.clone();
-                    let disabled = field.readonly;
-                    let resp = ui.add_enabled(!disabled, egui::TextEdit::singleline(&mut val));
-                    if resp.changed() {
-                        msgs.push(ExtraFieldsMsg::EditValue {
-                            index: idx,
-                            value: val,
-                        });
-                    }
-                    if !field.units.is_empty() {
-                        let mut current_unit = field.unit.clone().unwrap_or_default();
-                        egui::ComboBox::from_id_salt(format!("extra-unit-{}", idx))
-                            .selected_text(if current_unit.is_empty() {
-                                "Unit"
-                            } else {
-                                &current_unit
-                            })
-                            .show_ui(ui, |ui| {
-                                for unit in &field.units {
-                                    if ui
-                                        .selectable_value(&mut current_unit, unit.clone(), unit)
-                                        .clicked()
-                                    {
-                                        msgs.push(ExtraFieldsMsg::SelectUnit {
-                                            index: idx,
-                                            unit: unit.clone(),
-                                        });
-                                    }
-                                }
-                            });
-                    }
-                }
-                _ => {
-                    let mut val = field.value.clone();
-                    let disabled = field.readonly;
-                    let resp = ui.add_enabled(
-                        !disabled,
-                        egui::TextEdit::singleline(&mut val).hint_text(field_hint(&field.kind)),
+            }
+            ExtraFieldKind::Select | ExtraFieldKind::Radio => {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new("Options")
+                            .small()
+                            .color(egui::Color32::from_gray(140)),
                     );
-                    if resp.changed() {
-                        msgs.push(ExtraFieldsMsg::EditValue {
+                    ui.add_space(6.0);
+                    let mut allow_multi = field.allow_multi_values;
+                    if toggle_switch(ui, &mut allow_multi).clicked() {
+                        msgs.push(ExtraFieldsMsg::ToggleAllowMulti {
                             index: idx,
-                            value: val,
+                            enabled: allow_multi,
                         });
                     }
+                    ui.label(
+                        egui::RichText::new("Allow multiple")
+                            .small()
+                            .color(egui::Color32::from_gray(140)),
+                    );
+                });
+                ui.add_space(4.0);
+
+                if field.allow_multi_values {
+                    let mut chosen = if field.value_multi.is_empty() {
+                        split_multi(&field.value)
+                    } else {
+                        field.value_multi.clone()
+                    };
+                    for opt in &field.options {
+                        let mut is_on = chosen.contains(opt);
+                        if ui.checkbox(&mut is_on, opt).changed() {
+                            if is_on {
+                                chosen.push(opt.clone());
+                            } else {
+                                chosen.retain(|v| v != opt);
+                            }
+                            msgs.push(ExtraFieldsMsg::UpdateMulti {
+                                index: idx,
+                                values: chosen.clone(),
+                            });
+                        }
+                    }
+                } else {
+                    let mut current = field.value.clone();
+                    for opt in &field.options {
+                        if ui.radio_value(&mut current, opt.clone(), opt).clicked() {
+                            msgs.push(ExtraFieldsMsg::EditValue {
+                                index: idx,
+                                value: opt.clone(),
+                            });
+                        }
+                    }
+                }
+            }
+            ExtraFieldKind::Number => {
+                let mut val = field.value.clone();
+                let disabled = field.readonly;
+                let resp = ui.add_enabled(!disabled, egui::TextEdit::singleline(&mut val));
+                if resp.changed() {
+                    msgs.push(ExtraFieldsMsg::EditValue {
+                        index: idx,
+                        value: val,
+                    });
+                }
+                if !field.units.is_empty() {
+                    let mut current_unit = field.unit.clone().unwrap_or_default();
+                    egui::ComboBox::from_id_salt(format!("extra-unit-{}", idx))
+                        .selected_text(if current_unit.is_empty() {
+                            "Unit"
+                        } else {
+                            &current_unit
+                        })
+                        .show_ui(ui, |ui| {
+                            for unit in &field.units {
+                                if ui
+                                    .selectable_value(&mut current_unit, unit.clone(), unit)
+                                    .clicked()
+                                {
+                                    msgs.push(ExtraFieldsMsg::SelectUnit {
+                                        index: idx,
+                                        unit: unit.clone(),
+                                    });
+                                }
+                            }
+                        });
+                }
+            }
+            _ => {
+                let mut val = field.value.clone();
+                let disabled = field.readonly;
+                let resp = ui.add_enabled(
+                    !disabled,
+                    egui::TextEdit::singleline(&mut val).hint_text(field_hint(&field.kind)),
+                );
+                if resp.changed() {
+                    msgs.push(ExtraFieldsMsg::EditValue {
+                        index: idx,
+                        value: val,
+                    });
                 }
             }
         });
@@ -510,5 +516,39 @@ mod tests {
         assert_eq!(model.fields.len(), 1);
         assert!(event.message.contains("Imported 1 field"));
         assert!(!event.is_error);
+    }
+
+    #[test]
+    fn remove_field_updates_model() {
+        let mut model = ExtraFieldsModel::default();
+        let mut cmds = Vec::new();
+        update(
+            &mut model,
+            ExtraFieldsMsg::ImportLoaded {
+                fields: vec![ExtraField {
+                    label: "One".into(),
+                    kind: ExtraFieldKind::Text,
+                    value: "a".into(),
+                    value_multi: Vec::new(),
+                    options: vec![],
+                    unit: None,
+                    units: vec![],
+                    position: None,
+                    required: false,
+                    description: None,
+                    allow_multi_values: false,
+                    blank_value_on_duplicate: false,
+                    group_id: None,
+                    readonly: false,
+                }],
+                groups: vec![],
+                source: PathBuf::from("sample.json"),
+            },
+            &mut cmds,
+        );
+
+        assert_eq!(model.fields.len(), 1);
+        let _ = update(&mut model, ExtraFieldsMsg::RemoveField(0), &mut Vec::new());
+        assert!(model.fields.is_empty());
     }
 }
