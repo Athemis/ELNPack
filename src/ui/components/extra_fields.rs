@@ -351,12 +351,12 @@ pub fn update(
 pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> {
     let mut msgs = Vec::new();
 
-    egui::CollapsingHeader::new("Metadata (eLabFTW extra fields)")
+    egui::CollapsingHeader::new("Metadata")
         .default_open(false)
         .show(ui, |ui| {
             if ui
                 .add(egui::Button::new(format!(
-                    "{} Import metadata JSON",
+                    "{} Import JSON",
                     egui_phosphor::regular::FILE_ARROW_DOWN
                 )))
                 .clicked()
