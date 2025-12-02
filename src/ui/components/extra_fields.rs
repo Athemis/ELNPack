@@ -341,6 +341,15 @@ pub fn update(
         }
         ExtraFieldsMsg::CommitFieldModal => {
             if let Some(draft) = model.modal_draft.take() {
+                if name_conflict(model, &draft.label, model.editing_field) {
+                    // keep modal open; restore draft
+                    model.modal_draft = Some(draft);
+                    return Some(ExtraFieldsEvent {
+                        message: "Field name must be unique".into(),
+                        is_error: true,
+                    });
+                }
+
                 if let Some(idx) = model.editing_field {
                     if let Some(f) = model.fields.get_mut(idx) {
                         let label = draft.label.trim();
@@ -825,6 +834,16 @@ fn split_multi(value: &str) -> Vec<String> {
         .collect()
 }
 
+fn name_conflict(model: &ExtraFieldsModel, label: &str, editing: Option<usize>) -> bool {
+    let key = label.trim().to_lowercase();
+    if key.is_empty() {
+        return false;
+    }
+    model.fields.iter().enumerate().any(|(idx, f)| {
+        idx != editing.unwrap_or(usize::MAX) && f.label.trim().eq_ignore_ascii_case(&key)
+    })
+}
+
 fn render_field_modal(
     ctx: &egui::Context,
     model: &ExtraFieldsModel,
@@ -837,12 +856,18 @@ fn render_field_modal(
         return;
     };
 
+    let conflict = model
+        .modal_draft
+        .as_ref()
+        .map(|d| name_conflict(model, &d.label, model.editing_field))
+        .unwrap_or(false);
+
     egui::Window::new("Edit field")
         .collapsible(false)
         .resizable(true)
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(ctx, |ui| {
-            let can_save = !draft.label.trim().is_empty();
+            let can_save = !draft.label.trim().is_empty() && !conflict;
 
             ui.set_width(ui.available_width().max(420.0));
 
@@ -851,6 +876,18 @@ fn render_field_modal(
             if ui.text_edit_singleline(&mut title).changed() {
                 msgs.push(ExtraFieldsMsg::DraftLabelChanged(title));
             }
+            // Reserve space even when no conflict to avoid layout jump.
+            ui.add_space(2.0);
+            let color = if conflict {
+                egui::Color32::from_rgb(200, 80, 80)
+            } else {
+                egui::Color32::from_rgba_unmultiplied(0, 0, 0, 0)
+            };
+            let text = egui::RichText::new("Field name must be unique").color(color);
+            ui.scope(|ui| {
+                ui.spacing_mut().item_spacing.y = 0.0;
+                ui.label(text);
+            });
 
             if model.editing_field.is_none() {
                 ui.add_space(8.0);
@@ -1176,6 +1213,93 @@ mod tests {
         let _ = update(&mut model, ExtraFieldsMsg::CloseFieldModal, &mut cmds);
 
         assert_eq!(model.fields[0].label, "Old");
+    }
+
+    #[test]
+    fn duplicate_name_blocks_new_field() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "Name".into(),
+            kind: ExtraFieldKind::Text,
+            value: "".into(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::StartAddField { group_id: None },
+            &mut cmds,
+        );
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftLabelChanged("Name".into()),
+            &mut cmds,
+        );
+        let event = update(&mut model, ExtraFieldsMsg::CommitFieldModal, &mut cmds).unwrap();
+
+        assert!(event.is_error);
+        assert_eq!(model.fields.len(), 1);
+        assert!(model.modal_open); // still open for correction
+    }
+
+    #[test]
+    fn duplicate_name_blocks_edit() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "First".into(),
+            kind: ExtraFieldKind::Text,
+            value: "".into(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+        model.fields.push(ExtraField {
+            label: "Second".into(),
+            kind: ExtraFieldKind::Text,
+            value: "".into(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::OpenFieldModal(1), &mut cmds);
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftLabelChanged("First".into()),
+            &mut cmds,
+        );
+        let event = update(&mut model, ExtraFieldsMsg::CommitFieldModal, &mut cmds).unwrap();
+
+        assert!(event.is_error);
+        assert_eq!(model.fields[1].label, "Second"); // unchanged
+        assert!(model.modal_open);
     }
 
     #[test]
