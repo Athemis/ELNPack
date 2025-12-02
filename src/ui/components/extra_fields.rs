@@ -92,7 +92,9 @@ pub enum ExtraFieldsMsg {
     CancelGroupEdit,
     RemoveGroup(usize),
     AddGroup,
-    StartAddField,
+    StartAddField {
+        group_id: Option<i32>,
+    },
     OpenFieldModal(usize),
     CloseFieldModal,
     DraftLabelChanged(String),
@@ -300,10 +302,13 @@ pub fn update(
             }
             None
         }
-        ExtraFieldsMsg::StartAddField => {
+        ExtraFieldsMsg::StartAddField { group_id } => {
             model.modal_open = true;
             model.editing_field = None;
-            model.modal_draft = Some(FieldDraft::default());
+            model.modal_draft = Some(FieldDraft {
+                group_id,
+                ..Default::default()
+            });
             None
         }
         ExtraFieldsMsg::RemoveField(index) => {
@@ -451,7 +456,7 @@ pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> 
                     )))
                     .clicked()
                 {
-                    msgs.push(ExtraFieldsMsg::StartAddField);
+                    msgs.push(ExtraFieldsMsg::StartAddField { group_id: None });
                 }
                 if ui
                     .add(egui::Button::new(format!(
@@ -514,6 +519,18 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
                 ui.add_space(6.0);
             }
         }
+        if ui
+            .add(egui::Button::new(format!(
+                "{} Add field to {}",
+                egui_phosphor::regular::PLUS,
+                group.name
+            )))
+            .clicked()
+        {
+            msgs.push(ExtraFieldsMsg::StartAddField {
+                group_id: Some(group.id),
+            });
+        }
         ui.add_space(10.0);
     }
 
@@ -524,13 +541,20 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
         .filter(|(_, f)| f.group_id.is_none())
         .collect();
 
-    if !ungrouped.is_empty() {
-        ui.heading("Default");
-        ui.add_space(4.0);
-        for (idx, field) in ungrouped {
-            render_field(ui, field, idx, msgs);
-            ui.add_space(6.0);
-        }
+    ui.heading("Default");
+    ui.add_space(4.0);
+    for (idx, field) in ungrouped {
+        render_field(ui, field, idx, msgs);
+        ui.add_space(6.0);
+    }
+    if ui
+        .add(egui::Button::new(format!(
+            "{} Add field",
+            egui_phosphor::regular::PLUS
+        )))
+        .clicked()
+    {
+        msgs.push(ExtraFieldsMsg::StartAddField { group_id: None });
     }
 }
 
