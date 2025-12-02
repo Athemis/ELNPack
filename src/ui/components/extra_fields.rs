@@ -29,6 +29,7 @@ struct FieldDraft {
     units: Vec<String>,
     unit: String,
     kind: ExtraFieldKind,
+    group_id: Option<i32>,
 }
 
 impl Default for FieldDraft {
@@ -42,6 +43,7 @@ impl Default for FieldDraft {
             units: Vec::new(),
             unit: String::new(),
             kind: ExtraFieldKind::Text,
+            group_id: None,
         }
     }
 }
@@ -109,6 +111,7 @@ pub enum ExtraFieldsMsg {
     DraftAddUnit,
     DraftRemoveUnit(usize),
     DraftDefaultUnitChanged(String),
+    DraftGroupChanged(Option<i32>),
     CommitFieldModal,
 }
 
@@ -205,6 +208,7 @@ pub fn update(
                     units: f.units.clone(),
                     unit: f.unit.clone().unwrap_or_default(),
                     kind: f.kind.clone(),
+                    group_id: f.group_id,
                 });
             }
             None
@@ -289,6 +293,12 @@ pub fn update(
             }
             None
         }
+        ExtraFieldsMsg::DraftGroupChanged(group) => {
+            if let Some(d) = model.modal_draft.as_mut() {
+                d.group_id = group;
+            }
+            None
+        }
         ExtraFieldsMsg::StartAddField => {
             model.modal_open = true;
             model.editing_field = None;
@@ -317,6 +327,7 @@ pub fn update(
                         };
                         f.required = draft.required;
                         f.allow_multi_values = draft.allow_multi_values;
+                        f.group_id = draft.group_id;
                         if matches!(f.kind, ExtraFieldKind::Select | ExtraFieldKind::Radio) {
                             f.options = draft.options.clone();
                         }
@@ -353,7 +364,7 @@ pub fn update(
                             },
                             allow_multi_values: draft.allow_multi_values,
                             blank_value_on_duplicate: false,
-                            group_id: None,
+                            group_id: draft.group_id,
                             readonly: false,
                         };
                         model.fields.push(new_field);
@@ -802,6 +813,36 @@ fn render_field_modal(
                     }
                 }
                 _ => {}
+            }
+
+            ui.add_space(8.0);
+            ui.label("Group assignment");
+            if model.groups.is_empty() {
+                ui.label(
+                    egui::RichText::new("No groups defined.")
+                        .small()
+                        .color(egui::Color32::from_gray(120)),
+                );
+            } else {
+                let mut current = draft.group_id.unwrap_or(-1);
+                egui::ComboBox::from_label("Group")
+                    .selected_text(
+                        draft
+                            .group_id
+                            .and_then(|gid| model.groups.iter().find(|g| g.id == gid))
+                            .map(|g| g.name.clone())
+                            .unwrap_or_else(|| "None".into()),
+                    )
+                    .show_ui(ui, |ui| {
+                        if ui.selectable_value(&mut current, -1, "None").clicked() {
+                            msgs.push(ExtraFieldsMsg::DraftGroupChanged(None));
+                        }
+                        for g in &model.groups {
+                            if ui.selectable_value(&mut current, g.id, &g.name).clicked() {
+                                msgs.push(ExtraFieldsMsg::DraftGroupChanged(Some(g.id)));
+                            }
+                        }
+                    });
             }
 
             ui.add_space(10.0);
