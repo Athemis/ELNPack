@@ -61,6 +61,37 @@ impl ExtraFieldsModel {
     pub fn has_invalid_fields(&self) -> bool {
         self.fields.iter().any(field_invalid)
     }
+
+    pub fn ensure_default_group(&mut self) -> i32 {
+        if let Some(g) = self.groups.iter().find(|g| g.name == "Default") {
+            return g.id;
+        }
+        let next_id = self.groups.iter().map(|g| g.id).max().unwrap_or(0) + 1;
+        self.groups.push(ExtraFieldGroup {
+            id: next_id,
+            name: "Default".into(),
+            position: self.groups.len() as i32,
+        });
+        next_id
+    }
+
+    pub fn preferred_group_id(&mut self) -> i32 {
+        if self.groups.is_empty() {
+            return self.ensure_default_group();
+        }
+        self.groups
+            .iter()
+            .min_by_key(|g| (g.position, g.id))
+            .map(|g| g.id)
+            .unwrap_or_else(|| self.ensure_default_group())
+    }
+
+    pub fn display_group_name(&self, group_id: Option<i32>) -> String {
+        group_id
+            .and_then(|gid| self.groups.iter().find(|g| g.id == gid))
+            .map(|g| g.name.clone())
+            .unwrap_or_else(|| "Default".to_string())
+    }
 }
 
 /// Messages produced by the extra fields view.
@@ -367,7 +398,7 @@ pub fn update(
             model.modal_open = true;
             model.editing_field = None;
             let mut draft = FieldDraft::default();
-            let preferred = preferred_group_id(model);
+            let preferred = model.preferred_group_id();
             draft.group_id = group_id.or(Some(preferred));
             model.modal_draft = Some(draft);
             None
@@ -411,7 +442,7 @@ pub fn update(
                     let label = draft.label.trim().to_string();
                     if !label.is_empty() {
                         let mut draft = draft;
-                        let preferred = preferred_group_id(model);
+                        let preferred = model.preferred_group_id();
                         draft.group_id = draft.group_id.or(Some(preferred));
                         let new_field = ExtraField {
                             label,
@@ -488,7 +519,7 @@ pub fn update(
                     model.groups.remove(idx);
 
                     // Ensure a Default group exists for reassignment if needed
-                    let default_id = ensure_default_group(model);
+                    let default_id = model.ensure_default_group();
 
                     for f in model.fields.iter_mut() {
                         if f.group_id == Some(group.id) {
@@ -905,25 +936,6 @@ fn trimmed_or_none(input: &str) -> Option<String> {
     }
 }
 
-fn group_display_name(group_id: Option<i32>, model: &ExtraFieldsModel) -> String {
-    group_id
-        .and_then(|gid| model.groups.iter().find(|g| g.id == gid).cloned())
-        .map(|g| g.name)
-        .unwrap_or_else(|| "Default".to_string())
-}
-
-fn preferred_group_id(model: &mut ExtraFieldsModel) -> i32 {
-    if model.groups.is_empty() {
-        return ensure_default_group(model);
-    }
-    model
-        .groups
-        .iter()
-        .min_by_key(|g| (g.position, g.id))
-        .map(|g| g.id)
-        .unwrap_or_else(|| ensure_default_group(model))
-}
-
 fn render_field_modal(
     ctx: &egui::Context,
     model: &ExtraFieldsModel,
@@ -1059,7 +1071,7 @@ fn render_field_modal(
             ui.add_space(8.0);
             ui.label("Group assignment");
             let mut current = draft.group_id.unwrap_or(-1);
-            let display_name = group_display_name(draft.group_id, model);
+            let display_name = model.display_group_name(draft.group_id);
 
             egui::ComboBox::from_label("Group")
                 .selected_text(display_name)
@@ -1082,19 +1094,6 @@ fn render_field_modal(
                 }
             });
         });
-}
-
-fn ensure_default_group(model: &mut ExtraFieldsModel) -> i32 {
-    if let Some(g) = model.groups.iter().find(|g| g.name == "Default") {
-        return g.id;
-    }
-    let next_id = model.groups.iter().map(|g| g.id).max().unwrap_or(0) + 1;
-    model.groups.push(ExtraFieldGroup {
-        id: next_id,
-        name: "Default".into(),
-        position: model.groups.len() as i32,
-    });
-    next_id
 }
 
 #[cfg(test)]
@@ -1212,8 +1211,8 @@ mod tests {
             position: 0,
         });
 
-        assert_eq!(group_display_name(Some(1), &model), "One");
-        assert_eq!(group_display_name(Some(99), &model), "Default");
+        assert_eq!(model.display_group_name(Some(1)), "One");
+        assert_eq!(model.display_group_name(Some(99)), "Default");
     }
 
     #[test]
