@@ -132,6 +132,17 @@ pub struct ExtraFieldsEvent {
     pub is_error: bool,
 }
 
+/// Validation helper to ensure required fields are filled.
+fn missing_required(model: &ExtraFieldsModel) -> Vec<usize> {
+    model
+        .fields
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| f.required && f.value.trim().is_empty())
+        .map(|(idx, _)| idx)
+        .collect()
+}
+
 /// Update the model based on a message.
 pub fn update(
     model: &mut ExtraFieldsModel,
@@ -408,9 +419,19 @@ pub fn update(
                     }
                 }
             }
-            model.modal_open = false;
-            model.editing_field = None;
-            None
+            // Validate required fields globally after mutation.
+            let missing = missing_required(model);
+            if missing.is_empty() {
+                model.modal_open = false;
+                model.editing_field = None;
+                None
+            } else {
+                model.modal_open = false;
+                Some(ExtraFieldsEvent {
+                    message: "Please fill all required fields before saving.".into(),
+                    is_error: true,
+                })
+            }
         }
         ExtraFieldsMsg::StartEditGroup(idx) => {
             if let Some(g) = model.groups.get(idx) {
@@ -644,7 +665,17 @@ fn render_group_header(
 }
 
 fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Vec<ExtraFieldsMsg>) {
-    ui.group(|ui| {
+    let missing_required = field.required && field.value.trim().is_empty();
+    let frame = egui::Frame::group(ui.style()).stroke(if missing_required {
+        egui::Stroke::new(1.0, egui::Color32::from_rgb(200, 80, 80))
+    } else {
+        egui::Stroke::new(
+            1.0,
+            ui.style().visuals.widgets.noninteractive.bg_stroke.color,
+        )
+    });
+
+    frame.show(ui, |ui| {
         ui.horizontal(|ui| {
             let mut label = field.label.clone();
             if field.required {
