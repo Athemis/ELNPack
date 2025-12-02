@@ -56,6 +56,12 @@ impl ExtraFieldsModel {
     pub fn groups(&self) -> &[ExtraFieldGroup] {
         &self.groups
     }
+
+    pub fn has_missing_required(&self) -> bool {
+        self.fields
+            .iter()
+            .any(|f| f.required && f.value.trim().is_empty())
+    }
 }
 
 /// Messages produced by the extra fields view.
