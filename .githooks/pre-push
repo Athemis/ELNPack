@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2025 Alexander Minges
+set -euo pipefail
+
+# Pre-push hook to validate that all commits being pushed follow Conventional Commits
+# This prevents malformed commits that may have bypassed commit-msg hook during rebases
+
+# Source shared validation logic
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/validate-commit-msg.sh"
+
+remote="$1"
+url="$2"
+
+has_errors=0
+
+# Read stdin to get the refs being pushed
+while read local_ref local_sha remote_ref remote_sha; do
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+    # Deleting a branch, skip validation
+    continue
+  fi
+
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    # New branch, check all commits
+    range="$local_sha"
+  else
+    # Updating existing branch, check new commits only
+    range="$remote_sha..$local_sha"
+  fi
+
+  # Get all commit messages in the range
+  while IFS= read -r commit_msg; do
+    if ! validate_commit_msg "$commit_msg"; then
+      print_error "$commit_msg"
+      echo >&2
+      has_errors=1
+    fi
+  done < <(git log --format=%s "$range")
+done
+
+if [ $has_errors -eq 1 ]; then
+  echo >&2
+  echo "Push rejected due to invalid commit messages." >&2
+  echo "Please fix the commit messages using 'git rebase -i' or 'git commit --amend'." >&2
+  exit 1
+fi
+
+exit 0
