@@ -614,10 +614,11 @@ fn render_group_header(
                 {
                     msgs.push(ExtraFieldsMsg::StartEditGroup(idx));
                 }
-                if ui
-                    .button(egui_phosphor::regular::TRASH)
-                    .on_hover_text("Remove group")
-                    .clicked()
+                if model.groups.len() > 1
+                    && ui
+                        .button(egui_phosphor::regular::TRASH)
+                        .on_hover_text("Remove group")
+                        .clicked()
                     && let Some(idx) = model.groups.iter().position(|g| g.id == group.id)
                 {
                     msgs.push(ExtraFieldsMsg::RemoveGroup(idx));
