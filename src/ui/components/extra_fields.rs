@@ -533,7 +533,7 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
         );
     }
 
-    // Render grouped fields in group order, then any ungrouped.
+    // Render grouped fields in group order, collapsible.
     for group in model.groups.iter() {
         let group_fields: Vec<(usize, &ExtraField)> = model
             .fields
@@ -541,32 +541,43 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
             .enumerate()
             .filter(|(_, f)| f.group_id == Some(group.id))
             .collect();
-        render_group_header(ui, group, msgs, model);
-        ui.add_space(4.0);
-        if group_fields.is_empty() {
-            ui.label(
-                egui::RichText::new("No fields in this group yet.")
-                    .italics()
-                    .color(egui::Color32::from_gray(120)),
-            );
-        } else {
-            for (idx, field) in group_fields {
-                render_field(ui, field, idx, msgs);
-                ui.add_space(6.0);
-            }
-        }
-        if ui
-            .add(egui::Button::new(format!(
-                "{} Add field to {}",
-                egui_phosphor::regular::PLUS,
-                group.name
-            )))
-            .clicked()
-        {
-            msgs.push(ExtraFieldsMsg::StartAddField {
-                group_id: Some(group.id),
+
+        egui::CollapsingHeader::new(group.name.clone())
+            .id_salt(format!("extra-group-{}", group.id))
+            .default_open(true)
+            .show(ui, |ui| {
+                // Header controls inside the collapsible header area.
+                render_group_header(ui, group, msgs, model);
+                ui.add_space(4.0);
+
+                // Body: fields
+                if group_fields.is_empty() {
+                    ui.label(
+                        egui::RichText::new("No fields in this group yet.")
+                            .italics()
+                            .color(egui::Color32::from_gray(120)),
+                    );
+                } else {
+                    for (idx, field) in group_fields {
+                        render_field(ui, field, idx, msgs);
+                        ui.add_space(6.0);
+                    }
+                }
+
+                if ui
+                    .add(egui::Button::new(format!(
+                        "{} Add field to {}",
+                        egui_phosphor::regular::PLUS,
+                        group.name
+                    )))
+                    .clicked()
+                {
+                    msgs.push(ExtraFieldsMsg::StartAddField {
+                        group_id: Some(group.id),
+                    });
+                }
             });
-        }
+
         ui.add_space(10.0);
     }
 }
