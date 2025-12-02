@@ -61,6 +61,7 @@ impl ExtraFieldsModel {
 /// Messages produced by the extra fields view.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ExtraFieldsMsg {
+    DraftKindChanged(ExtraFieldKind),
     RemoveField(usize),
     ImportRequested,
     ImportCancelled,
@@ -237,6 +238,18 @@ pub fn update(
         ExtraFieldsMsg::DraftRequiredToggled(val) => {
             if let Some(d) = model.modal_draft.as_mut() {
                 d.required = val;
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftKindChanged(kind) => {
+            if model.editing_field.is_none()
+                && let Some(d) = model.modal_draft.as_mut()
+            {
+                d.kind = kind;
+                d.options.clear();
+                d.units.clear();
+                d.unit.clear();
+                d.allow_multi_values = false;
             }
             None
         }
@@ -761,6 +774,43 @@ fn field_hint(kind: &ExtraFieldKind) -> &'static str {
     }
 }
 
+fn kind_label(kind: &ExtraFieldKind) -> &'static str {
+    match kind {
+        ExtraFieldKind::Text => "Text",
+        ExtraFieldKind::Number => "Number",
+        ExtraFieldKind::Select => "Select",
+        ExtraFieldKind::Checkbox => "Checkbox",
+        ExtraFieldKind::Date => "Date",
+        ExtraFieldKind::DateTimeLocal => "Date/time",
+        ExtraFieldKind::Time => "Time",
+        ExtraFieldKind::Url => "URL",
+        ExtraFieldKind::Email => "Email",
+        ExtraFieldKind::Radio => "Radio",
+        ExtraFieldKind::Items => "Items",
+        ExtraFieldKind::Experiments => "Experiments",
+        ExtraFieldKind::Users => "Users",
+        ExtraFieldKind::Unknown(_) => "Unknown",
+    }
+}
+
+fn all_kinds() -> Vec<ExtraFieldKind> {
+    vec![
+        ExtraFieldKind::Text,
+        ExtraFieldKind::Number,
+        ExtraFieldKind::Select,
+        ExtraFieldKind::Checkbox,
+        ExtraFieldKind::Date,
+        ExtraFieldKind::DateTimeLocal,
+        ExtraFieldKind::Time,
+        ExtraFieldKind::Url,
+        ExtraFieldKind::Email,
+        ExtraFieldKind::Radio,
+        ExtraFieldKind::Items,
+        ExtraFieldKind::Experiments,
+        ExtraFieldKind::Users,
+    ]
+}
+
 fn split_multi(value: &str) -> Vec<String> {
     value
         .split(',')
@@ -787,12 +837,32 @@ fn render_field_modal(
         .resizable(true)
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(ctx, |ui| {
+            let can_save = !draft.label.trim().is_empty();
+
             ui.set_width(ui.available_width().max(420.0));
 
             ui.label("Title");
             let mut title = draft.label.clone();
             if ui.text_edit_singleline(&mut title).changed() {
                 msgs.push(ExtraFieldsMsg::DraftLabelChanged(title));
+            }
+
+            if model.editing_field.is_none() {
+                ui.add_space(8.0);
+                ui.label("Field type");
+                let mut kind = draft.kind.clone();
+                egui::ComboBox::from_id_salt("extra-field-kind")
+                    .selected_text(kind_label(&kind))
+                    .show_ui(ui, |ui| {
+                        for k in all_kinds() {
+                            if ui
+                                .selectable_value(&mut kind, k.clone(), kind_label(&k))
+                                .clicked()
+                            {
+                                msgs.push(ExtraFieldsMsg::DraftKindChanged(k));
+                            }
+                        }
+                    });
             }
 
             ui.add_space(8.0);
@@ -888,7 +958,8 @@ fn render_field_modal(
 
             ui.add_space(10.0);
             ui.horizontal(|ui| {
-                if ui.button("Save").clicked() {
+                let save_btn = ui.add_enabled(can_save, egui::Button::new("Save"));
+                if save_btn.clicked() && can_save {
                     msgs.push(ExtraFieldsMsg::CommitFieldModal);
                 }
                 if ui.button("Cancel").clicked() {
@@ -1011,6 +1082,51 @@ mod tests {
         assert_eq!(f.description.as_deref(), Some("ndesc"));
         assert!(f.allow_multi_values);
         assert!(f.options.contains(&"C".into()));
+    }
+
+    #[test]
+    fn draft_kind_change_only_affects_creation() {
+        // Creation path
+        let mut model = ExtraFieldsModel::default();
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::StartAddField { group_id: None },
+            &mut cmds,
+        );
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftKindChanged(ExtraFieldKind::Select),
+            &mut cmds,
+        );
+        let _ = update(&mut model, ExtraFieldsMsg::DraftAddOption, &mut cmds);
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftOptionChanged {
+                index: 0,
+                value: "One".into(),
+            },
+            &mut cmds,
+        );
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftLabelChanged("New field".into()),
+            &mut cmds,
+        );
+        let _ = update(&mut model, ExtraFieldsMsg::CommitFieldModal, &mut cmds);
+        assert_eq!(model.fields.len(), 1);
+        assert_eq!(model.fields[0].kind, ExtraFieldKind::Select);
+        assert_eq!(model.fields[0].options, vec!["One".to_string()]);
+
+        // Edit path should ignore kind change
+        let _ = update(&mut model, ExtraFieldsMsg::OpenFieldModal(0), &mut cmds);
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftKindChanged(ExtraFieldKind::Text),
+            &mut cmds,
+        );
+        let _ = update(&mut model, ExtraFieldsMsg::CommitFieldModal, &mut cmds);
+        assert_eq!(model.fields[0].kind, ExtraFieldKind::Select);
     }
 
     #[test]
