@@ -49,6 +49,26 @@ impl ExtraFieldKind {
             other => Self::Unknown(other.to_string()),
         }
     }
+
+    /// String form used when emitting metadata.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Text => "text",
+            Self::Number => "number",
+            Self::Select => "select",
+            Self::Checkbox => "checkbox",
+            Self::Date => "date",
+            Self::DateTimeLocal => "datetime-local",
+            Self::Time => "time",
+            Self::Url => "url",
+            Self::Email => "email",
+            Self::Radio => "radio",
+            Self::Items => "items",
+            Self::Experiments => "experiments",
+            Self::Users => "users",
+            Self::Unknown(raw) => raw.as_str(),
+        }
+    }
 }
 
 /// Single extra field definition + value.

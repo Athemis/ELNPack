@@ -77,6 +77,7 @@ SPDX-FileCopyrightText: 2025 Alexander Minges
 - **`src/utils/`**: Helpers (`sanitize_component`, `hash_file`).
 - **`src/models/`**: Pure data/validation (`attachment`, `keywords`).
 - **`src/logic/eln.rs`**: ELN RO-Crate build/write, metadata, suggested archive name. Conforms to RO-Crate 1.2 and ELN File Format spec; uses pre-sanitized names from attachments. No UI deps.
+- Extra fields export: archives emit eLabFTW-style PropertyValue nodes (`pv://` v4 ids) linked via `variableMeasured`, include a metadata blob PropertyValue with reconstructed `elabftw_metadata` (with `display_main_text`).
 
 ## Testing Guidelines
 

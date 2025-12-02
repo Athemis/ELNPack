@@ -27,6 +27,7 @@ egui-phosphor = { version = "0.11", default-features = false, features = ["regul
 ammonia = "4.1"
 deunicode = "1.6"
 url = { version = "2", default-features = false, features = ["std"] }
+uuid = { version = "1", features = ["v4", "v5"] }
 
 [dev-dependencies]
 tempfile = "3.14"
