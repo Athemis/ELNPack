@@ -33,6 +33,25 @@ struct FieldDraft {
 }
 
 impl Default for FieldDraft {
+    /// Creates a new `FieldDraft` populated with empty/default values.
+    ///
+    /// The returned draft has an empty `label` and `description`, `required` and
+    /// `allow_multi_values` set to `false`, no `options` or `units`, the default
+    /// kind `ExtraFieldKind::Text`, and no group assignment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let d = FieldDraft::default();
+    /// assert!(d.label.is_empty());
+    /// assert!(d.description.is_empty());
+    /// assert_eq!(d.required, false);
+    /// assert_eq!(d.allow_multi_values, false);
+    /// assert!(d.options.is_empty());
+    /// assert!(d.units.is_empty());
+    /// assert_eq!(d.kind, ExtraFieldKind::Text);
+    /// assert!(d.group_id.is_none());
+    /// ```
     fn default() -> Self {
         Self {
             label: String::new(),
@@ -49,18 +68,73 @@ impl Default for FieldDraft {
 }
 
 impl ExtraFieldsModel {
+    /// Access the model's extra fields as a slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Given an existing `model: ExtraFieldsModel`:
+    /// // let slice = model.fields();
+    /// // assert!(slice.is_empty() || slice[0].label.len() > 0);
+    /// ```
     pub fn fields(&self) -> &[ExtraField] {
         &self.fields
     }
 
+    /// Returns a slice of all field groups in the model.
+    ///
+    /// The returned slice borrows the model's internal group storage and can be used for read-only iteration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let model = ExtraFieldsModel::default();
+    /// let groups: &[ExtraFieldGroup] = model.groups();
+    /// // iterate without taking ownership
+    /// for g in groups {
+    ///     println!("{}", g.name);
+    /// }
+    /// ```
     pub fn groups(&self) -> &[ExtraFieldGroup] {
         &self.groups
     }
 
+    /// Returns whether any extra field in the model is invalid.
+    ///
+    /// # Returns
+    ///
+    /// `true` if at least one field is invalid, `false` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let model = ExtraFieldsModel {
+    ///     fields: Vec::new(),
+    ///     groups: Vec::new(),
+    ///     editing_group: None,
+    ///     editing_group_buffer: String::new(),
+    ///     editing_field: None,
+    ///     modal_open: false,
+    ///     modal_draft: None,
+    /// };
+    /// assert!(!model.has_invalid_fields());
+    /// ```
     pub fn has_invalid_fields(&self) -> bool {
         self.fields.iter().any(field_invalid)
     }
 
+    /// Ensure a group named "Default" exists in the model and return its id.
+    ///
+    /// If a "Default" group already exists, returns its id. Otherwise a new group named
+    /// "Default" is created with a new id and appended to `self.groups`, and that id is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut model = ExtraFieldsModel::default();
+    /// let id = model.ensure_default_group();
+    /// assert_eq!(model.groups.iter().find(|g| g.name == "Default").unwrap().id, id);
+    /// ```
     pub fn ensure_default_group(&mut self) -> i32 {
         if let Some(g) = self.groups.iter().find(|g| g.name == "Default") {
             return g.id;
@@ -74,6 +148,26 @@ impl ExtraFieldsModel {
         next_id
     }
 
+    /// Return the id of the group with the lowest position, creating a default group if none exist.
+    ///
+    /// If multiple groups share the same lowest position, the group with the smallest id is chosen.
+    /// If the model has no groups, a Default group is created and its id is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Assuming `ExtraFieldsModel` has a public `new()` constructor and public `groups` field.
+    /// let mut model = ExtraFieldsModel::new();
+    /// // No groups yet: this will create the Default group and return its id.
+    /// let default_id = model.lowest_position_group_id();
+    /// assert!(model.groups.iter().any(|g| g.id == default_id));
+    ///
+    /// // When multiple groups exist, returns the one with the lowest position (tie-broken by id).
+    /// model.groups.push(ExtraFieldGroup { id: 10, position: 1, name: "A".into() });
+    /// model.groups.push(ExtraFieldGroup { id: 5, position: 1, name: "B".into() });
+    /// let chosen = model.lowest_position_group_id();
+    /// assert_eq!(chosen, 5);
+    /// ```
     pub fn lowest_position_group_id(&mut self) -> i32 {
         if self.groups.is_empty() {
             return self.ensure_default_group();
@@ -85,6 +179,25 @@ impl ExtraFieldsModel {
             .unwrap_or_else(|| self.ensure_default_group())
     }
 
+    /// Return the name of the group with the given id, or "Default" when `group_id` is `None` or no matching group exists.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let model = ExtraFieldsModel {
+    ///     fields: vec![],
+    ///     groups: vec![ExtraFieldGroup { id: 1, name: "Specs".into(), position: 0 }],
+    ///     editing_group: None,
+    ///     editing_group_buffer: String::new(),
+    ///     editing_field: None,
+    ///     modal_open: false,
+    ///     modal_draft: None,
+    /// };
+    ///
+    /// assert_eq!(model.display_group_name(Some(1)), "Specs");
+    /// assert_eq!(model.display_group_name(None), "Default");
+    /// assert_eq!(model.display_group_name(Some(42)), "Default");
+    /// ```
     pub fn display_group_name(&self, group_id: Option<i32>) -> String {
         group_id
             .and_then(|gid| self.groups.iter().find(|g| g.id == gid))
@@ -476,7 +589,28 @@ pub fn update(
     }
 }
 
-/// Render the component and return triggered messages.
+/// Render the extra-fields editor UI and collect user actions as messages.
+///
+/// This draws the collapsible "Metadata" section, action buttons, the grouped field list,
+/// and any open field-edit modal, returning a list of messages for actions the user took
+/// during this render pass.
+///
+/// # Returns
+///
+/// A `Vec<ExtraFieldsMsg>` containing messages that represent user actions triggered while rendering.
+///
+/// # Examples
+///
+/// ```no_run
+/// use egui::Context;
+/// // Create a UI context and model (in a real app these come from your app state)
+/// let ctx = Context::default();
+/// let mut model = crate::ui::components::extra_fields::ExtraFieldsModel::default();
+/// // Render once to collect messages (in a real app this happens inside your frame)
+/// let mut ui = ctx.begin_frame(Default::default());
+/// let msgs = crate::ui::components::extra_fields::view(&mut ui, &model);
+/// // msgs now contains any actions the user performed during the render
+/// ```
 pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> {
     let mut msgs = Vec::new();
 
@@ -532,6 +666,27 @@ pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> 
     msgs
 }
 
+/// Render the list of extra fields grouped into collapsible group panels and collect any emitted UI messages.
+///
+/// Renders each group in `model.groups` as a collapsible header containing its fields; when there are
+/// no groups and no fields a muted placeholder label is shown. User actions in the rendered controls
+/// (for example "Add field to <group>") are pushed into `msgs`.
+///
+/// # Examples
+///
+/// ```no_run
+/// use egui;
+/// let ctx = egui::Context::default();
+/// let mut model = ExtraFieldsModel::default();
+/// let mut msgs = Vec::new();
+///
+/// egui::CentralPanel::default().show(&ctx, |ui| {
+///     render_fields(ui, &model, &mut msgs);
+/// });
+///
+/// // No interaction in this example, so no messages were produced.
+/// assert!(msgs.is_empty());
+/// ```
 fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<ExtraFieldsMsg>) {
     if model.fields.is_empty() && model.groups.is_empty() {
         ui.label(
@@ -588,6 +743,33 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
     }
 }
 
+/// Render the header controls for a single extra-field group (rename, remove, or edit).
+///
+/// Displays either an inline editing row (cancel and commit buttons plus a single-line
+/// text edit bound to the model's editing buffer) when that group is currently being
+/// edited, or action buttons to rename or remove the group when not editing. User
+/// interactions append corresponding `ExtraFieldsMsg` entries to the provided `msgs`
+/// vector:
+/// - CancelGroupEdit, CommitGroupName, EditGroupName when editing;
+/// - RemoveGroup(idx) or StartEditGroup(idx) when not editing (removal only shown if
+///   more than one group exists).
+///
+/// The function reads `model.editing_group` and `model.editing_group_buffer` and uses
+/// the group's `id` to find the group's index when emitting messages that require it.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use egui;
+/// # use my_crate::ui::components::extra_fields::{ExtraFieldGroup, ExtraFieldsModel, ExtraFieldsMsg, render_group_header};
+/// # // The following is a non-executable sketch showing typical usage:
+/// # let mut ui: egui::Ui = unimplemented!();
+/// # let group = ExtraFieldGroup { id: 1, name: "Default".into(), position: 0 };
+/// # let model = ExtraFieldsModel::default();
+/// let mut msgs = Vec::new();
+/// // render_group_header(&mut ui, &group, &mut msgs, &model);
+/// // After calling, `msgs` may contain messages produced by user interaction.
+/// ```
 fn render_group_header(
     ui: &mut egui::Ui,
     group: &ExtraFieldGroup,
@@ -642,6 +824,26 @@ fn render_group_header(
     });
 }
 
+/// Render a single extra-field card including its label, description, controls (edit/remove)
+/// and the appropriate value editor for the field's kind.
+///
+/// The card is visually highlighted when the field is invalid. Clicking the trash or pencil
+/// buttons pushes `ExtraFieldsMsg::RemoveField` or `ExtraFieldsMsg::OpenFieldModal` (with
+/// the provided `idx`) onto the supplied `msgs` vector; other interactions push their
+/// corresponding messages as handled by the value renderer.
+///
+/// # Examples
+///
+/// ```
+/// use egui::{CtxRef, CentralPanel};
+/// // In an actual egui app you would call this from within a UI callback:
+/// // let ctx: &egui::CtxRef = ...;
+/// // CentralPanel::default().show(ctx, |ui| {
+/// //     let field = ExtraField::default(); // construct a test field
+/// //     let mut msgs = Vec::new();
+/// //     render_field(ui, &field, 0, &mut msgs);
+/// // });
+/// ```
 fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Vec<ExtraFieldsMsg>) {
     let invalid = field_invalid(field);
     let mut frame = egui::Frame::group(ui.style()).stroke(if invalid {
@@ -704,6 +906,25 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
     });
 }
 
+/// Renders the appropriate input widget for a field based on its kind inside a framed group.
+///
+/// The widget emitted depends on the field's `kind`:
+/// - `Checkbox` renders a checkbox control.
+/// - `Select` and `Radio` render option controls.
+/// - `Number` renders a numeric input (and unit selector when applicable).
+/// - All other kinds render a text input.
+///
+/// The function emits user interactions as `ExtraFieldsMsg` entries pushed into `msgs`.
+///
+/// # Examples
+///
+/// ```
+/// // Note: this example is illustrative; constructing a real `egui::Ui` requires an egui context.
+/// // let mut ui: egui::Ui = ...;
+/// // let field = ExtraField::default();
+/// // let mut msgs = Vec::new();
+/// // render_field_value(&mut ui, &field, 0, &mut msgs);
+/// ```
 fn render_field_value(
     ui: &mut egui::Ui,
     field: &ExtraField,
@@ -718,6 +939,51 @@ fn render_field_value(
     });
 }
 
+/// Renders a checkbox for a boolean extra field and queues a ToggleCheckbox message when its state changes.
+
+///
+
+/// The checkbox reflects the field's `value` being `"on"` and, when toggled by the user, appends
+
+/// `ExtraFieldsMsg::ToggleCheckbox { index, checked }` to `msgs`.
+
+///
+
+/// # Examples
+
+///
+
+/// ```no_run
+
+/// use crate::ui::components::extra_fields::{ExtraField, ExtraFieldKind, ExtraFieldsMsg};
+
+/// use egui::Ui;
+
+///
+
+/// // Inside an egui UI callback:
+
+/// // let mut ui: Ui = ...;
+
+/// let field = ExtraField {
+
+///     label: "Enabled".into(),
+
+///     value: "on".into(),
+
+///     kind: ExtraFieldKind::Checkbox,
+
+///     ..Default::default()
+
+/// };
+
+/// let mut msgs = Vec::new();
+
+/// // render_checkbox(&mut ui, &field, 0, &mut msgs);
+
+/// // If the user toggles the checkbox, msgs will receive a ToggleCheckbox message.
+
+/// ```
 fn render_checkbox(
     ui: &mut egui::Ui,
     field: &ExtraField,
@@ -733,6 +999,19 @@ fn render_checkbox(
     }
 }
 
+/// Renders selectable options for a select/radio field and emits messages when the selection changes.
+///
+/// When `field.allow_multi_values` is true this renders a list of checkboxes and emits
+/// `ExtraFieldsMsg::UpdateMulti` with the selected values; otherwise it renders radio buttons
+/// and emits `ExtraFieldsMsg::EditValue` for the chosen option.
+///
+/// # Examples
+///
+/// ```
+/// // inside an egui UI callback:
+/// // let mut msgs = Vec::new();
+/// // render_options(ui, &field, 0, &mut msgs);
+/// ```
 fn render_options(
     ui: &mut egui::Ui,
     field: &ExtraField,
@@ -772,6 +1051,17 @@ fn render_options(
     }
 }
 
+/// Renders a numeric text input for an extra field and, if present, a unit selector.
+///
+/// The input is disabled when the field is read-only. User edits emit `ExtraFieldsMsg::EditValue`,
+/// and selecting a unit emits `ExtraFieldsMsg::SelectUnit`.
+///
+/// # Examples
+///
+/// ```no_run
+/// // inside an egui UI callback:
+/// // render_number(ui, &field, idx, &mut msgs);
+/// ```
 fn render_number(
     ui: &mut egui::Ui,
     field: &ExtraField,
@@ -814,6 +1104,16 @@ fn render_number(
     });
 }
 
+/// Renders a single-line text input for an ExtraField and emits an `EditValue` message when the user edits the value.
+///
+/// The input is rendered disabled when the field is readonly.
+///
+/// # Examples
+///
+/// ```no_run
+/// // Within an egui UI callback:
+/// // render_text_input(&mut ui, &field, idx, &mut msgs);
+/// ```
 fn render_text_input(
     ui: &mut egui::Ui,
     field: &ExtraField,
@@ -834,6 +1134,16 @@ fn render_text_input(
     }
 }
 
+/// Provides a short placeholder hint string for the given field kind.
+///
+/// The hint is intended for use as an input placeholder or example value (e.g., date format, URL, email, numeric ID).
+///
+/// # Examples
+///
+/// ```
+/// let hint = field_hint(&ExtraFieldKind::Date);
+/// assert_eq!(hint, "YYYY-MM-DD");
+/// ```
 fn field_hint(kind: &ExtraFieldKind) -> &'static str {
     match kind {
         ExtraFieldKind::Date => "YYYY-MM-DD",
@@ -847,6 +1157,17 @@ fn field_hint(kind: &ExtraFieldKind) -> &'static str {
     }
 }
 
+/// Provides a human-readable label for an `ExtraFieldKind`.
+///
+/// The returned string is the display name used in the UI for the given kind.
+///
+/// # Examples
+///
+/// ```
+/// use crate::ExtraFieldKind;
+/// assert_eq!(super::kind_label(&ExtraFieldKind::Text), "Text");
+/// assert_eq!(super::kind_label(&ExtraFieldKind::DateTimeLocal), "Date/time");
+/// ```
 fn kind_label(kind: &ExtraFieldKind) -> &'static str {
     match kind {
         ExtraFieldKind::Text => "Text",
@@ -866,6 +1187,18 @@ fn kind_label(kind: &ExtraFieldKind) -> &'static str {
     }
 }
 
+/// List all supported extra-field kinds in a stable, display-friendly order.
+///
+/// The returned vector enumerates every `ExtraFieldKind` the UI supports; the order is stable
+/// and used for consistent presentation in selection widgets.
+///
+/// # Examples
+///
+/// ```
+/// let kinds = all_kinds();
+/// assert!(!kinds.is_empty());
+/// assert_eq!(kinds[0], ExtraFieldKind::Text);
+/// ```
 fn all_kinds() -> Vec<ExtraFieldKind> {
     vec![
         ExtraFieldKind::Text,
@@ -884,6 +1217,16 @@ fn all_kinds() -> Vec<ExtraFieldKind> {
     ]
 }
 
+/// Split a comma-separated string into trimmed, non-empty tokens.
+///
+/// Empty items and surrounding whitespace are discarded; each token is returned as an owned `String`.
+///
+/// # Examples
+///
+/// ```
+/// let v = split_multi(" a, b, ,c ");
+/// assert_eq!(v, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+/// ```
 fn split_multi(value: &str) -> Vec<String> {
     value
         .split(',')
@@ -893,6 +1236,23 @@ fn split_multi(value: &str) -> Vec<String> {
         .collect()
 }
 
+/// Determine if a label conflicts with any existing field label in the model, ignoring case and surrounding whitespace, optionally excluding a field at the given index (useful while editing).
+///
+/// The check is case-insensitive and treats labels that are empty after trimming as non-conflicting.
+///
+/// # Examples
+///
+/// ```
+/// let mut model = ExtraFieldsModel::default();
+/// // assume ExtraField implements Default and has a `label` field
+/// model.fields.push(ExtraField { label: "Email".into(), ..Default::default() });
+///
+/// // New label "email" conflicts with existing "Email"
+/// assert!(name_conflict(&model, "email", None));
+///
+/// // When editing the existing field, exclude its index to avoid a self-conflict
+/// assert!(!name_conflict(&model, "email", Some(0)));
+/// ```
 fn name_conflict(model: &ExtraFieldsModel, label: &str, editing: Option<usize>) -> bool {
     let key = label.trim().to_lowercase();
     if key.is_empty() {
@@ -903,10 +1263,31 @@ fn name_conflict(model: &ExtraFieldsModel, label: &str, editing: Option<usize>) 
     })
 }
 
+/// Determines whether a metadata field fails validation.
+///
+/// # Returns
+///
+/// `true` if the field fails validation, `false` otherwise.
+///
+/// # Examples
+///
+/// ```
+/// let f = ExtraField::default();
+/// assert_eq!(field_invalid(&f), validate_field(&f).is_some());
+/// ```
 fn field_invalid(field: &ExtraField) -> bool {
     validate_field(field).is_some()
 }
 
+/// Returns the trimmed input as `Some(String)` or `None` when the trimmed string is empty.
+///
+/// # Examples
+///
+/// ```
+/// assert_eq!(trimmed_or_none("  foo  "), Some(String::from("foo")));
+/// assert_eq!(trimmed_or_none("   "), None);
+/// assert_eq!(trimmed_or_none("bar"), Some(String::from("bar")));
+/// ```
 fn trimmed_or_none(input: &str) -> Option<String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
@@ -916,6 +1297,51 @@ fn trimmed_or_none(input: &str) -> Option<String> {
     }
 }
 
+/// Applies a FieldDraft to an existing ExtraField, updating the field's editable properties.
+///
+/// The draft's trimmed non-empty `label` replaces the field label; `description` is trimmed and
+/// stored as `Some` or `None`; `required`, `allow_multi_values`, and `group_id` are applied
+/// directly. When the field kind is `Select` or `Radio`, `options` are copied from the draft.
+/// When the field kind is `Number`, `units` and the trimmed default `unit` are copied from the draft.
+///
+/// # Examples
+///
+/// ```
+/// let mut field = ExtraField {
+///     label: "Old".into(),
+///     description: Some("old".into()),
+///     required: false,
+///     allow_multi_values: false,
+///     options: vec![],
+///     units: vec![],
+///     unit: None,
+///     kind: ExtraFieldKind::Select,
+///     group_id: Some(1),
+///     value: String::new(),
+///     value_multi: vec![],
+/// };
+///
+/// let draft = FieldDraft {
+///     label: " New Label ".into(),
+///     description: "  ".into(),
+///     required: true,
+///     allow_multi_values: true,
+///     options: vec!["a".into(), "b".into()],
+///     units: vec!["u".into()],
+///     unit: "u".into(),
+///     kind: ExtraFieldKind::Select,
+///     group_id: Some(2),
+/// };
+///
+/// apply_draft_to_field(&draft, &mut field);
+///
+/// assert_eq!(field.label, "New Label");
+/// assert_eq!(field.description, None);
+/// assert!(field.required);
+/// assert!(field.allow_multi_values);
+/// assert_eq!(field.options, vec!["a", "b"]);
+/// assert_eq!(field.group_id, Some(2));
+/// ```
 fn apply_draft_to_field(draft: &FieldDraft, field: &mut ExtraField) {
     let label = draft.label.trim();
     if !label.is_empty() {
@@ -936,6 +1362,24 @@ fn apply_draft_to_field(draft: &FieldDraft, field: &mut ExtraField) {
     }
 }
 
+/// Renders and manages the "Edit field" modal for creating or editing an extra field.
+///
+/// The modal is shown only when the model's `modal_open` is true and a `modal_draft` is present.
+/// While open, the modal updates the draft via `ExtraFieldsMsg` entries pushed to `msgs` (e.g.
+/// `DraftLabelChanged`, `DraftDescChanged`, `DraftOptionChanged`, `DraftGroupChanged`, etc.)
+/// and emits `CommitFieldModal` or `CloseFieldModal` when the user saves or cancels.
+/// The save button is enabled only when the draft has a non-empty title and no name conflict.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// // Typical usage inside a UI render loop:
+/// // let ctx: egui::Context = /* obtained from egui framework */;
+/// // let mut model = ExtraFieldsModel::default();
+/// // let mut msgs = Vec::new();
+/// render_field_modal(&ctx, &model, &mut msgs);
+/// // Process `msgs` through the component's update function afterwards.
+/// ```
 fn render_field_modal(
     ctx: &egui::Context,
     model: &ExtraFieldsModel,
@@ -1101,6 +1545,20 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
+    /// Creates a new `ExtraField` with the given label and kind, initialized with empty/default values.
+    ///
+    /// The returned field has no value, options, units, or group assigned and is not required or readonly.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let f = make_field("Temperature", ExtraFieldKind::Number);
+    /// assert_eq!(f.label, "Temperature");
+    /// assert_eq!(f.kind, ExtraFieldKind::Number);
+    /// assert!(f.value.is_empty());
+    /// assert!(f.options.is_empty());
+    /// assert!(!f.required);
+    /// ```
     fn make_field(label: &str, kind: ExtraFieldKind) -> ExtraField {
         ExtraField {
             label: label.into(),
@@ -1120,6 +1578,16 @@ mod tests {
         }
     }
 
+    /// Create an ExtraFieldGroup with the given id and name, initializing its position to 0.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let g = make_group(42, "Measurements");
+    /// assert_eq!(g.id, 42);
+    /// assert_eq!(g.name, "Measurements");
+    /// assert_eq!(g.position, 0);
+    /// ```
     fn make_group(id: i32, name: &str) -> ExtraFieldGroup {
         ExtraFieldGroup {
             id,
@@ -1413,6 +1881,18 @@ mod tests {
         assert!(model.modal_open); // still open for correction
     }
 
+    /// Ensures renaming a field to a label that already exists is rejected and the modal remains open.
+    ///
+    /// Verifies that committing an edit which would produce a duplicate label emits an error event,
+    /// leaves the original field label unchanged, and keeps the edit modal open.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Setup: two fields "First" and "Second"
+    /// // Open modal for the second field, change its label to "First", and attempt to commit.
+    /// // Expected: an error event is returned, the second field's label stays "Second", and modal stays open.
+    /// ```
     #[test]
     fn duplicate_name_blocks_edit() {
         let mut model = ExtraFieldsModel::default();
