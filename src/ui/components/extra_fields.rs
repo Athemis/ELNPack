@@ -6,6 +6,7 @@
 use eframe::egui;
 
 use crate::models::extra_fields::{ExtraField, ExtraFieldGroup, ExtraFieldKind};
+use crate::ui::components::toggle_switch;
 
 /// UI state for imported extra fields.
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
@@ -346,13 +347,27 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
                     }
                 }
                 ExtraFieldKind::Select | ExtraFieldKind::Radio => {
-                    let mut allow_multi = field.allow_multi_values;
-                    if ui.checkbox(&mut allow_multi, "Allow multiple").changed() {
-                        msgs.push(ExtraFieldsMsg::ToggleAllowMulti {
-                            index: idx,
-                            enabled: allow_multi,
-                        });
-                    }
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new("Options")
+                                .small()
+                                .color(egui::Color32::from_gray(140)),
+                        );
+                        ui.add_space(6.0);
+                        let mut allow_multi = field.allow_multi_values;
+                        if toggle_switch(ui, &mut allow_multi).clicked() {
+                            msgs.push(ExtraFieldsMsg::ToggleAllowMulti {
+                                index: idx,
+                                enabled: allow_multi,
+                            });
+                        }
+                        ui.label(
+                            egui::RichText::new("Allow multiple")
+                                .small()
+                                .color(egui::Color32::from_gray(140)),
+                        );
+                    });
+                    ui.add_space(4.0);
 
                     if field.allow_multi_values {
                         let mut chosen = if field.value_multi.is_empty() {
