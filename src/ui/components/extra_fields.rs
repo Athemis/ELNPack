@@ -804,6 +804,147 @@ mod tests {
     }
 
     #[test]
+    fn remove_field_drops_entry() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "One".into(),
+            kind: ExtraFieldKind::Text,
+            value: "a".into(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        let _ = update(&mut model, ExtraFieldsMsg::RemoveField(0), &mut Vec::new());
+        assert!(model.fields.is_empty());
+    }
+
+    #[test]
+    fn modal_save_updates_field() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "Old".into(),
+            kind: ExtraFieldKind::Select,
+            value: "A".into(),
+            value_multi: vec!["A".into()],
+            options: vec!["A".into(), "B".into()],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: Some("desc".into()),
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::OpenFieldModal(0), &mut cmds);
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftLabelChanged("New".into()),
+            &mut cmds,
+        );
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftDescChanged("ndesc".into()),
+            &mut cmds,
+        );
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftAllowMultiToggled(true),
+            &mut cmds,
+        );
+        let _ = update(&mut model, ExtraFieldsMsg::DraftAddOption, &mut cmds);
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftOptionChanged {
+                index: 2,
+                value: "C".into(),
+            },
+            &mut cmds,
+        );
+        let _ = update(&mut model, ExtraFieldsMsg::CommitFieldModal, &mut cmds);
+
+        let f = &model.fields[0];
+        assert_eq!(f.label, "New");
+        assert_eq!(f.description.as_deref(), Some("ndesc"));
+        assert!(f.allow_multi_values);
+        assert!(f.options.contains(&"C".into()));
+    }
+
+    #[test]
+    fn modal_cancel_keeps_field() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "Old".into(),
+            kind: ExtraFieldKind::Number,
+            value: "1".into(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: Some("m".into()),
+            units: vec!["m".into()],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::OpenFieldModal(0), &mut cmds);
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftLabelChanged("New".into()),
+            &mut cmds,
+        );
+        let _ = update(&mut model, ExtraFieldsMsg::CloseFieldModal, &mut cmds);
+
+        assert_eq!(model.fields[0].label, "Old");
+    }
+
+    #[test]
+    fn remove_group_clears_field_group_ids() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 1,
+            name: "G1".into(),
+            position: 0,
+        });
+        model.fields.push(ExtraField {
+            label: "F".into(),
+            kind: ExtraFieldKind::Text,
+            value: "v".into(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: Some(1),
+            readonly: false,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::RemoveGroup(0), &mut cmds);
+
+        assert!(model.groups.is_empty());
+        assert!(model.fields[0].group_id.is_none());
+    }
+
+    #[test]
     fn remove_field_updates_model() {
         let mut model = ExtraFieldsModel::default();
         let mut cmds = Vec::new();
