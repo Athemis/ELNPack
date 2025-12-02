@@ -138,17 +138,6 @@ pub struct ExtraFieldsEvent {
     pub is_error: bool,
 }
 
-/// Validation helper to ensure required fields are filled.
-fn missing_required(model: &ExtraFieldsModel) -> Vec<usize> {
-    model
-        .fields
-        .iter()
-        .enumerate()
-        .filter(|(_, f)| f.required && f.value.trim().is_empty())
-        .map(|(idx, _)| idx)
-        .collect()
-}
-
 /// Update the model based on a message.
 pub fn update(
     model: &mut ExtraFieldsModel,
@@ -425,19 +414,9 @@ pub fn update(
                     }
                 }
             }
-            // Validate required fields globally after mutation.
-            let missing = missing_required(model);
-            if missing.is_empty() {
-                model.modal_open = false;
-                model.editing_field = None;
-                None
-            } else {
-                model.modal_open = false;
-                Some(ExtraFieldsEvent {
-                    message: "Please fill all required fields before saving.".into(),
-                    is_error: true,
-                })
-            }
+            model.modal_open = false;
+            model.editing_field = None;
+            None
         }
         ExtraFieldsMsg::StartEditGroup(idx) => {
             if let Some(g) = model.groups.get(idx) {
