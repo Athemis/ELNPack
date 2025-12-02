@@ -22,6 +22,9 @@ use crate::models::attachment::{Attachment, assert_unique_sanitized_names};
 use crate::models::extra_fields::{ExtraField, ExtraFieldGroup};
 use crate::utils::{hash_file, sanitize_component};
 
+/// Internal ELN/RO-Crate format version (eLabFTW expects 103+ for id-based `variableMeasured`).
+const ELN_FORMAT_VERSION: i32 = 103;
+
 /// Export-ready packaging of extra fields.
 struct ExtraFieldsExport {
     /// PropertyValue nodes for each field.
@@ -228,7 +231,7 @@ pub fn build_and_write_archive(
         "@type": "Dataset",
         "name": title,
         "hasPart": [ { "@id": "./experiment/" } ],
-        "version": 103,
+        "version": ELN_FORMAT_VERSION,
     });
 
     let metadata_node = serde_json::json!({
