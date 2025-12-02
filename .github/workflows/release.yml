@@ -77,6 +77,13 @@ jobs:
             linux: true
             pkg_config_libdir: "/usr/lib/i386-linux-gnu/pkgconfig"
             multilib: true
+          - runner: ubuntu-latest
+            target: i586-unknown-linux-gnu
+            archive: tar.gz
+            rustflags: ""
+            linux: true
+            pkg_config_libdir: "/usr/lib/i386-linux-gnu/pkgconfig"
+            multilib: true
           - runner: windows-latest
             target: i686-pc-windows-msvc
             archive: zip
@@ -110,7 +117,7 @@ jobs:
             libwayland-dev libxkbcommon-dev
 
       - name: Install 32-bit Linux deps
-        if: matrix.target == 'i686-unknown-linux-gnu'
+        if: matrix.target == 'i686-unknown-linux-gnu' || matrix.target == 'i586-unknown-linux-gnu'
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
