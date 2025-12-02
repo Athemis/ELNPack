@@ -1174,6 +1174,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "time",
+ "url",
  "usvg",
  "zip",
 ]
