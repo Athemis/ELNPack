@@ -88,6 +88,7 @@ pub enum ExtraFieldsMsg {
     EditGroupName(String),
     CommitGroupName,
     CancelGroupEdit,
+    RemoveGroup(usize),
     OpenFieldModal(usize),
     CloseFieldModal,
     DraftLabelChanged(String),
@@ -351,6 +352,19 @@ pub fn update(
             model.editing_group_buffer.clear();
             None
         }
+        ExtraFieldsMsg::RemoveGroup(idx) => {
+            if let Some(group) = model.groups.get(idx).cloned() {
+                // Drop group
+                model.groups.remove(idx);
+                // Clear group assignments from fields that referenced it.
+                for f in model.fields.iter_mut() {
+                    if f.group_id == Some(group.id) {
+                        f.group_id = None;
+                    }
+                }
+            }
+            None
+        }
     }
 }
 
@@ -427,7 +441,7 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
         .collect();
 
     if !ungrouped.is_empty() {
-        ui.heading("Other");
+        ui.heading("Default");
         ui.add_space(4.0);
         for (idx, field) in ungrouped {
             render_field(ui, field, idx, msgs);
@@ -469,17 +483,25 @@ fn render_group_header(
                 msgs.push(ExtraFieldsMsg::CancelGroupEdit);
             }
         } else {
-            ui.heading(&group.name);
-            if ui
-                .button(egui_phosphor::regular::PENCIL_SIMPLE)
-                .on_hover_text("Rename group")
-                .clicked()
-            {
-                // find index of this group
-                if let Some(idx) = model.groups.iter().position(|g| g.id == group.id) {
+            ui.horizontal(|ui| {
+                ui.heading(&group.name);
+                if ui
+                    .button(egui_phosphor::regular::PENCIL_SIMPLE)
+                    .on_hover_text("Rename group")
+                    .clicked()
+                    && let Some(idx) = model.groups.iter().position(|g| g.id == group.id)
+                {
                     msgs.push(ExtraFieldsMsg::StartEditGroup(idx));
                 }
-            }
+                if ui
+                    .button(egui_phosphor::regular::TRASH)
+                    .on_hover_text("Remove group")
+                    .clicked()
+                    && let Some(idx) = model.groups.iter().position(|g| g.id == group.id)
+                {
+                    msgs.push(ExtraFieldsMsg::RemoveGroup(idx));
+                }
+            });
         }
     });
 }
@@ -494,18 +516,18 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
             ui.label(label);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui
-                    .button(egui_phosphor::regular::PENCIL_SIMPLE)
-                    .on_hover_text("Edit field")
-                    .clicked()
-                {
-                    msgs.push(ExtraFieldsMsg::OpenFieldModal(idx));
-                }
-                if ui
                     .button(egui_phosphor::regular::TRASH)
                     .on_hover_text("Remove field")
                     .clicked()
                 {
                     msgs.push(ExtraFieldsMsg::RemoveField(idx));
+                }
+                if ui
+                    .button(egui_phosphor::regular::PENCIL_SIMPLE)
+                    .on_hover_text("Edit field")
+                    .clicked()
+                {
+                    msgs.push(ExtraFieldsMsg::OpenFieldModal(idx));
                 }
             });
         });
