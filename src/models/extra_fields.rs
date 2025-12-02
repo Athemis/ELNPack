@@ -7,6 +7,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::{Context, Result};
+use email_address::EmailAddress;
 use serde::Deserialize;
 use serde_json::Value;
 use url::Url;
@@ -134,6 +135,16 @@ pub fn validate_field(field: &ExtraField) -> Option<&'static str> {
                 None
             } else {
                 Some("invalid_integer")
+            }
+        }
+        ExtraFieldKind::Email => {
+            if value.is_empty() {
+                return None;
+            }
+            if EmailAddress::parse_with_options(value, Default::default()).is_ok() {
+                None
+            } else {
+                Some("invalid_email")
             }
         }
         _ => None,
