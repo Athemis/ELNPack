@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::Value;
+use url::Url;
 
 /// Supported eLabFTW field kinds we know how to render.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -73,6 +74,49 @@ impl ExtraField {
     /// Sort helper: position first, then label.
     pub fn cmp_key(&self) -> (i32, &str) {
         (self.position.unwrap_or(i32::MAX), &self.label)
+    }
+}
+
+/// Pure validation of a single extra field. Returns `Some(reason_code)` when invalid.
+pub fn validate_field(field: &ExtraField) -> Option<&'static str> {
+    let value = field.value.trim();
+
+    if field.required && value.is_empty() {
+        return Some("required");
+    }
+
+    match field.kind {
+        ExtraFieldKind::Url => {
+            if value.is_empty() {
+                return None;
+            }
+            Url::parse(value)
+                .ok()
+                .filter(|u| matches!(u.scheme(), "http" | "https") && u.host_str().is_some())
+                .map(|_| None)
+                .unwrap_or(Some("invalid_url"))
+        }
+        ExtraFieldKind::Number => {
+            if value.is_empty() {
+                return None;
+            }
+            if value.parse::<f64>().is_ok() {
+                None
+            } else {
+                Some("invalid_number")
+            }
+        }
+        ExtraFieldKind::Items | ExtraFieldKind::Experiments | ExtraFieldKind::Users => {
+            if value.is_empty() {
+                return None;
+            }
+            if value.parse::<i64>().is_ok() {
+                None
+            } else {
+                Some("invalid_integer")
+            }
+        }
+        _ => None,
     }
 }
 
