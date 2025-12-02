@@ -89,6 +89,7 @@ pub enum ExtraFieldsMsg {
     CommitGroupName,
     CancelGroupEdit,
     RemoveGroup(usize),
+    StartAddField,
     OpenFieldModal(usize),
     CloseFieldModal,
     DraftLabelChanged(String),
@@ -288,6 +289,12 @@ pub fn update(
             }
             None
         }
+        ExtraFieldsMsg::StartAddField => {
+            model.modal_open = true;
+            model.editing_field = None;
+            model.modal_draft = Some(FieldDraft::default());
+            None
+        }
         ExtraFieldsMsg::RemoveField(index) => {
             if index < model.fields.len() {
                 model.fields.remove(index);
@@ -295,31 +302,62 @@ pub fn update(
             None
         }
         ExtraFieldsMsg::CommitFieldModal => {
-            if let (Some(idx), Some(draft)) = (model.editing_field, model.modal_draft.take())
-                && let Some(f) = model.fields.get_mut(idx)
-            {
-                let label = draft.label.trim();
-                if !label.is_empty() {
-                    f.label = label.to_string();
-                }
-                let desc = draft.description.trim();
-                f.description = if desc.is_empty() {
-                    None
+            if let Some(draft) = model.modal_draft.take() {
+                if let Some(idx) = model.editing_field {
+                    if let Some(f) = model.fields.get_mut(idx) {
+                        let label = draft.label.trim();
+                        if !label.is_empty() {
+                            f.label = label.to_string();
+                        }
+                        let desc = draft.description.trim();
+                        f.description = if desc.is_empty() {
+                            None
+                        } else {
+                            Some(desc.to_string())
+                        };
+                        f.required = draft.required;
+                        f.allow_multi_values = draft.allow_multi_values;
+                        if matches!(f.kind, ExtraFieldKind::Select | ExtraFieldKind::Radio) {
+                            f.options = draft.options.clone();
+                        }
+                        if matches!(f.kind, ExtraFieldKind::Number) {
+                            f.units = draft.units.clone();
+                            f.unit = if draft.unit.trim().is_empty() {
+                                None
+                            } else {
+                                Some(draft.unit.trim().to_string())
+                            };
+                        }
+                    }
                 } else {
-                    Some(desc.to_string())
-                };
-                f.required = draft.required;
-                f.allow_multi_values = draft.allow_multi_values;
-                if matches!(f.kind, ExtraFieldKind::Select | ExtraFieldKind::Radio) {
-                    f.options = draft.options.clone();
-                }
-                if matches!(f.kind, ExtraFieldKind::Number) {
-                    f.units = draft.units.clone();
-                    f.unit = if draft.unit.trim().is_empty() {
-                        None
-                    } else {
-                        Some(draft.unit.trim().to_string())
-                    };
+                    let label = draft.label.trim();
+                    if !label.is_empty() {
+                        let new_field = ExtraField {
+                            label: label.to_string(),
+                            kind: draft.kind,
+                            value: String::new(),
+                            value_multi: Vec::new(),
+                            options: draft.options,
+                            unit: if draft.unit.trim().is_empty() {
+                                None
+                            } else {
+                                Some(draft.unit.trim().to_string())
+                            },
+                            units: draft.units,
+                            position: Some(model.fields.len() as i32),
+                            required: draft.required,
+                            description: if draft.description.trim().is_empty() {
+                                None
+                            } else {
+                                Some(draft.description.trim().to_string())
+                            },
+                            allow_multi_values: draft.allow_multi_values,
+                            blank_value_on_duplicate: false,
+                            group_id: None,
+                            readonly: false,
+                        };
+                        model.fields.push(new_field);
+                    }
                 }
             }
             model.modal_open = false;
@@ -375,17 +413,29 @@ pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> 
     egui::CollapsingHeader::new("Metadata")
         .default_open(false)
         .show(ui, |ui| {
-            if ui
-                .add(egui::Button::new(format!(
-                    "{} Import JSON",
-                    egui_phosphor::regular::FILE_ARROW_DOWN
-                )))
-                .clicked()
-            {
-                msgs.push(ExtraFieldsMsg::ImportRequested);
-            }
+            ui.horizontal(|ui| {
+                if ui
+                    .add(egui::Button::new(format!(
+                        "{} Add field",
+                        egui_phosphor::regular::PLUS
+                    )))
+                    .clicked()
+                {
+                    msgs.push(ExtraFieldsMsg::StartAddField);
+                }
+                if ui
+                    .add(egui::Button::new(format!(
+                        "{} Import JSON",
+                        egui_phosphor::regular::FILE_ARROW_DOWN
+                    )))
+                    .clicked()
+                {
+                    msgs.push(ExtraFieldsMsg::ImportRequested);
+                }
+            });
 
             ui.add_space(6.0);
+
             ui.label(
                 egui::RichText::new(
                     "Imports eLabFTW-style extra_fields JSON. Field options are imported; you can adjust values before saving."
