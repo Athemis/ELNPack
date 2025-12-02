@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use crate::logic::eln::{ArchiveGenre, build_and_write_archive};
 use crate::models::attachment::Attachment;
-use crate::models::extra_fields::{ExtraField, ExtraFieldGroup};
+use crate::models::extra_fields::{ExtraField, ExtraFieldGroup, ExtraFieldKind};
 use crate::models::keywords::Keywords;
 use crate::ui::components::attachments::{
     self, AttachmentsCommand, AttachmentsModel, AttachmentsMsg,
@@ -18,6 +18,7 @@ use crate::ui::components::extra_fields::{
 };
 use crate::ui::components::keywords::{self, KeywordsModel, KeywordsMsg};
 use crate::ui::components::markdown::{MarkdownModel, MarkdownMsg};
+use url::Url;
 
 /// Top-level application state.
 #[derive(Default)]
@@ -301,6 +302,18 @@ fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePaylo
         if field.required && field.value.trim().is_empty() {
             return Err(format!("Field '{}' is required.", field.label));
         }
+
+        if matches!(field.kind, ExtraFieldKind::Url) && !field.value.trim().is_empty() {
+            let parsed = Url::parse(field.value.trim())
+                .ok()
+                .filter(|u| matches!(u.scheme(), "http" | "https") && u.host_str().is_some());
+            if parsed.is_none() {
+                return Err(format!(
+                    "Field '{}' must be a valid http/https URL.",
+                    field.label
+                ));
+            }
+        }
     }
 
     Ok(SavePayload {
@@ -322,6 +335,7 @@ mod tests {
     #![allow(clippy::field_reassign_with_default)]
 
     use super::*;
+    use crate::ui::components::extra_fields::ExtraFieldsMsg;
     use std::path::PathBuf;
     use tempfile::TempDir;
 
@@ -431,5 +445,70 @@ mod tests {
         model.pending_commands = model.pending_commands.saturating_sub(1);
 
         assert_eq!(model.pending_commands, 0);
+    }
+
+    #[test]
+    fn validate_rejects_invalid_url_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has URL".into();
+        model.markdown.text = "Body".into();
+
+        add_url_field(&mut model, "htp://example");
+
+        match validate_for_save(&model, PathBuf::from("/tmp/out.eln")) {
+            Err(err) => assert!(err.contains("valid http/https URL")),
+            Ok(_) => panic!("validation should fail for invalid URL"),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_valid_url_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has URL".into();
+        model.markdown.text = "Body".into();
+
+        add_url_field(&mut model, "https://example.com/path");
+
+        let res = validate_for_save(&model, PathBuf::from("/tmp/out.eln"));
+
+        assert!(res.is_ok());
+    }
+
+    fn add_url_field(model: &mut AppModel, value: &str) {
+        let mut cmds = Vec::new();
+
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::StartAddField { group_id: None }),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::DraftLabelChanged("URL".into())),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::DraftKindChanged(ExtraFieldKind::Url)),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::CommitFieldModal),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::EditValue {
+                index: 0,
+                value: value.into(),
+            }),
+            &mut cmds,
+        );
+
+        assert!(
+            cmds.is_empty(),
+            "URL field setup should not enqueue commands"
+        );
     }
 }
