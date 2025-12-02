@@ -440,12 +440,26 @@ pub fn update(
         }
         ExtraFieldsMsg::RemoveGroup(idx) => {
             if let Some(group) = model.groups.get(idx).cloned() {
-                // Drop group
-                model.groups.remove(idx);
-                // Clear group assignments from fields that referenced it.
-                for f in model.fields.iter_mut() {
-                    if f.group_id == Some(group.id) {
-                        f.group_id = None;
+                let removing_last = model.groups.len() == 1;
+                if removing_last {
+                    if let Some(g) = model.groups.get_mut(idx) {
+                        g.name = "Default".into();
+                        for f in model.fields.iter_mut() {
+                            if f.group_id == Some(group.id) {
+                                f.group_id = Some(g.id);
+                            }
+                        }
+                    }
+                } else {
+                    model.groups.remove(idx);
+
+                    // Ensure a Default group exists for reassignment if needed
+                    let default_id = ensure_default_group(model);
+
+                    for f in model.fields.iter_mut() {
+                        if f.group_id == Some(group.id) {
+                            f.group_id = Some(default_id);
+                        }
                     }
                 }
             }
@@ -554,22 +568,6 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
             });
         }
         ui.add_space(10.0);
-    }
-
-    let ungrouped: Vec<(usize, &ExtraField)> = model
-        .fields
-        .iter()
-        .enumerate()
-        .filter(|(_, f)| f.group_id.is_none())
-        .collect();
-
-    if !ungrouped.is_empty() {
-        ui.heading("Default");
-        ui.add_space(4.0);
-        for (idx, field) in ungrouped {
-            render_field(ui, field, idx, msgs);
-            ui.add_space(6.0);
-        }
     }
 }
 
@@ -969,6 +967,19 @@ fn render_field_modal(
         });
 }
 
+fn ensure_default_group(model: &mut ExtraFieldsModel) -> i32 {
+    if let Some(g) = model.groups.iter().find(|g| g.name == "Default") {
+        return g.id;
+    }
+    let next_id = model.groups.iter().map(|g| g.id).max().unwrap_or(0) + 1;
+    model.groups.push(ExtraFieldGroup {
+        id: next_id,
+        name: "Default".into(),
+        position: model.groups.len() as i32,
+    });
+    next_id
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1188,8 +1199,118 @@ mod tests {
         let mut cmds = Vec::new();
         let _ = update(&mut model, ExtraFieldsMsg::RemoveGroup(0), &mut cmds);
 
-        assert!(model.groups.is_empty());
-        assert!(model.fields[0].group_id.is_none());
+        assert_eq!(model.groups.len(), 1);
+        assert_eq!(model.groups[0].name, "Default");
+        assert_eq!(model.fields[0].group_id, Some(model.groups[0].id));
+    }
+
+    #[test]
+    fn removing_last_group_recreates_default_and_reassigns() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 5,
+            name: "Only".into(),
+            position: 0,
+        });
+        model.fields.push(ExtraField {
+            label: "F".into(),
+            kind: ExtraFieldKind::Text,
+            value: "v".into(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: Some(5),
+            readonly: false,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::RemoveGroup(0), &mut cmds);
+
+        assert_eq!(model.groups.len(), 1);
+        assert_eq!(model.groups[0].name, "Default");
+        assert_eq!(model.fields[0].group_id, Some(model.groups[0].id));
+    }
+
+    #[test]
+    fn removing_only_group_renames_to_default() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 7,
+            name: "Solo".into(),
+            position: 0,
+        });
+        model.fields.push(ExtraField {
+            label: "F".into(),
+            kind: ExtraFieldKind::Text,
+            value: "v".into(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: Some(7),
+            readonly: false,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::RemoveGroup(0), &mut cmds);
+
+        assert_eq!(model.groups.len(), 1);
+        assert_eq!(model.groups[0].name, "Default");
+        assert_eq!(model.fields[0].group_id, Some(7));
+    }
+
+    #[test]
+    fn removing_group_moves_fields_to_default() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 1,
+            name: "G1".into(),
+            position: 0,
+        });
+        model.groups.push(ExtraFieldGroup {
+            id: 2,
+            name: "G2".into(),
+            position: 1,
+        });
+        model.fields.push(ExtraField {
+            label: "F".into(),
+            kind: ExtraFieldKind::Text,
+            value: "v".into(),
+            value_multi: Vec::new(),
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: Some(2),
+            readonly: false,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::RemoveGroup(1), &mut cmds);
+
+        assert!(model.groups.iter().any(|g| g.name == "Default"));
+        let default_id = model
+            .groups
+            .iter()
+            .find(|g| g.name == "Default")
+            .unwrap()
+            .id;
+        assert_eq!(model.fields[0].group_id, Some(default_id));
     }
 
     #[test]
