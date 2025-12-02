@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use crate::logic::eln::{ArchiveGenre, build_and_write_archive};
 use crate::models::attachment::Attachment;
-use crate::models::extra_fields::ExtraField;
+use crate::models::extra_fields::{ExtraField, ExtraFieldGroup};
 use crate::models::keywords::Keywords;
 use crate::ui::components::attachments::{
     self, AttachmentsCommand, AttachmentsModel, AttachmentsMsg,
@@ -97,6 +97,7 @@ pub struct SavePayload {
     pub keywords: Vec<String>,
     /// Imported extra fields metadata.
     pub extra_fields: Vec<ExtraField>,
+    pub extra_groups: Vec<ExtraFieldGroup>,
     /// Stored body format (HTML or Markdown).
     pub body_format: crate::logic::eln::BodyFormat,
 }
@@ -212,8 +213,9 @@ pub fn run_command(cmd: Command) -> Msg {
                 Some(path) => match std::fs::read_to_string(&path) {
                     Ok(content) => {
                         match crate::models::extra_fields::parse_elabftw_extra_fields(&content) {
-                            Ok(fields) => Msg::ExtraFields(ExtraFieldsMsg::ImportLoaded {
-                                fields,
+                            Ok(import) => Msg::ExtraFields(ExtraFieldsMsg::ImportLoaded {
+                                fields: import.fields,
+                                groups: import.groups,
                                 source: path,
                             }),
                             Err(err) => {
@@ -252,6 +254,7 @@ pub fn run_command(cmd: Command) -> Msg {
                 &payload.body,
                 &payload.attachments,
                 &payload.extra_fields,
+                &payload.extra_groups,
                 payload.performed_at,
                 payload.genre,
                 &payload.keywords,
@@ -309,6 +312,7 @@ fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePaylo
         genre: model.archive_genre,
         keywords: keywords.into_vec(),
         extra_fields: model.extra_fields.fields().to_vec(),
+        extra_groups: model.extra_fields.groups().to_vec(),
         body_format: model.body_format,
     })
 }

@@ -18,7 +18,7 @@ use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use zip::{CompressionMethod, write::FileOptions};
 
 use crate::models::attachment::{Attachment, assert_unique_sanitized_names};
-use crate::models::extra_fields::ExtraField;
+use crate::models::extra_fields::{ExtraField, ExtraFieldGroup};
 use crate::utils::{hash_file, sanitize_component};
 
 /// Suggest a safe archive filename from a user-facing title.
@@ -84,12 +84,13 @@ pub fn build_and_write_archive(
     body: &str,
     attachments: &[Attachment],
     extra_fields: &[ExtraField],
+    extra_groups: &[ExtraFieldGroup],
     performed_at: OffsetDateTime,
     genre: ArchiveGenre,
     keywords: &[String],
     body_format: BodyFormat,
 ) -> Result<()> {
-    let _ = extra_fields;
+    let _ = (extra_fields, extra_groups);
     // Ensure parent exists so the archive can be written without IO errors.
     if let Some(parent) = output.parent()
         && !parent.exists()
@@ -372,6 +373,7 @@ mod tests {
             "Title",
             "Body",
             &attachments,
+            &[],
             &[],
             OffsetDateTime::from_unix_timestamp(0).unwrap(),
             ArchiveGenre::Experiment,
