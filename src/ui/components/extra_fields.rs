@@ -817,33 +817,25 @@ fn render_field_modal(
 
             ui.add_space(8.0);
             ui.label("Group assignment");
-            if model.groups.is_empty() {
-                ui.label(
-                    egui::RichText::new("No groups defined.")
-                        .small()
-                        .color(egui::Color32::from_gray(120)),
-                );
-            } else {
-                let mut current = draft.group_id.unwrap_or(-1);
-                egui::ComboBox::from_label("Group")
-                    .selected_text(
-                        draft
-                            .group_id
-                            .and_then(|gid| model.groups.iter().find(|g| g.id == gid))
-                            .map(|g| g.name.clone())
-                            .unwrap_or_else(|| "None".into()),
-                    )
-                    .show_ui(ui, |ui| {
-                        if ui.selectable_value(&mut current, -1, "None").clicked() {
-                            msgs.push(ExtraFieldsMsg::DraftGroupChanged(None));
+            let mut current = draft.group_id.unwrap_or(-1);
+            let display_name = draft
+                .group_id
+                .and_then(|gid| model.groups.iter().find(|g| g.id == gid))
+                .map(|g| g.name.clone())
+                .unwrap_or_else(|| "Default".into());
+
+            egui::ComboBox::from_label("Group")
+                .selected_text(display_name)
+                .show_ui(ui, |ui| {
+                    if ui.selectable_value(&mut current, -1, "Default").clicked() {
+                        msgs.push(ExtraFieldsMsg::DraftGroupChanged(None));
+                    }
+                    for g in &model.groups {
+                        if ui.selectable_value(&mut current, g.id, &g.name).clicked() {
+                            msgs.push(ExtraFieldsMsg::DraftGroupChanged(Some(g.id)));
                         }
-                        for g in &model.groups {
-                            if ui.selectable_value(&mut current, g.id, &g.name).clicked() {
-                                msgs.push(ExtraFieldsMsg::DraftGroupChanged(Some(g.id)));
-                            }
-                        }
-                    });
-            }
+                    }
+                });
 
             ui.add_space(10.0);
             ui.horizontal(|ui| {
