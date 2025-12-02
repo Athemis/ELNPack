@@ -1639,3 +1639,676 @@ mod tests {
         assert!(model.fields.is_empty());
     }
 }
+
+    #[test]
+    fn edit_value_updates_field_and_syncs_multi() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "Tags".into(),
+            kind: ExtraFieldKind::Select,
+            value: String::new(),
+            value_multi: vec![],
+            options: vec!["A".into(), "B".into()],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: true,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::EditValue {
+                index: 0,
+                value: "A, B".into(),
+            },
+            &mut cmds,
+        );
+
+        assert_eq!(model.fields[0].value, "A, B");
+        assert_eq!(model.fields[0].value_multi, vec!["A", "B"]);
+    }
+
+    #[test]
+    fn toggle_checkbox_updates_value() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "Enabled".into(),
+            kind: ExtraFieldKind::Checkbox,
+            value: String::new(),
+            value_multi: vec![],
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::ToggleCheckbox {
+                index: 0,
+                checked: true,
+            },
+            &mut cmds,
+        );
+
+        assert_eq!(model.fields[0].value, "on");
+
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::ToggleCheckbox {
+                index: 0,
+                checked: false,
+            },
+            &mut cmds,
+        );
+
+        assert_eq!(model.fields[0].value, "");
+    }
+
+    #[test]
+    fn select_unit_updates_field() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "Weight".into(),
+            kind: ExtraFieldKind::Number,
+            value: "100".into(),
+            value_multi: vec![],
+            options: vec![],
+            unit: Some("g".into()),
+            units: vec!["g".into(), "kg".into()],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::SelectUnit {
+                index: 0,
+                unit: "kg".into(),
+            },
+            &mut cmds,
+        );
+
+        assert_eq!(model.fields[0].unit, Some("kg".to_string()));
+    }
+
+    #[test]
+    fn update_multi_values_syncs_value_string() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "Tags".into(),
+            kind: ExtraFieldKind::Select,
+            value: String::new(),
+            value_multi: vec![],
+            options: vec!["X".into(), "Y".into(), "Z".into()],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: true,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::UpdateMulti {
+                index: 0,
+                values: vec!["X".into(), "Z".into()],
+            },
+            &mut cmds,
+        );
+
+        assert_eq!(model.fields[0].value, "X, Z");
+        assert_eq!(model.fields[0].value_multi, vec!["X", "Z"]);
+    }
+
+    #[test]
+    fn start_add_field_opens_modal_with_draft() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 5,
+            name: "Test".into(),
+            position: 0,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::StartAddField { group_id: Some(5) },
+            &mut cmds,
+        );
+
+        assert!(model.modal_open);
+        assert!(model.editing_field.is_none());
+        assert!(model.modal_draft.is_some());
+        assert_eq!(model.modal_draft.as_ref().unwrap().group_id, Some(5));
+    }
+
+    #[test]
+    fn close_field_modal_clears_state() {
+        let mut model = ExtraFieldsModel::default();
+        model.modal_open = true;
+        model.modal_draft = Some(FieldDraft::default());
+        model.editing_field = Some(0);
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::CloseFieldModal, &mut cmds);
+
+        assert!(!model.modal_open);
+        assert!(model.modal_draft.is_none());
+        assert!(model.editing_field.is_none());
+    }
+
+    #[test]
+    fn draft_option_changes_update_draft() {
+        let mut model = ExtraFieldsModel::default();
+        model.modal_open = true;
+        model.modal_draft = Some(FieldDraft {
+            label: "Select".into(),
+            kind: ExtraFieldKind::Select,
+            options: vec!["A".into(), "B".into()],
+            ..Default::default()
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftOptionChanged {
+                index: 1,
+                value: "Updated".into(),
+            },
+            &mut cmds,
+        );
+
+        assert_eq!(model.modal_draft.as_ref().unwrap().options[1], "Updated");
+    }
+
+    #[test]
+    fn draft_add_option_appends_empty_string() {
+        let mut model = ExtraFieldsModel::default();
+        model.modal_draft = Some(FieldDraft {
+            options: vec!["A".into()],
+            ..Default::default()
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::DraftAddOption, &mut cmds);
+
+        assert_eq!(model.modal_draft.as_ref().unwrap().options.len(), 2);
+        assert_eq!(model.modal_draft.as_ref().unwrap().options[1], "");
+    }
+
+    #[test]
+    fn draft_remove_option_deletes_entry() {
+        let mut model = ExtraFieldsModel::default();
+        model.modal_draft = Some(FieldDraft {
+            options: vec!["A".into(), "B".into(), "C".into()],
+            ..Default::default()
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::DraftRemoveOption(1), &mut cmds);
+
+        assert_eq!(model.modal_draft.as_ref().unwrap().options, vec!["A", "C"]);
+    }
+
+    #[test]
+    fn draft_unit_operations_work() {
+        let mut model = ExtraFieldsModel::default();
+        model.modal_draft = Some(FieldDraft {
+            units: vec!["g".into()],
+            ..Default::default()
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::DraftAddUnit, &mut cmds);
+        assert_eq!(model.modal_draft.as_ref().unwrap().units.len(), 2);
+
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftUnitChanged {
+                index: 1,
+                value: "kg".into(),
+            },
+            &mut cmds,
+        );
+        assert_eq!(model.modal_draft.as_ref().unwrap().units[1], "kg");
+
+        let _ = update(&mut model, ExtraFieldsMsg::DraftRemoveUnit(0), &mut cmds);
+        assert_eq!(model.modal_draft.as_ref().unwrap().units, vec!["kg"]);
+    }
+
+    #[test]
+    fn draft_default_unit_changed_updates() {
+        let mut model = ExtraFieldsModel::default();
+        model.modal_draft = Some(FieldDraft::default());
+
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftDefaultUnitChanged("mm".into()),
+            &mut cmds,
+        );
+
+        assert_eq!(model.modal_draft.as_ref().unwrap().unit, "mm");
+    }
+
+    #[test]
+    fn draft_group_changed_updates_group_id() {
+        let mut model = ExtraFieldsModel::default();
+        model.modal_draft = Some(FieldDraft::default());
+
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftGroupChanged(Some(42)),
+            &mut cmds,
+        );
+
+        assert_eq!(model.modal_draft.as_ref().unwrap().group_id, Some(42));
+    }
+
+    #[test]
+    fn draft_required_toggled_updates_flag() {
+        let mut model = ExtraFieldsModel::default();
+        model.modal_draft = Some(FieldDraft::default());
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::DraftRequiredToggled(true), &mut cmds);
+
+        assert!(model.modal_draft.as_ref().unwrap().required);
+    }
+
+    #[test]
+    fn draft_allow_multi_toggled_updates_flag() {
+        let mut model = ExtraFieldsModel::default();
+        model.modal_draft = Some(FieldDraft::default());
+
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftAllowMultiToggled(true),
+            &mut cmds,
+        );
+
+        assert!(model.modal_draft.as_ref().unwrap().allow_multi_values);
+    }
+
+    #[test]
+    fn start_edit_group_sets_editing_state() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 1,
+            name: "Original".into(),
+            position: 0,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::StartEditGroup(0), &mut cmds);
+
+        assert_eq!(model.editing_group, Some(0));
+        assert_eq!(model.editing_group_buffer, "Original");
+    }
+
+    #[test]
+    fn edit_group_name_updates_buffer() {
+        let mut model = ExtraFieldsModel::default();
+        model.editing_group = Some(0);
+
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::EditGroupName("NewName".into()),
+            &mut cmds,
+        );
+
+        assert_eq!(model.editing_group_buffer, "NewName");
+    }
+
+    #[test]
+    fn commit_group_name_applies_changes() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 1,
+            name: "Old".into(),
+            position: 0,
+        });
+        model.editing_group = Some(0);
+        model.editing_group_buffer = "  New  ".into();
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::CommitGroupName, &mut cmds);
+
+        assert_eq!(model.groups[0].name, "New");
+        assert!(model.editing_group.is_none());
+        assert!(model.editing_group_buffer.is_empty());
+    }
+
+    #[test]
+    fn cancel_group_edit_clears_state() {
+        let mut model = ExtraFieldsModel::default();
+        model.editing_group = Some(0);
+        model.editing_group_buffer = "Buffer".into();
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::CancelGroupEdit, &mut cmds);
+
+        assert!(model.editing_group.is_none());
+        assert!(model.editing_group_buffer.is_empty());
+    }
+
+    #[test]
+    fn add_group_increments_id_properly() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 5,
+            name: "G1".into(),
+            position: 0,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::AddGroup, &mut cmds);
+
+        assert_eq!(model.groups.len(), 2);
+        assert_eq!(model.groups[1].id, 6);
+        assert!(model.groups[1].name.contains("6"));
+    }
+
+    #[test]
+    fn has_invalid_fields_detects_validation_errors() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "Valid".into(),
+            kind: ExtraFieldKind::Text,
+            value: "ok".into(),
+            value_multi: vec![],
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        assert!(!model.has_invalid_fields());
+
+        model.fields.push(ExtraField {
+            label: "Required".into(),
+            kind: ExtraFieldKind::Text,
+            value: "".into(),
+            value_multi: vec![],
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: true,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        assert!(model.has_invalid_fields());
+    }
+
+    #[test]
+    fn ensure_default_group_creates_when_missing() {
+        let mut model = ExtraFieldsModel::default();
+        let id = model.ensure_default_group();
+
+        assert_eq!(model.groups.len(), 1);
+        assert_eq!(model.groups[0].name, "Default");
+        assert_eq!(model.groups[0].id, id);
+    }
+
+    #[test]
+    fn ensure_default_group_reuses_existing() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 42,
+            name: "Default".into(),
+            position: 0,
+        });
+
+        let id = model.ensure_default_group();
+
+        assert_eq!(model.groups.len(), 1);
+        assert_eq!(id, 42);
+    }
+
+    #[test]
+    fn lowest_position_group_id_returns_first_by_position() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 3,
+            name: "Third".into(),
+            position: 2,
+        });
+        model.groups.push(ExtraFieldGroup {
+            id: 1,
+            name: "First".into(),
+            position: 0,
+        });
+        model.groups.push(ExtraFieldGroup {
+            id: 2,
+            name: "Second".into(),
+            position: 1,
+        });
+
+        let id = model.lowest_position_group_id();
+
+        assert_eq!(id, 1);
+    }
+
+    #[test]
+    fn display_group_name_handles_missing_group() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 10,
+            name: "Known".into(),
+            position: 0,
+        });
+
+        assert_eq!(model.display_group_name(Some(10)), "Known");
+        assert_eq!(model.display_group_name(Some(99)), "Default");
+        assert_eq!(model.display_group_name(None), "Default");
+    }
+
+    #[test]
+    fn import_requested_enqueues_command() {
+        let mut model = ExtraFieldsModel::default();
+        let mut cmds = Vec::new();
+
+        let _ = update(&mut model, ExtraFieldsMsg::ImportRequested, &mut cmds);
+
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(
+            cmds[0],
+            ExtraFieldsCommand::PickMetadataFile
+        ));
+    }
+
+    #[test]
+    fn import_cancelled_returns_event() {
+        let mut model = ExtraFieldsModel::default();
+        let mut cmds = Vec::new();
+
+        let event = update(&mut model, ExtraFieldsMsg::ImportCancelled, &mut cmds).unwrap();
+
+        assert!(!event.is_error);
+        assert!(event.message.contains("cancelled"));
+    }
+
+    #[test]
+    fn import_failed_returns_error_event() {
+        let mut model = ExtraFieldsModel::default();
+        let mut cmds = Vec::new();
+
+        let event = update(
+            &mut model,
+            ExtraFieldsMsg::ImportFailed("Parse error".into()),
+            &mut cmds,
+        )
+        .unwrap();
+
+        assert!(event.is_error);
+        assert_eq!(event.message, "Parse error");
+    }
+
+    #[test]
+    fn commit_field_modal_creates_new_field() {
+        let mut model = ExtraFieldsModel::default();
+        model.modal_open = true;
+        model.modal_draft = Some(FieldDraft {
+            label: "NewField".into(),
+            kind: ExtraFieldKind::Number,
+            required: true,
+            ..Default::default()
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::CommitFieldModal, &mut cmds);
+
+        assert_eq!(model.fields.len(), 1);
+        assert_eq!(model.fields[0].label, "NewField");
+        assert_eq!(model.fields[0].kind, ExtraFieldKind::Number);
+        assert!(model.fields[0].required);
+        assert!(!model.modal_open);
+    }
+
+    #[test]
+    fn commit_field_modal_ignores_empty_label() {
+        let mut model = ExtraFieldsModel::default();
+        model.modal_open = true;
+        model.modal_draft = Some(FieldDraft {
+            label: "   ".into(),
+            ..Default::default()
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::CommitFieldModal, &mut cmds);
+
+        assert_eq!(model.fields.len(), 0);
+        assert!(!model.modal_open);
+    }
+
+    #[test]
+    fn draft_kind_change_only_affects_new_fields() {
+        let mut model = ExtraFieldsModel::default();
+        model.fields.push(ExtraField {
+            label: "Existing".into(),
+            kind: ExtraFieldKind::Text,
+            value: String::new(),
+            value_multi: vec![],
+            options: vec![],
+            unit: None,
+            units: vec![],
+            position: None,
+            required: false,
+            description: None,
+            allow_multi_values: false,
+            blank_value_on_duplicate: false,
+            group_id: None,
+            readonly: false,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(&mut model, ExtraFieldsMsg::OpenFieldModal(0), &mut cmds);
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftKindChanged(ExtraFieldKind::Number),
+            &mut cmds,
+        );
+
+        assert_eq!(
+            model.modal_draft.as_ref().unwrap().kind,
+            ExtraFieldKind::Text
+        );
+    }
+
+    #[test]
+    fn import_loaded_sorts_and_clears_editing() {
+        let mut model = ExtraFieldsModel::default();
+        model.editing_group = Some(0);
+        model.editing_group_buffer = "test".into();
+
+        let mut cmds = Vec::new();
+        let event = update(
+            &mut model,
+            ExtraFieldsMsg::ImportLoaded {
+                fields: vec![
+                    ExtraField {
+                        label: "Z".into(),
+                        kind: ExtraFieldKind::Text,
+                        value: String::new(),
+                        value_multi: vec![],
+                        options: vec![],
+                        unit: None,
+                        units: vec![],
+                        position: Some(2),
+                        required: false,
+                        description: None,
+                        allow_multi_values: false,
+                        blank_value_on_duplicate: false,
+                        group_id: None,
+                        readonly: false,
+                    },
+                    ExtraField {
+                        label: "A".into(),
+                        kind: ExtraFieldKind::Text,
+                        value: String::new(),
+                        value_multi: vec![],
+                        options: vec![],
+                        unit: None,
+                        units: vec![],
+                        position: Some(1),
+                        required: false,
+                        description: None,
+                        allow_multi_values: false,
+                        blank_value_on_duplicate: false,
+                        group_id: None,
+                        readonly: false,
+                    },
+                ],
+                groups: vec![],
+                source: PathBuf::from("test.json"),
+            },
+            &mut cmds,
+        )
+        .unwrap();
+
+        assert_eq!(model.fields[0].label, "A");
+        assert_eq!(model.fields[1].label, "Z");
+        assert!(model.editing_group.is_none());
+        assert!(model.editing_group_buffer.is_empty());
+        assert!(!event.is_error);
+    }
+}
