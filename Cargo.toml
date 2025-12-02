@@ -30,6 +30,6 @@ deunicode = "1.6"
 tempfile = "3.14"
 
 [profile.release]
-lto = true
+lto = "thin"
 panic = "abort"
-strip = "debuginfo"
+strip = "symbols"
