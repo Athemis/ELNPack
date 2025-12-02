@@ -12,6 +12,8 @@ use crate::models::extra_fields::{ExtraField, ExtraFieldGroup, ExtraFieldKind};
 pub struct ExtraFieldsModel {
     fields: Vec<ExtraField>,
     groups: Vec<ExtraFieldGroup>,
+    editing_group: Option<usize>,
+    editing_group_buffer: String,
 }
 
 impl ExtraFieldsModel {
@@ -51,6 +53,10 @@ pub enum ExtraFieldsMsg {
         index: usize,
         values: Vec<String>,
     },
+    StartEditGroup(usize),
+    EditGroupName(String),
+    CommitGroupName,
+    CancelGroupEdit,
 }
 
 /// Commands that require side effects.
@@ -93,6 +99,8 @@ pub fn update(
             fields.sort_by(|a, b| a.cmp_key().cmp(&b.cmp_key()));
             model.fields = fields;
             model.groups = groups;
+            model.editing_group = None;
+            model.editing_group_buffer.clear();
             Some(ExtraFieldsEvent {
                 message: format!(
                     "Imported {} field(s) from {}",
@@ -129,6 +137,32 @@ pub fn update(
                 field.value_multi = values.clone();
                 field.value = values.join(", ");
             }
+            None
+        }
+        ExtraFieldsMsg::StartEditGroup(idx) => {
+            if let Some(g) = model.groups.get(idx) {
+                model.editing_group = Some(idx);
+                model.editing_group_buffer = g.name.clone();
+            }
+            None
+        }
+        ExtraFieldsMsg::EditGroupName(name) => {
+            model.editing_group_buffer = name;
+            None
+        }
+        ExtraFieldsMsg::CommitGroupName => {
+            if let Some(idx) = model.editing_group
+                && let Some(group) = model.groups.get_mut(idx)
+            {
+                group.name = model.editing_group_buffer.trim().to_string();
+            }
+            model.editing_group = None;
+            model.editing_group_buffer.clear();
+            None
+        }
+        ExtraFieldsMsg::CancelGroupEdit => {
+            model.editing_group = None;
+            model.editing_group_buffer.clear();
             None
         }
     }
@@ -188,7 +222,7 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
         if group_fields.is_empty() {
             continue;
         }
-        ui.heading(&group.name);
+        render_group_header(ui, group, msgs, model);
         ui.add_space(4.0);
         for (idx, field) in group_fields {
             render_field(ui, field, idx, msgs);
@@ -212,6 +246,54 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
             ui.add_space(6.0);
         }
     }
+}
+
+fn render_group_header(
+    ui: &mut egui::Ui,
+    group: &ExtraFieldGroup,
+    msgs: &mut Vec<ExtraFieldsMsg>,
+    model: &ExtraFieldsModel,
+) {
+    ui.horizontal(|ui| {
+        let is_editing = model
+            .editing_group
+            .map(|idx| {
+                model
+                    .groups
+                    .get(idx)
+                    .map(|g| g.id == group.id)
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+
+        if is_editing {
+            let mut text = model.editing_group_buffer.clone();
+            if ui
+                .add(egui::TextEdit::singleline(&mut text).hint_text("Group name"))
+                .changed()
+            {
+                msgs.push(ExtraFieldsMsg::EditGroupName(text));
+            }
+            if ui.button(egui_phosphor::regular::CHECK).clicked() {
+                msgs.push(ExtraFieldsMsg::CommitGroupName);
+            }
+            if ui.button(egui_phosphor::regular::X).clicked() {
+                msgs.push(ExtraFieldsMsg::CancelGroupEdit);
+            }
+        } else {
+            ui.heading(&group.name);
+            if ui
+                .button(egui_phosphor::regular::PENCIL_SIMPLE)
+                .on_hover_text("Rename group")
+                .clicked()
+            {
+                // find index of this group
+                if let Some(idx) = model.groups.iter().position(|g| g.id == group.id) {
+                    msgs.push(ExtraFieldsMsg::StartEditGroup(idx));
+                }
+            }
+        }
+    });
 }
 
 fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Vec<ExtraFieldsMsg>) {
@@ -298,7 +380,7 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
                         });
                     }
                     if !field.units.is_empty() {
-                        let mut current_unit = field.unit.clone().unwrap_or_else(|| "".to_string());
+                        let mut current_unit = field.unit.clone().unwrap_or_default();
                         egui::ComboBox::from_id_salt(format!("extra-unit-{}", idx))
                             .selected_text(if current_unit.is_empty() {
                                 "Unit"
@@ -375,6 +457,7 @@ mod tests {
                 label: "Example".into(),
                 kind: ExtraFieldKind::Text,
                 value: "value".into(),
+                value_multi: Vec::new(),
                 options: vec![],
                 unit: None,
                 units: vec![],
@@ -386,6 +469,7 @@ mod tests {
                 group_id: None,
                 readonly: false,
             }],
+            groups: vec![],
             source: PathBuf::from("sample.json"),
         };
 
