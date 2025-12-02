@@ -61,15 +61,34 @@ jobs:
             archive: tar.gz
             rustflags: ""
             linux: true
+            pkg_config_libdir: ""
+            multilib: false
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             archive: zip
             rustflags: ""
             linux: false
+            pkg_config_libdir: ""
+            multilib: false
+          - runner: ubuntu-latest
+            target: i686-unknown-linux-gnu
+            archive: tar.gz
+            rustflags: ""
+            linux: true
+            pkg_config_libdir: "/usr/lib/i386-linux-gnu/pkgconfig"
+            multilib: true
+          - runner: windows-latest
+            target: i686-pc-windows-msvc
+            archive: zip
+            rustflags: ""
+            linux: false
+            pkg_config_libdir: ""
+            multilib: false
     runs-on: ${{ matrix.runner }}
     env:
       TARGET: ${{ matrix.target }}
       RUSTFLAGS: ${{ matrix.rustflags }}
+      PKG_CONFIG_LIBDIR: ${{ matrix.pkg_config_libdir }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -89,6 +108,17 @@ jobs:
             libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
             libgl1-mesa-dev libasound2-dev libudev-dev \
             libwayland-dev libxkbcommon-dev
+
+      - name: Install 32-bit Linux deps
+        if: matrix.target == 'i686-unknown-linux-gnu'
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-multilib g++-multilib pkg-config \
+            libx11-dev:i386 libxcursor-dev:i386 libxrandr-dev:i386 libxi-dev:i386 \
+            libgl1-mesa-dev:i386 libasound2-dev:i386 libudev-dev:i386 \
+            libwayland-dev:i386 libxkbcommon-dev:i386
 
       - name: Cache cargo
         uses: actions/cache@v4
