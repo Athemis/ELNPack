@@ -8,3 +8,6 @@ pub mod datetime_picker;
 pub mod extra_fields;
 pub mod keywords;
 pub mod markdown;
+pub mod toggle;
+
+pub use toggle::toggle_switch;
