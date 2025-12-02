@@ -5,17 +5,22 @@
 
 use eframe::egui;
 
-use crate::models::extra_fields::{ExtraField, ExtraFieldKind};
+use crate::models::extra_fields::{ExtraField, ExtraFieldGroup, ExtraFieldKind};
 
 /// UI state for imported extra fields.
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub struct ExtraFieldsModel {
     fields: Vec<ExtraField>,
+    groups: Vec<ExtraFieldGroup>,
 }
 
 impl ExtraFieldsModel {
     pub fn fields(&self) -> &[ExtraField] {
         &self.fields
+    }
+
+    pub fn groups(&self) -> &[ExtraFieldGroup] {
+        &self.groups
     }
 }
 
@@ -26,6 +31,7 @@ pub enum ExtraFieldsMsg {
     ImportCancelled,
     ImportLoaded {
         fields: Vec<ExtraField>,
+        groups: Vec<ExtraFieldGroup>,
         source: std::path::PathBuf,
     },
     ImportFailed(String),
@@ -40,6 +46,10 @@ pub enum ExtraFieldsMsg {
     SelectUnit {
         index: usize,
         unit: String,
+    },
+    UpdateMulti {
+        index: usize,
+        values: Vec<String>,
     },
 }
 
@@ -75,9 +85,14 @@ pub fn update(
             message: err,
             is_error: true,
         }),
-        ExtraFieldsMsg::ImportLoaded { mut fields, source } => {
+        ExtraFieldsMsg::ImportLoaded {
+            mut fields,
+            groups,
+            source,
+        } => {
             fields.sort_by(|a, b| a.cmp_key().cmp(&b.cmp_key()));
             model.fields = fields;
+            model.groups = groups;
             Some(ExtraFieldsEvent {
                 message: format!(
                     "Imported {} field(s) from {}",
@@ -90,6 +105,10 @@ pub fn update(
         ExtraFieldsMsg::EditValue { index, value } => {
             if let Some(field) = model.fields.get_mut(index) {
                 field.value = value;
+                // keep multi list in sync for multi selects
+                if field.allow_multi_values {
+                    field.value_multi = split_multi(&field.value);
+                }
             }
             None
         }
@@ -102,6 +121,13 @@ pub fn update(
         ExtraFieldsMsg::SelectUnit { index, unit } => {
             if let Some(field) = model.fields.get_mut(index) {
                 field.unit = Some(unit);
+            }
+            None
+        }
+        ExtraFieldsMsg::UpdateMulti { index, values } => {
+            if let Some(field) = model.fields.get_mut(index) {
+                field.value_multi = values.clone();
+                field.value = values.join(", ");
             }
             None
         }
@@ -151,7 +177,45 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
         return;
     }
 
-    for (idx, field) in model.fields.iter().enumerate() {
+    // Render grouped fields in group order, then any ungrouped.
+    for group in model.groups.iter() {
+        let group_fields: Vec<(usize, &ExtraField)> = model
+            .fields
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| f.group_id == Some(group.id))
+            .collect();
+        if group_fields.is_empty() {
+            continue;
+        }
+        ui.heading(&group.name);
+        ui.add_space(4.0);
+        for (idx, field) in group_fields {
+            render_field(ui, field, idx, msgs);
+            ui.add_space(6.0);
+        }
+        ui.add_space(10.0);
+    }
+
+    let ungrouped: Vec<(usize, &ExtraField)> = model
+        .fields
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| f.group_id.is_none())
+        .collect();
+
+    if !ungrouped.is_empty() {
+        ui.heading("Other");
+        ui.add_space(4.0);
+        for (idx, field) in ungrouped {
+            render_field(ui, field, idx, msgs);
+            ui.add_space(6.0);
+        }
+    }
+}
+
+fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Vec<ExtraFieldsMsg>) {
+    ui.group(|ui| {
         ui.group(|ui| {
             ui.horizontal(|ui| {
                 let mut label = field.label.clone();
@@ -180,26 +244,48 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
                     }
                 }
                 ExtraFieldKind::Select | ExtraFieldKind::Radio => {
-                    let mut current = field.value.clone();
-                    egui::ComboBox::from_id_salt(format!("extra-select-{}", idx))
-                        .selected_text(if current.is_empty() {
-                            "Select"
+                    if field.allow_multi_values {
+                        let mut chosen = if field.value_multi.is_empty() {
+                            split_multi(&field.value)
                         } else {
-                            &current
-                        })
-                        .show_ui(ui, |ui| {
-                            for opt in &field.options {
-                                if ui
-                                    .selectable_value(&mut current, opt.clone(), opt)
-                                    .clicked()
-                                {
-                                    msgs.push(ExtraFieldsMsg::EditValue {
-                                        index: idx,
-                                        value: opt.clone(),
-                                    });
+                            field.value_multi.clone()
+                        };
+                        for opt in &field.options {
+                            let mut is_on = chosen.contains(opt);
+                            if ui.checkbox(&mut is_on, opt).changed() {
+                                if is_on {
+                                    chosen.push(opt.clone());
+                                } else {
+                                    chosen.retain(|v| v != opt);
                                 }
+                                msgs.push(ExtraFieldsMsg::UpdateMulti {
+                                    index: idx,
+                                    values: chosen.clone(),
+                                });
                             }
-                        });
+                        }
+                    } else {
+                        let mut current = field.value.clone();
+                        egui::ComboBox::from_id_salt(format!("extra-select-{}", idx))
+                            .selected_text(if current.is_empty() {
+                                "Select"
+                            } else {
+                                &current
+                            })
+                            .show_ui(ui, |ui| {
+                                for opt in &field.options {
+                                    if ui
+                                        .selectable_value(&mut current, opt.clone(), opt)
+                                        .clicked()
+                                    {
+                                        msgs.push(ExtraFieldsMsg::EditValue {
+                                            index: idx,
+                                            value: opt.clone(),
+                                        });
+                                    }
+                                }
+                            });
+                    }
                 }
                 ExtraFieldKind::Number => {
                     let mut val = field.value.clone();
@@ -251,7 +337,7 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
             }
         });
         ui.add_space(6.0);
-    }
+    });
 }
 
 fn field_hint(kind: &ExtraFieldKind) -> &'static str {
@@ -264,6 +350,15 @@ fn field_hint(kind: &ExtraFieldKind) -> &'static str {
         ExtraFieldKind::Number => "Number",
         _ => "",
     }
+}
+
+fn split_multi(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
 }
 
 #[cfg(test)]

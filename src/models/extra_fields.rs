@@ -56,6 +56,7 @@ pub struct ExtraField {
     pub label: String,
     pub kind: ExtraFieldKind,
     pub value: String,
+    pub value_multi: Vec<String>,
     pub options: Vec<String>,
     pub unit: Option<String>,
     pub units: Vec<String>,
@@ -78,6 +79,28 @@ impl ExtraField {
 #[derive(Debug, Deserialize)]
 struct ExtraFieldsEnvelope {
     extra_fields: BTreeMap<String, ExtraFieldRaw>,
+    #[serde(default)]
+    elabftw: Option<ElabFtWBlock>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ElabFtWBlock {
+    #[serde(default)]
+    extra_fields_groups: Vec<ExtraFieldGroupRaw>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExtraFieldGroupRaw {
+    id: Value,
+    name: String,
+}
+
+/// Group information for display ordering.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExtraFieldGroup {
+    pub id: i32,
+    pub name: String,
+    pub position: i32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -108,8 +131,14 @@ struct ExtraFieldRaw {
     group_id: Option<Value>,
 }
 
+/// Parsed payload: fields plus optional groups metadata.
+pub struct ExtraFieldsImport {
+    pub fields: Vec<ExtraField>,
+    pub groups: Vec<ExtraFieldGroup>,
+}
+
 /// Parse the `extra_fields` object from an eLabFTW metadata JSON string.
-pub fn parse_elabftw_extra_fields(json: &str) -> Result<Vec<ExtraField>> {
+pub fn parse_elabftw_extra_fields(json: &str) -> Result<ExtraFieldsImport> {
     let env: ExtraFieldsEnvelope =
         serde_json::from_str(json).context("Failed to parse eLabFTW metadata JSON")?;
 
@@ -128,11 +157,22 @@ pub fn parse_elabftw_extra_fields(json: &str) -> Result<Vec<ExtraField>> {
             .filter_map(|v| value_to_string(Some(v)))
             .collect::<Vec<_>>();
 
-        let value = raw
-            .value
-            .as_ref()
-            .and_then(|v| value_to_string(Some(v)))
-            .unwrap_or_else(String::new);
+        let (value, value_multi) = match raw.value.as_ref() {
+            Some(Value::Array(arr)) => {
+                let vals = arr
+                    .iter()
+                    .filter_map(|v| value_to_string(Some(v)))
+                    .collect::<Vec<_>>();
+                let joined = vals.join(", ");
+                (joined, vals)
+            }
+            other => (
+                other
+                    .and_then(|v| value_to_string(Some(v)))
+                    .unwrap_or_else(String::new),
+                Vec::new(),
+            ),
+        };
 
         let group_id = match raw.group_id.as_ref() {
             Some(Value::Number(n)) => n.as_i64().map(|v| v as i32),
@@ -144,6 +184,7 @@ pub fn parse_elabftw_extra_fields(json: &str) -> Result<Vec<ExtraField>> {
             label,
             kind,
             value,
+            value_multi,
             options,
             unit: raw.unit.filter(|u| !u.trim().is_empty()),
             units,
@@ -158,7 +199,25 @@ pub fn parse_elabftw_extra_fields(json: &str) -> Result<Vec<ExtraField>> {
     }
 
     fields.sort_by(|a, b| a.cmp_key().cmp(&b.cmp_key()));
-    Ok(fields)
+    let groups = env
+        .elabftw
+        .unwrap_or_default()
+        .extra_fields_groups
+        .into_iter()
+        .enumerate()
+        .filter_map(|(idx, g)| match g.id {
+            Value::Number(n) => n.as_i64().map(|v| (v as i32, idx as i32, g.name)),
+            Value::String(s) => s.parse::<i32>().ok().map(|v| (v, idx as i32, g.name)),
+            _ => None,
+        })
+        .map(|(id, pos, name)| ExtraFieldGroup {
+            id,
+            name,
+            position: pos,
+        })
+        .collect();
+
+    Ok(ExtraFieldsImport { fields, groups })
 }
 
 fn value_to_string(val: Option<&Value>) -> Option<String> {
@@ -176,19 +235,22 @@ mod tests {
 
     #[test]
     fn parses_sample_extra_fields() {
-        let json = r#"{"extra_fields":{"Model":{"type":"text","value":"Empyrian","position":1,"required":true},"X-Ray Wavelength":{"type":"number","unit":"\u212b","units":["\u212b","nm"],"value":1.540562,"position":8}}}"#;
+        let json = r#"{"elabftw":{"extra_fields_groups":[{"id":1,"name":"General"}]},"extra_fields":{"Model":{"type":"text","value":"Empyrian","position":1,"required":true,"group_id":1},"X-Ray Wavelength":{"type":"number","unit":"\u212b","units":["\u212b","nm"],"value":1.540562,"position":8}}}"#;
 
-        let fields = parse_elabftw_extra_fields(json).unwrap();
-        assert_eq!(fields.len(), 2);
-        assert_eq!(fields[0].label, "Model");
-        assert_eq!(fields[0].value, "Empyrian");
-        assert!(fields[0].required);
-        assert_eq!(fields[1].label, "X-Ray Wavelength");
-        assert_eq!(fields[1].unit.as_deref(), Some("\u{212b}"));
+        let import = parse_elabftw_extra_fields(json).unwrap();
+        assert_eq!(import.groups.len(), 1);
+        assert_eq!(import.groups[0].name, "General");
+        assert_eq!(import.fields.len(), 2);
+        assert_eq!(import.fields[0].label, "Model");
+        assert_eq!(import.fields[0].value, "Empyrian");
+        assert!(import.fields[0].required);
+        assert_eq!(import.fields[0].group_id, Some(1));
+        assert_eq!(import.fields[1].label, "X-Ray Wavelength");
+        assert_eq!(import.fields[1].unit.as_deref(), Some("\u{212b}"));
         assert_eq!(
-            fields[1].units,
+            import.fields[1].units,
             vec!["\u{212b}".to_string(), "nm".to_string()]
         );
-        assert_eq!(fields[1].value, "1.540562");
+        assert_eq!(import.fields[1].value, "1.540562");
     }
 }
