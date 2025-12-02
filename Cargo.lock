@@ -1169,6 +1169,7 @@ dependencies = [
  "mime_guess",
  "pulldown-cmark",
  "rfd",
+ "serde",
  "serde_json",
  "sha2",
  "tempfile",

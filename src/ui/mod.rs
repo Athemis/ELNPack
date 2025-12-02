@@ -10,7 +10,7 @@ use eframe::egui;
 
 use crate::logic::eln::{ArchiveGenre, ensure_extension, suggested_archive_name};
 use crate::mvu::{self, AppModel, Command, Msg};
-use crate::ui::components::{attachments, datetime_picker, keywords, markdown};
+use crate::ui::components::{attachments, datetime_picker, extra_fields, keywords, markdown};
 
 /// Stateful egui application for building and exporting ELN entries.
 pub struct ElnPackApp {
@@ -125,6 +125,9 @@ impl eframe::App for ElnPackApp {
 
                 let kw_msgs = keywords::view(ui, ctx, &self.model.keywords);
                 self.inbox.extend(kw_msgs.into_iter().map(Msg::Keywords));
+                ui.add_space(12.0);
+
+                self.render_extra_fields_section(ui);
                 ui.add_space(12.0);
 
                 self.render_attachments_section(ui, ctx);
@@ -260,6 +263,11 @@ impl ElnPackApp {
                 self.inbox
                     .extend(att_msgs.into_iter().map(Msg::Attachments));
             });
+    }
+
+    fn render_extra_fields_section(&mut self, ui: &mut egui::Ui) {
+        let msgs = extra_fields::view(ui, &self.model.extra_fields);
+        self.inbox.extend(msgs.into_iter().map(Msg::ExtraFields));
     }
 
     /// Render entry type selection (segmented buttons).

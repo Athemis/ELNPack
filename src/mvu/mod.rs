@@ -7,11 +7,15 @@ use std::path::PathBuf;
 
 use crate::logic::eln::{ArchiveGenre, build_and_write_archive};
 use crate::models::attachment::Attachment;
+use crate::models::extra_fields::ExtraField;
 use crate::models::keywords::Keywords;
 use crate::ui::components::attachments::{
     self, AttachmentsCommand, AttachmentsModel, AttachmentsMsg,
 };
 use crate::ui::components::datetime_picker::{self, DateTimeModel, DateTimeMsg};
+use crate::ui::components::extra_fields::{
+    self, ExtraFieldsCommand, ExtraFieldsModel, ExtraFieldsMsg,
+};
 use crate::ui::components::keywords::{self, KeywordsModel, KeywordsMsg};
 use crate::ui::components::markdown::{MarkdownModel, MarkdownMsg};
 
@@ -30,6 +34,8 @@ pub struct AppModel {
     pub attachments: AttachmentsModel,
     /// Keywords editor state.
     pub keywords: KeywordsModel,
+    /// Imported eLabFTW extra fields metadata.
+    pub extra_fields: ExtraFieldsModel,
     /// Date/time picker state.
     pub datetime: DateTimeModel,
     /// Latest status message to display.
@@ -60,6 +66,7 @@ pub enum Msg {
     Markdown(MarkdownMsg),
     Attachments(AttachmentsMsg),
     Keywords(KeywordsMsg),
+    ExtraFields(ExtraFieldsMsg),
     DateTime(DateTimeMsg),
 }
 
@@ -68,6 +75,7 @@ pub enum Command {
     PickFiles,
     HashFile { path: PathBuf, _retry: bool },
     LoadThumbnail { path: PathBuf, _retry: bool },
+    PickExtraFieldsFile,
     SaveArchive(SavePayload),
 }
 
@@ -87,6 +95,8 @@ pub struct SavePayload {
     pub genre: ArchiveGenre,
     /// Normalized keywords.
     pub keywords: Vec<String>,
+    /// Imported extra fields metadata.
+    pub extra_fields: Vec<ExtraField>,
     /// Stored body format (HTML or Markdown).
     pub body_format: crate::logic::eln::BodyFormat,
 }
@@ -158,6 +168,17 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
                 surface_event(model, event.message, event.is_error);
             }
         }
+        Msg::ExtraFields(m) => {
+            let mut extra_cmds = Vec::new();
+            if let Some(event) = extra_fields::update(&mut model.extra_fields, m, &mut extra_cmds) {
+                surface_event(model, event.message, event.is_error);
+            }
+            for c in extra_cmds {
+                match c {
+                    ExtraFieldsCommand::PickMetadataFile => cmds.push(Command::PickExtraFieldsFile),
+                }
+            }
+        }
         Msg::DateTime(m) => datetime_picker::update(&mut model.datetime, m),
         Msg::SaveRequested(output_path) => match validate_for_save(model, output_path) {
             Ok(payload) => cmds.push(Command::SaveArchive(payload)),
@@ -180,6 +201,32 @@ pub fn run_command(cmd: Command) -> Msg {
                 .pick_files()
                 .unwrap_or_default();
             Msg::Attachments(AttachmentsMsg::FilesPicked(files))
+        }
+        Command::PickExtraFieldsFile => {
+            let file = rfd::FileDialog::new()
+                .set_title("Select eLabFTW metadata JSON")
+                .add_filter("JSON", &["json"])
+                .pick_file();
+
+            match file {
+                Some(path) => match std::fs::read_to_string(&path) {
+                    Ok(content) => {
+                        match crate::models::extra_fields::parse_elabftw_extra_fields(&content) {
+                            Ok(fields) => Msg::ExtraFields(ExtraFieldsMsg::ImportLoaded {
+                                fields,
+                                source: path,
+                            }),
+                            Err(err) => {
+                                Msg::ExtraFields(ExtraFieldsMsg::ImportFailed(err.to_string()))
+                            }
+                        }
+                    }
+                    Err(err) => Msg::ExtraFields(ExtraFieldsMsg::ImportFailed(format!(
+                        "Failed to read metadata file: {err}"
+                    ))),
+                },
+                None => Msg::ExtraFields(ExtraFieldsMsg::ImportCancelled),
+            }
         }
         Command::HashFile { path, _retry: _ } => {
             let sha256 = crate::utils::hash_file(&path).unwrap_or_else(|_| "unavailable".into());
@@ -204,6 +251,7 @@ pub fn run_command(cmd: Command) -> Msg {
                 &payload.title,
                 &payload.body,
                 &payload.attachments,
+                &payload.extra_fields,
                 payload.performed_at,
                 payload.genre,
                 &payload.keywords,
@@ -246,6 +294,12 @@ fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePaylo
     crate::models::attachment::assert_unique_sanitized_names(&attachment_meta)
         .map_err(|e| e.to_string())?;
 
+    for field in model.extra_fields.fields() {
+        if field.required && field.value.trim().is_empty() {
+            return Err(format!("Field '{}' is required.", field.label));
+        }
+    }
+
     Ok(SavePayload {
         output: output_path,
         title,
@@ -254,6 +308,7 @@ fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePaylo
         performed_at,
         genre: model.archive_genre,
         keywords: keywords.into_vec(),
+        extra_fields: model.extra_fields.fields().to_vec(),
         body_format: model.body_format,
     })
 }
