@@ -61,18 +61,41 @@ jobs:
             archive: tar.gz
             rustflags: ""
             linux: true
+            pkg_config_libdir: ""
+            multilib: false
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             archive: zip
             rustflags: ""
             linux: false
+            pkg_config_libdir: ""
+            multilib: false
+          - runner: ubuntu-latest
+            target: i686-unknown-linux-gnu
+            archive: tar.gz
+            rustflags: ""
+            linux: true
+            pkg_config_libdir: "/usr/lib/i386-linux-gnu/pkgconfig"
+            multilib: true
+          - runner: windows-latest
+            target: i686-pc-windows-msvc
+            archive: zip
+            rustflags: ""
+            linux: false
+            pkg_config_libdir: ""
+            multilib: false
     runs-on: ${{ matrix.runner }}
     env:
       TARGET: ${{ matrix.target }}
       RUSTFLAGS: ${{ matrix.rustflags }}
+      PKG_CONFIG_LIBDIR: ${{ matrix.pkg_config_libdir }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Set safe ref name
+        shell: bash
+        run: echo "SAFE_REF=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_ENV"
 
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@7b1c307e0dcbda6122208f10795a713336a9b35a
@@ -90,6 +113,17 @@ jobs:
             libgl1-mesa-dev libasound2-dev libudev-dev \
             libwayland-dev libxkbcommon-dev
 
+      - name: Install 32-bit Linux deps
+        if: matrix.target == 'i686-unknown-linux-gnu'
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-multilib g++-multilib pkg-config \
+            libx11-dev:i386 libxcursor-dev:i386 libxrandr-dev:i386 libxi-dev:i386 \
+            libgl1-mesa-dev:i386 libasound2-dev:i386 libudev-dev:i386 \
+            libwayland-dev:i386 libxkbcommon-dev:i386
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -104,10 +138,6 @@ jobs:
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Strip binary (Linux)
-        if: matrix.linux
-        run: strip --strip-unneeded target/$TARGET/release/elnpack
-
       - name: Package artifact (Linux)
         if: matrix.archive == 'tar.gz'
         run: |
@@ -116,7 +146,7 @@ jobs:
           mkdir -p "$pkg_dir"
           cp "$bin_path" "$pkg_dir/"
           cp README.md LICENSE "$pkg_dir/"
-          tar -czf elnpack-${{ github.ref_name }}-$TARGET.tar.gz -C "$pkg_dir" .
+          tar -czf "elnpack-$SAFE_REF-$TARGET.tar.gz" -C "$pkg_dir" .
 
       - name: Package artifact (Windows)
         if: matrix.archive == 'zip'
@@ -127,14 +157,15 @@ jobs:
           New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
           Copy-Item $binPath "$pkgDir/"
           Copy-Item "README.md","LICENSE" "$pkgDir/"
-          Compress-Archive -Path "$pkgDir/*" -DestinationPath "elnpack-${{ github.ref_name }}-${env:TARGET}.zip"
+          $safeRef = $env:SAFE_REF
+          Compress-Archive -Path "$pkgDir/*" -DestinationPath "elnpack-$safeRef-${env:TARGET}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: elnpack-${{ github.ref_name }}-${{ matrix.target }}
+          name: elnpack-${{ env.SAFE_REF }}-${{ matrix.target }}
           path: |
-            elnpack-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.archive }}
+            elnpack-${{ env.SAFE_REF }}-${{ matrix.target }}.${{ matrix.archive }}
 
   publish:
     name: Publish Release
