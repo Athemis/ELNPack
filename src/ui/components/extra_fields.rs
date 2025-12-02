@@ -395,12 +395,7 @@ pub fn update(
                         if !label.is_empty() {
                             f.label = label.to_string();
                         }
-                        let desc = draft.description.trim();
-                        f.description = if desc.is_empty() {
-                            None
-                        } else {
-                            Some(desc.to_string())
-                        };
+                        f.description = trimmed_or_none(&draft.description);
                         f.required = draft.required;
                         f.allow_multi_values = draft.allow_multi_values;
                         f.group_id = draft.group_id;
@@ -409,11 +404,7 @@ pub fn update(
                         }
                         if matches!(f.kind, ExtraFieldKind::Number) {
                             f.units = draft.units.clone();
-                            f.unit = if draft.unit.trim().is_empty() {
-                                None
-                            } else {
-                                Some(draft.unit.trim().to_string())
-                            };
+                            f.unit = trimmed_or_none(&draft.unit);
                         }
                     }
                 } else {
@@ -428,19 +419,11 @@ pub fn update(
                             value: String::new(),
                             value_multi: Vec::new(),
                             options: draft.options,
-                            unit: if draft.unit.trim().is_empty() {
-                                None
-                            } else {
-                                Some(draft.unit.trim().to_string())
-                            },
+                            unit: trimmed_or_none(&draft.unit),
                             units: draft.units,
                             position: Some(model.fields.len() as i32),
                             required: draft.required,
-                            description: if draft.description.trim().is_empty() {
-                                None
-                            } else {
-                                Some(draft.description.trim().to_string())
-                            },
+                            description: trimmed_or_none(&draft.description),
                             allow_multi_values: draft.allow_multi_values,
                             blank_value_on_duplicate: false,
                             group_id: draft.group_id,
@@ -911,6 +894,15 @@ fn name_conflict(model: &ExtraFieldsModel, label: &str, editing: Option<usize>) 
 
 fn field_invalid(field: &ExtraField) -> bool {
     validate_field(field).is_some()
+}
+
+fn trimmed_or_none(input: &str) -> Option<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 fn group_display_name(group_id: Option<i32>, model: &ExtraFieldsModel) -> String {
