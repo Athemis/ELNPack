@@ -324,17 +324,8 @@ pub fn update(
             model.modal_open = true;
             model.editing_field = None;
             let mut draft = FieldDraft::default();
-            if group_id.is_some() {
-                draft.group_id = group_id;
-            } else if model.groups.is_empty() {
-                let next_id = 1;
-                model.groups.push(ExtraFieldGroup {
-                    id: next_id,
-                    name: "Default".into(),
-                    position: 0,
-                });
-                draft.group_id = Some(next_id);
-            }
+            let preferred = preferred_group_id(model);
+            draft.group_id = group_id.or(Some(preferred));
             model.modal_draft = Some(draft);
             None
         }
@@ -383,10 +374,13 @@ pub fn update(
                         }
                     }
                 } else {
-                    let label = draft.label.trim();
+                    let label = draft.label.trim().to_string();
                     if !label.is_empty() {
+                        let mut draft = draft;
+                        let preferred = preferred_group_id(model);
+                        draft.group_id = draft.group_id.or(Some(preferred));
                         let new_field = ExtraField {
-                            label: label.to_string(),
+                            label,
                             kind: draft.kind,
                             value: String::new(),
                             value_multi: Vec::new(),
@@ -895,6 +889,25 @@ fn field_invalid(field: &ExtraField) -> bool {
     }
 }
 
+fn group_display_name(group_id: Option<i32>, model: &ExtraFieldsModel) -> String {
+    group_id
+        .and_then(|gid| model.groups.iter().find(|g| g.id == gid).cloned())
+        .map(|g| g.name)
+        .unwrap_or_else(|| "Default".to_string())
+}
+
+fn preferred_group_id(model: &mut ExtraFieldsModel) -> i32 {
+    if model.groups.is_empty() {
+        return ensure_default_group(model);
+    }
+    model
+        .groups
+        .iter()
+        .min_by_key(|g| (g.position, g.id))
+        .map(|g| g.id)
+        .unwrap_or_else(|| ensure_default_group(model))
+}
+
 fn render_field_modal(
     ctx: &egui::Context,
     model: &ExtraFieldsModel,
@@ -1030,18 +1043,11 @@ fn render_field_modal(
             ui.add_space(8.0);
             ui.label("Group assignment");
             let mut current = draft.group_id.unwrap_or(-1);
-            let display_name = draft
-                .group_id
-                .and_then(|gid| model.groups.iter().find(|g| g.id == gid))
-                .map(|g| g.name.clone())
-                .unwrap_or_else(|| "Default".into());
+            let display_name = group_display_name(draft.group_id, model);
 
             egui::ComboBox::from_label("Group")
                 .selected_text(display_name)
                 .show_ui(ui, |ui| {
-                    if ui.selectable_value(&mut current, -1, "Default").clicked() {
-                        msgs.push(ExtraFieldsMsg::DraftGroupChanged(None));
-                    }
                     for g in &model.groups {
                         if ui.selectable_value(&mut current, g.id, &g.name).clicked() {
                             msgs.push(ExtraFieldsMsg::DraftGroupChanged(Some(g.id)));
@@ -1179,6 +1185,46 @@ mod tests {
         });
 
         assert!(!model.has_invalid_fields());
+    }
+
+    #[test]
+    fn group_display_name_falls_back_to_id() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 1,
+            name: "One".into(),
+            position: 0,
+        });
+
+        assert_eq!(group_display_name(Some(1), &model), "One");
+        assert_eq!(group_display_name(Some(99), &model), "Default");
+    }
+
+    #[test]
+    fn add_field_uses_existing_group_when_present() {
+        let mut model = ExtraFieldsModel::default();
+        model.groups.push(ExtraFieldGroup {
+            id: 10,
+            name: "Group 1".into(),
+            position: 0,
+        });
+
+        let mut cmds = Vec::new();
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::StartAddField { group_id: None },
+            &mut cmds,
+        );
+        let _ = update(
+            &mut model,
+            ExtraFieldsMsg::DraftLabelChanged("Example".into()),
+            &mut cmds,
+        );
+        let _ = update(&mut model, ExtraFieldsMsg::CommitFieldModal, &mut cmds);
+
+        assert_eq!(model.groups.len(), 1, "should not create new default group");
+        assert_eq!(model.fields.len(), 1);
+        assert_eq!(model.fields[0].group_id, Some(10));
     }
 
     #[test]
