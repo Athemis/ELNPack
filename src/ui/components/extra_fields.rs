@@ -57,6 +57,10 @@ pub enum ExtraFieldsMsg {
     EditGroupName(String),
     CommitGroupName,
     CancelGroupEdit,
+    ToggleAllowMulti {
+        index: usize,
+        enabled: bool,
+    },
 }
 
 /// Commands that require side effects.
@@ -136,6 +140,22 @@ pub fn update(
             if let Some(field) = model.fields.get_mut(index) {
                 field.value_multi = values.clone();
                 field.value = values.join(", ");
+            }
+            None
+        }
+        ExtraFieldsMsg::ToggleAllowMulti { index, enabled } => {
+            if let Some(field) = model.fields.get_mut(index) {
+                field.allow_multi_values = enabled;
+                if enabled {
+                    if field.value_multi.is_empty() && !field.value.is_empty() {
+                        field.value_multi = split_multi(&field.value);
+                    }
+                } else {
+                    if !field.value_multi.is_empty() {
+                        field.value = field.value_multi.first().cloned().unwrap_or_default();
+                    }
+                    field.value_multi.clear();
+                }
             }
             None
         }
@@ -326,6 +346,14 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
                     }
                 }
                 ExtraFieldKind::Select | ExtraFieldKind::Radio => {
+                    let mut allow_multi = field.allow_multi_values;
+                    if ui.checkbox(&mut allow_multi, "Allow multiple").changed() {
+                        msgs.push(ExtraFieldsMsg::ToggleAllowMulti {
+                            index: idx,
+                            enabled: allow_multi,
+                        });
+                    }
+
                     if field.allow_multi_values {
                         let mut chosen = if field.value_multi.is_empty() {
                             split_multi(&field.value)
@@ -348,25 +376,14 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
                         }
                     } else {
                         let mut current = field.value.clone();
-                        egui::ComboBox::from_id_salt(format!("extra-select-{}", idx))
-                            .selected_text(if current.is_empty() {
-                                "Select"
-                            } else {
-                                &current
-                            })
-                            .show_ui(ui, |ui| {
-                                for opt in &field.options {
-                                    if ui
-                                        .selectable_value(&mut current, opt.clone(), opt)
-                                        .clicked()
-                                    {
-                                        msgs.push(ExtraFieldsMsg::EditValue {
-                                            index: idx,
-                                            value: opt.clone(),
-                                        });
-                                    }
-                                }
-                            });
+                        for opt in &field.options {
+                            if ui.radio_value(&mut current, opt.clone(), opt).clicked() {
+                                msgs.push(ExtraFieldsMsg::EditValue {
+                                    index: idx,
+                                    value: opt.clone(),
+                                });
+                            }
+                        }
                     }
                 }
                 ExtraFieldKind::Number => {
