@@ -137,6 +137,49 @@ pub struct ExtraFieldsEvent {
     pub is_error: bool,
 }
 
+/// Pure validation of a single field. Returns `Some(reason)` when invalid.
+pub fn validate_field(field: &ExtraField) -> Option<&'static str> {
+    let value = field.value.trim();
+
+    if field.required && value.is_empty() {
+        return Some("required");
+    }
+
+    match field.kind {
+        ExtraFieldKind::Url => {
+            if value.is_empty() {
+                return None;
+            }
+            Url::parse(value)
+                .ok()
+                .filter(|u| matches!(u.scheme(), "http" | "https") && u.host_str().is_some())
+                .map(|_| None)
+                .unwrap_or(Some("invalid_url"))
+        }
+        ExtraFieldKind::Number => {
+            if value.is_empty() {
+                return None;
+            }
+            if value.parse::<f64>().is_ok() {
+                None
+            } else {
+                Some("invalid_number")
+            }
+        }
+        ExtraFieldKind::Items | ExtraFieldKind::Experiments | ExtraFieldKind::Users => {
+            if value.is_empty() {
+                return None;
+            }
+            if value.parse::<i64>().is_ok() {
+                None
+            } else {
+                Some("invalid_integer")
+            }
+        }
+        _ => None,
+    }
+}
+
 /// Update the model based on a message.
 pub fn update(
     model: &mut ExtraFieldsModel,
@@ -867,26 +910,7 @@ fn name_conflict(model: &ExtraFieldsModel, label: &str, editing: Option<usize>) 
 }
 
 fn field_invalid(field: &ExtraField) -> bool {
-    let value = field.value.trim();
-
-    if field.required && value.is_empty() {
-        return true;
-    }
-
-    match field.kind {
-        ExtraFieldKind::Url => {
-            !value.is_empty()
-                && Url::parse(value)
-                    .ok()
-                    .filter(|u| matches!(u.scheme(), "http" | "https") && u.host_str().is_some())
-                    .is_none()
-        }
-        ExtraFieldKind::Number => !value.is_empty() && value.parse::<f64>().is_err(),
-        ExtraFieldKind::Items | ExtraFieldKind::Experiments | ExtraFieldKind::Users => {
-            !value.is_empty() && value.parse::<i64>().is_err()
-        }
-        _ => false,
-    }
+    validate_field(field).is_some()
 }
 
 fn group_display_name(group_id: Option<i32>, model: &ExtraFieldsModel) -> String {
