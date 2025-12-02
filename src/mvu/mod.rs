@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use crate::logic::eln::{ArchiveGenre, build_and_write_archive};
 use crate::models::attachment::Attachment;
-use crate::models::extra_fields::{ExtraField, ExtraFieldGroup, ExtraFieldKind};
+use crate::models::extra_fields::{ExtraField, ExtraFieldGroup};
 use crate::models::keywords::Keywords;
 use crate::ui::components::attachments::{
     self, AttachmentsCommand, AttachmentsModel, AttachmentsMsg,
@@ -18,7 +18,6 @@ use crate::ui::components::extra_fields::{
 };
 use crate::ui::components::keywords::{self, KeywordsModel, KeywordsMsg};
 use crate::ui::components::markdown::{MarkdownModel, MarkdownMsg};
-use url::Url;
 
 /// Top-level application state.
 #[derive(Default)]
@@ -299,39 +298,15 @@ fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePaylo
         .map_err(|e| e.to_string())?;
 
     for field in model.extra_fields.fields() {
-        if field.required && field.value.trim().is_empty() {
-            return Err(format!("Field '{}' is required.", field.label));
-        }
-
-        if matches!(field.kind, ExtraFieldKind::Url) && !field.value.trim().is_empty() {
-            let parsed = Url::parse(field.value.trim())
-                .ok()
-                .filter(|u| matches!(u.scheme(), "http" | "https") && u.host_str().is_some());
-            if parsed.is_none() {
-                return Err(format!(
-                    "Field '{}' must be a valid http/https URL.",
-                    field.label
-                ));
-            }
-        }
-
-        if matches!(field.kind, ExtraFieldKind::Number)
-            && !field.value.trim().is_empty()
-            && field.value.trim().parse::<f64>().is_err()
-        {
-            return Err(format!("Field '{}' must be a valid number.", field.label));
-        }
-
-        if matches!(
-            field.kind,
-            ExtraFieldKind::Items | ExtraFieldKind::Experiments | ExtraFieldKind::Users
-        ) && !field.value.trim().is_empty()
-            && field.value.trim().parse::<i64>().is_err()
-        {
-            return Err(format!(
-                "Field '{}' must be a valid integer ID.",
-                field.label
-            ));
+        if let Some(err) = crate::ui::components::extra_fields::validate_field(field) {
+            let msg = match err {
+                "required" => format!("Field '{}' is required.", field.label),
+                "invalid_url" => format!("Field '{}' must be a valid http/https URL.", field.label),
+                "invalid_number" => format!("Field '{}' must be a valid number.", field.label),
+                "invalid_integer" => format!("Field '{}' must be a valid integer ID.", field.label),
+                _ => format!("Field '{}' is invalid.", field.label),
+            };
+            return Err(msg);
         }
     }
 
@@ -354,6 +329,7 @@ mod tests {
     #![allow(clippy::field_reassign_with_default)]
 
     use super::*;
+    use crate::models::extra_fields::ExtraFieldKind;
     use crate::ui::components::extra_fields::ExtraFieldsMsg;
     use std::path::PathBuf;
     use tempfile::TempDir;
