@@ -5,3 +5,39 @@ path = "**.lock"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2025 Alexander Minges"
 SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ".github/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025 Alexander Minges"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "**/*.md"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025 Alexander Minges"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "**/*.yml"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025 Alexander Minges"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "**/*.toml"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025 Alexander Minges"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "**/*.json"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025 Alexander Minges"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "**/*.nix"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025 Alexander Minges"
+SPDX-License-Identifier = "MIT"
