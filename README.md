@@ -78,6 +78,14 @@ This repository follows the [REUSE Software](https://reuse.software/) specificat
 - ELNPack runs locally and does not make outbound network requests.
 - File dialogs use native OS pickers; archives are written only to user-selected locations.
 
+## Windows prerequisites
+
+- The binaries rely on the Microsoft Visual C++ Redistributable v14. On Windows 10+, install the latest package from Microsoft: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
+- For Windows 7 targets (`*-win7-windows-msvc`), use the older 2015–2019 redistributable which still supports Win7:
+  - x64: https://aka.ms/vs/16/release/vc_redist.x64.exe
+  - x86: https://aka.ms/vs/16/release/vc_redist.x86.exe
+- Pick the x86 installer for 32-bit systems.
+
 ## Contributing
 
 We welcome issues and PRs! See [CONTRIBUTING](CONTRIBUTING.md) for coding standards, testing checklist, git hooks, and commit conventions.
