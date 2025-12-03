@@ -1,8 +1,3 @@
-<!--
-SPDX-License-Identifier: MIT
-SPDX-FileCopyrightText: 2025 Alexander Minges
--->
-
 # Contributing to ELNPack
 
 Thanks for your interest in improving ELNPack! This guide keeps contributions consistent and easy to review.

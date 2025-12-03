@@ -1,8 +1,3 @@
-<!--
-SPDX-License-Identifier: MIT
-SPDX-FileCopyrightText: 2025 Alexander Minges
--->
-
 # ELNPack
 
 [![CI](https://github.com/Athemis/ELNPack/actions/workflows/ci.yml/badge.svg)](https://github.com/Athemis/ELNPack/actions/workflows/ci.yml)
