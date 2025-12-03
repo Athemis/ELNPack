@@ -86,12 +86,42 @@ pub fn ensure_extension(mut path: PathBuf, extension: &str) -> PathBuf {
     path
 }
 
-/// Build a RO-Crate archive ZIP containing the experiment text, metadata, and attachments.
+/// Create a RO-Crate ZIP at `output` containing the experiment text, generated RO-Crate JSON-LD metadata, and the provided attachments.
 ///
-/// Creates directories inside the archive, copies attachments with sanitized names,
-/// emits RO-Crate JSON-LD metadata, and writes the final ZIP to `output`.
-/// Parent directories for `output` are created if missing.
-#[allow(clippy::too_many_arguments)]
+/// Parent directories for `output` are created if missing. Attachment filenames are sanitized and checked for duplicates; attachments with a recorded SHA-256 will be rehashed and rejected if the hash no longer matches. The archive contains a root directory, an `experiment/` directory with the body and attachments, and a `ro-crate-metadata.json` graph including per-file `File` nodes and extra fields exported as `PropertyValue` nodes.
+///
+/// Returns `Ok(())` on success or an error describing any I/O, hashing, or metadata construction failure.
+///
+/// # Examples
+///
+/// ```no_run
+/// use time::OffsetDateTime;
+/// // Construct attachments and extra fields according to your application's types,
+/// // then call `build_and_write_archive`.
+/// let output = std::path::Path::new("example.eln");
+/// let title = "My Experiment";
+/// let body = "# Notes\n\nExperiment body";
+/// let attachments: Vec<crate::models::Attachment> = Vec::new();
+/// let extra_fields: Vec<crate::models::ExtraField> = Vec::new();
+/// let extra_groups: Vec<crate::models::ExtraFieldGroup> = Vec::new();
+/// let performed_at = OffsetDateTime::now_utc();
+/// let genre = crate::logic::eln::ArchiveGenre::Experiment;
+/// let keywords: Vec<String> = vec!["test".into()];
+/// let body_format = crate::logic::eln::BodyFormat::Markdown;
+///
+/// crate::logic::eln::build_and_write_archive(
+///     output,
+///     title,
+///     body,
+///     &attachments,
+///     &extra_fields,
+///     &extra_groups,
+///     performed_at,
+///     genre,
+///     &keywords,
+///     body_format,
+/// ).unwrap();
+/// ```
 pub fn build_and_write_archive(
     output: &Path,
     title: &str,
@@ -270,7 +300,27 @@ pub fn build_and_write_archive(
     Ok(())
 }
 
-/// Build PropertyValue nodes and reconstructed eLabFTW JSON for extra fields.
+/// Builds semantic PropertyValue nodes and a reconstructed eLabFTW metadata blob for extra fields.
+///
+/// The function converts each `ExtraField` into a `PropertyValue` JSON node and produces an
+/// additional `PropertyValue` that embeds the full eLabFTW-compatible metadata JSON as a string.
+/// The returned `variable_measured_ids` lists the `@id` values for the metadata blob followed by
+/// each field's PropertyValue `@id`, suitable for inclusion in an experiment's `variableMeasured`.
+///
+/// # Returns
+///
+/// An `ExtraFieldsExport` containing:
+/// - `property_values`: an array of `PropertyValue` JSON objects, one per extra field;
+/// - `metadata_property`: a `PropertyValue` JSON object whose `value` is the eLabFTW metadata JSON string;
+/// - `variable_measured_ids`: an array of `@id` strings (metadata `@id` first, then field `@id`s).
+///
+/// # Examples
+///
+/// ```
+/// let export = build_extra_fields_export(&[], &[]).unwrap();
+/// assert!(export.property_values.is_empty());
+/// assert!(export.variable_measured_ids.len() >= 1); // metadata property id is always present
+/// ```
 fn build_extra_fields_export(
     extra_fields: &[ExtraField],
     extra_groups: &[ExtraFieldGroup],
@@ -332,7 +382,24 @@ fn build_extra_fields_export(
     })
 }
 
-/// Produce the eLabFTW-compatible extra_fields JSON from current state.
+/// Builds a JSON blob compatible with eLabFTW that describes extra fields and groups.
+///
+/// The returned string contains two top-level keys:
+/// - `"elabftw"`: metadata including `display_main_text` and `extra_fields_groups`.
+/// - `"extra_fields"`: a map from field label to the field definition and value.
+///
+/// # Returns
+///
+/// A JSON string containing the eLabFTW-compatible metadata.
+///
+/// # Examples
+///
+/// ```
+/// // Produce minimal eLabFTW metadata with no fields or groups.
+/// let json = reconstruct_elabftw_metadata(&[], &[]).unwrap();
+/// assert!(json.contains(r#""elabftw""#));
+/// assert!(json.contains(r#""extra_fields""#));
+/// ```
 fn reconstruct_elabftw_metadata(
     extra_fields: &[ExtraField],
     extra_groups: &[ExtraFieldGroup],
@@ -456,6 +523,42 @@ enum ValueShape {
     Metadata,
 }
 
+/// Convert an ExtraField's value into a serde_json::Value suitable for export.
+///
+/// The result is:
+/// - a JSON array of strings if the field allows multiple values and `value_multi` is non-empty;
+/// - a JSON string for numeric and default kinds (numbers are exported as strings for compatibility);
+/// - a JSON number when the kind is `Items`, `Experiments`, or `Users` and the value parses as an integer; otherwise a string.
+///
+/// The `shape` parameter is accepted for API compatibility but is not used by this function.
+///
+/// # Examples
+///
+/// ```
+/// # use crate::models::extra_fields::{ExtraField, ExtraFieldKind};
+/// # use serde_json::Value;
+/// // multi-value field
+/// let f_multi = ExtraField {
+///     value: "".to_string(),
+///     value_multi: vec!["a".into(), "b".into()],
+///     allow_multi_values: true,
+///     kind: ExtraFieldKind::Items,
+///     ..Default::default()
+/// };
+/// let v = crate::logic::eln::value_to_json(&f_multi, crate::logic::eln::ValueShape::Property);
+/// assert_eq!(v, Value::Array(vec![Value::String("a".into()), Value::String("b".into())]));
+///
+/// // numeric kind exported as string
+/// let f_num = ExtraField {
+///     value: "3.14".to_string(),
+///     value_multi: Vec::new(),
+///     allow_multi_values: false,
+///     kind: ExtraFieldKind::Number,
+///     ..Default::default()
+/// };
+/// let v2 = crate::logic::eln::value_to_json(&f_num, crate::logic::eln::ValueShape::Property);
+/// assert_eq!(v2, Value::String("3.14".into()));
+/// ```
 fn value_to_json(field: &ExtraField, _shape: ValueShape) -> serde_json::Value {
     if field.allow_multi_values && !field.value_multi.is_empty() {
         return serde_json::Value::Array(
@@ -586,6 +689,19 @@ mod tests {
         );
     }
 
+    /// Verifies building an archive embeds extra fields as eLabFTW-style PropertyValue nodes and a reconstructed `elabftw_metadata` blob.
+    ///
+    /// The test asserts that:
+    /// - the experiment node's `variableMeasured` contains both a per-field `PropertyValue` and the metadata `PropertyValue`,
+    /// - the per-field `PropertyValue` for the "Detector" field has the expected `@type`, `valueReference`, `value`, and `unitText`,
+    /// - the `elabftw_metadata` blob is present and includes the "Detector" field with the expected `type` and `value`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Creates an archive with one select extra field and verifies the ro-crate metadata
+    /// // contains both the PropertyValue node and the elabftw_metadata blob.
+    /// ```
     #[test]
     fn build_and_write_archive_writes_elabftw_style_extra_fields() {
         use tempfile::TempDir;

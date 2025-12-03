@@ -32,6 +32,19 @@ pub enum ExtraFieldKind {
 }
 
 impl ExtraFieldKind {
+    /// Creates an `ExtraFieldKind` from an eLabFTW type token.
+    ///
+    /// Maps known type strings (e.g. `"text"`, `"number"`, `"select"`, `"url"`, `"email"`, `"items"`, `"experiments"`, `"users"`, etc.) to their corresponding `ExtraFieldKind` variants. Unknown tokens are returned as `ExtraFieldKind::Unknown` containing the original string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use crate::models::extra_fields::ExtraFieldKind;
+    ///
+    /// assert_eq!(ExtraFieldKind::from_str("text"), ExtraFieldKind::Text);
+    /// assert_eq!(ExtraFieldKind::from_str("number"), ExtraFieldKind::Number);
+    /// assert_eq!(ExtraFieldKind::from_str("custom-type"), ExtraFieldKind::Unknown("custom-type".to_string()));
+    /// ```
     fn from_str(raw: &str) -> Self {
         match raw {
             "text" => Self::Text,
@@ -98,7 +111,46 @@ impl ExtraField {
     }
 }
 
-/// Pure validation of a single extra field. Returns `Some(reason_code)` when invalid.
+/// Validate a single `ExtraField` and return a reason code when the field is invalid.
+///
+/// Performs required-field checks and kind-specific validations:
+/// - `required`: returns `Some("required")` when the trimmed value is empty.
+/// - `Url`: returns `Some("invalid_url")` if the non-empty value is not an `http`/`https` URL with a host.
+/// - `Number`: returns `Some("invalid_number")` if the non-empty value is not a valid floating-point number.
+/// - `Items`, `Experiments`, `Users`: return `Some("invalid_integer")` if the non-empty value is not a valid integer.
+/// - `Email`: returns `Some("invalid_email")` if the non-empty value is not a valid email address.
+/// For other kinds or when the value is empty (and not required), validation returns `None`.
+///
+/// # Returns
+///
+/// `Some(reason_code)` if the field is invalid, `None` if the field is valid or no validation applies.
+///
+/// # Examples
+///
+/// ```
+/// use crate::models::extra_fields::{ExtraField, ExtraFieldKind, validate_field};
+///
+/// let valid_number = ExtraField {
+///     label: "num".into(),
+///     kind: ExtraFieldKind::Number,
+///     value: "3.14".into(),
+///     value_multi: Vec::new(),
+///     options: Vec::new(),
+///     unit: None,
+///     units: Vec::new(),
+///     position: None,
+///     required: false,
+///     description: None,
+///     allow_multi_values: false,
+///     blank_value_on_duplicate: false,
+///     group_id: None,
+///     readonly: false,
+/// };
+/// assert_eq!(validate_field(&valid_number), None);
+///
+/// let missing_required = ExtraField { required: true, value: "".into(), ..valid_number.clone() };
+/// assert_eq!(validate_field(&missing_required), Some("required"));
+/// ```
 pub fn validate_field(field: &ExtraField) -> Option<&'static str> {
     let value = field.value.trim();
 
@@ -212,7 +264,35 @@ pub struct ExtraFieldsImport {
     pub groups: Vec<ExtraFieldGroup>,
 }
 
-/// Parse the `extra_fields` object from an eLabFTW metadata JSON string.
+/// Parse extra field definitions and groups from an eLabFTW metadata JSON string.
+///
+/// This function deserializes the eLabFTW metadata payload and converts the `extra_fields` map
+/// and `elabftw.extra_fields_groups` into a structured `ExtraFieldsImport` containing normalized
+/// `ExtraField` entries (with single and multi values, options, units, group association, etc.)
+/// and ordered `ExtraFieldGroup` entries. It treats absent or empty shapes as defaults and converts
+/// JSON numbers/strings to the appropriate Rust types where possible.
+///
+/// # Returns
+///
+/// `ExtraFieldsImport` containing parsed `fields` and `groups` on success; returns an error if the
+/// input JSON cannot be parsed as expected.
+///
+/// # Examples
+///
+/// ```
+/// let json = r#"
+/// {
+///   "extra_fields": {
+///     "Notes": { "type": "text", "value": "sample" }
+///   },
+///   "elabftw": { "extra_fields_groups": [] }
+/// }
+/// "#;
+/// let parsed = parse_elabftw_extra_fields(json).unwrap();
+/// assert_eq!(parsed.fields.len(), 1);
+/// assert_eq!(parsed.fields[0].label, "Notes");
+/// assert_eq!(parsed.fields[0].value, "sample");
+/// ```
 pub fn parse_elabftw_extra_fields(json: &str) -> Result<ExtraFieldsImport> {
     let env: ExtraFieldsEnvelope =
         serde_json::from_str(json).context("Failed to parse eLabFTW metadata JSON")?;
@@ -295,6 +375,25 @@ pub fn parse_elabftw_extra_fields(json: &str) -> Result<ExtraFieldsImport> {
     Ok(ExtraFieldsImport { fields, groups })
 }
 
+/// Convert a JSON `Value` reference into an optional `String` representation.
+///
+/// - Returns `None` when `val` is `None`.
+/// - For `Value::String`, returns a cloned string.
+/// - For `Value::Number`, returns the number's string form.
+/// - For `Value::Bool`, returns `"on"` for `true` and an empty string for `false`.
+/// - For all other JSON value types, returns the value's `to_string()` representation.
+///
+/// # Examples
+///
+/// ```
+/// use serde_json::Value;
+///
+/// assert_eq!(super::value_to_string(None), None);
+/// assert_eq!(super::value_to_string(Some(&Value::String("hi".into()))), Some("hi".into()));
+/// assert_eq!(super::value_to_string(Some(&Value::Number(42.into()))), Some("42".into()));
+/// assert_eq!(super::value_to_string(Some(&Value::Bool(true))), Some("on".into()));
+/// assert_eq!(super::value_to_string(Some(&Value::Bool(false))), Some("".into()));
+/// ```
 fn value_to_string(val: Option<&Value>) -> Option<String> {
     match val? {
         Value::String(s) => Some(s.clone()),
