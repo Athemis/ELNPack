@@ -2,6 +2,14 @@
 name = "elnpack"
 version = "0.1.0"
 edition = "2024"
+description = "Lightweight electronic lab notebook (ELN) entry packager that creates .eln archives with Markdown notes, attachments, and RO-Crate metadata."
+license = "MIT"
+authors = ["Alexander Minges"]
+repository = "https://github.com/Athemis/ELNPack"
+homepage = "https://github.com/Athemis/ELNPack"
+readme = "README.md"
+keywords = ["science", "eln", "electronic-lab-notebook", "ro-crate", "research-data-management", "egui"]
+
 
 [dependencies]
 eframe = "0.33"
@@ -34,3 +42,8 @@ tempfile = "3.14"
 lto = "thin"
 panic = "abort"
 strip = "symbols"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
