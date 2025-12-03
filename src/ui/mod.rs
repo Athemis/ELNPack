@@ -65,13 +65,6 @@ impl eframe::App for ElnPackApp {
     /// - `ctx` - The egui context used to build and render UI components.
     /// - `_frame` - The eframe frame provided by the runtime (unused by this implementation).
     ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// // The eframe runtime calls `update` automatically; an app implements it as shown:
-    /// let mut app = ElnPackApp::default();
-    /// // eframe::run_native(...) will invoke `app.update(&ctx, &mut frame)` as part of the GUI loop.
-    /// ```
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.ensure_spacing(ctx);
 
@@ -168,15 +161,6 @@ impl ElnPackApp {
     /// Adds a 2.0-point vertical spacer, then inserts egui's built-in global theme
     /// preference switch into the provided UI.
     ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// // Called from within an egui UI callback:
-    /// // egui::CentralPanel::default().show(&ctx, |ui| {
-    /// //     let mut app = ElnPackApp::default();
-    /// //     app.render_theme_controls(ui);
-    /// // });
-    /// ```
     fn render_theme_controls(&mut self, ui: &mut egui::Ui) {
         ui.add_space(2.0);
         egui::widgets::global_theme_preference_switch(ui);
@@ -186,16 +170,6 @@ impl ElnPackApp {
     ///
     /// The button is enabled only when the entry title is not empty and there are no invalid extra fields. When the user selects a file the chosen path is normalized to have the `.eln` extension and a `Msg::SaveRequested(path)` is queued; if the dialog is cancelled a `Msg::SaveCancelled` is queued.
     ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # use crate::ElnPackApp;
-    /// # // This example illustrates how to call the method from an egui UI callback.
-    /// # let mut app = ElnPackApp::default();
-    /// # // In a real application `ui` is provided by egui within a frame.
-    /// # let mut ui: egui::Ui = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
-    /// // app.render_save_button(&mut ui);
-    /// ```
     fn render_save_button(&mut self, ui: &mut egui::Ui) {
         let save_enabled = !self.model.entry_title.trim().is_empty()
             && !self.model.extra_fields.has_invalid_fields();
@@ -317,13 +291,6 @@ impl ElnPackApp {
     ///
     /// The view is produced by `extra_fields::view` and each returned message is wrapped and appended to `self.inbox`.
     ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// let mut app = ElnPackApp::default();
-    /// // inside an egui UI callback:
-    /// // app.render_extra_fields_section(&mut ui);
-    /// ```
     fn render_extra_fields_section(&mut self, ui: &mut egui::Ui) {
         let msgs = extra_fields::view(ui, &self.model.extra_fields);
         self.inbox.extend(msgs.into_iter().map(Msg::ExtraFields));
@@ -333,12 +300,6 @@ impl ElnPackApp {
     ///
     /// The currently selected genre is highlighted; clicking a button enqueues a `Msg::SetGenre` corresponding to the chosen genre.
     ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// // Given `app: &mut ElnPackApp` and `ui: &mut egui::Ui`:
-    /// // app.render_entry_type(ui);
-    /// ```
     fn render_entry_type(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             let exp = egui::Button::new("Experiment")

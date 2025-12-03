@@ -8,6 +8,18 @@ use eframe::egui;
 use egui_phosphor::Variant;
 
 /// Bootstrap the desktop application and run the main egui event loop.
+///
+/// # Errors
+///
+/// Propagates any failure from `eframe::run_native`, such as window creation errors.
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// fn main() -> eframe::Result<()> {
+///     elnpack::app::run()
+/// }
+/// ```
 pub fn run() -> eframe::Result<()> {
     // Register Phosphor icon font.
     let mut fonts = egui::FontDefinitions::default();

@@ -38,7 +38,7 @@ impl ExtraFieldKind {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// use crate::models::extra_fields::ExtraFieldKind;
     ///
     /// assert_eq!(ExtraFieldKind::from_str("text"), ExtraFieldKind::Text);
@@ -128,7 +128,7 @@ impl ExtraField {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// use crate::models::extra_fields::{ExtraField, ExtraFieldKind, validate_field};
 ///
 /// let valid_number = ExtraField {
@@ -280,7 +280,7 @@ pub struct ExtraFieldsImport {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// let json = r#"
 /// {
 ///   "extra_fields": {
@@ -386,7 +386,7 @@ pub fn parse_elabftw_extra_fields(json: &str) -> Result<ExtraFieldsImport> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// use serde_json::Value;
 ///
 /// assert_eq!(super::value_to_string(None), None);

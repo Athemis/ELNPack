@@ -30,11 +30,11 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-stable-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Install stable toolchain
+      - name: Install toolchain
         uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e
         with:
           toolchain: stable
@@ -63,6 +63,9 @@ jobs:
             linux: true
             pkg_config_libdir: ""
             multilib: false
+            toolchain: stable
+            build_std_flag: ""
+            install_target: true
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             archive: zip
@@ -70,6 +73,19 @@ jobs:
             linux: false
             pkg_config_libdir: ""
             multilib: false
+            toolchain: stable
+            build_std_flag: ""
+            install_target: true
+          - runner: windows-latest
+            target: x86_64-win7-windows-msvc
+            archive: zip
+            rustflags: ""
+            linux: false
+            pkg_config_libdir: ""
+            multilib: false
+            toolchain: nightly
+            build_std_flag: "-Z build-std"
+            install_target: false
           - runner: ubuntu-latest
             target: i686-unknown-linux-gnu
             archive: tar.gz
@@ -77,6 +93,9 @@ jobs:
             linux: true
             pkg_config_libdir: "/usr/lib/i386-linux-gnu/pkgconfig"
             multilib: true
+            toolchain: stable
+            build_std_flag: ""
+            install_target: true
           - runner: windows-latest
             target: i686-pc-windows-msvc
             archive: zip
@@ -84,6 +103,19 @@ jobs:
             linux: false
             pkg_config_libdir: ""
             multilib: false
+            toolchain: stable
+            build_std_flag: ""
+            install_target: true
+          - runner: windows-latest
+            target: i686-win7-windows-msvc
+            archive: zip
+            rustflags: ""
+            linux: false
+            pkg_config_libdir: ""
+            multilib: false
+            toolchain: nightly
+            build_std_flag: "-Z build-std"
+            install_target: false
     runs-on: ${{ matrix.runner }}
     env:
       TARGET: ${{ matrix.target }}
@@ -93,15 +125,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set safe ref name
+      - name: Set safe ref name (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $safe = $env:GITHUB_REF_NAME -replace '/', '-'
+          Add-Content -Path $env:GITHUB_ENV -Value "SAFE_REF=$safe"
+
+      - name: Set safe ref name (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: echo "SAFE_REF=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_ENV"
 
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@7b1c307e0dcbda6122208f10795a713336a9b35a
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e
         with:
-          toolchain: stable
-          target: ${{ matrix.target }}
+          toolchain: ${{ matrix.toolchain }}
+
+      - name: Add target
+        if: matrix.install_target
+        run: rustup target add ${{ matrix.target }} --toolchain ${{ matrix.toolchain }}
+
+      - name: Add rust-src component
+        if: matrix.build_std_flag != ''
+        run: rustup component add rust-src --toolchain ${{ matrix.toolchain }}
 
       - name: Install Linux build deps
         if: matrix.linux
@@ -131,18 +178,18 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ matrix.toolchain }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
       - name: Build release
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo +${{ matrix.toolchain }} build ${{ matrix.build_std_flag }} --release --target ${{ matrix.target }}
 
       - name: Package artifact (Linux)
         if: matrix.archive == 'tar.gz'
         run: |
           bin_path=target/$TARGET/release/elnpack
-          pkg_dir=package-linux
+          pkg_dir=package-${{ runner.os }}
           mkdir -p "$pkg_dir"
           cp "$bin_path" "$pkg_dir/"
           cp README.md LICENSE "$pkg_dir/"
@@ -153,7 +200,7 @@ jobs:
         shell: pwsh
         run: |
           $binPath = "target/${env:TARGET}/release/elnpack.exe"
-          $pkgDir = "package-windows"
+          $pkgDir = "package-${env:RUNNER_OS}"
           New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
           Copy-Item $binPath "$pkgDir/"
           Copy-Item "README.md","LICENSE" "$pkgDir/"

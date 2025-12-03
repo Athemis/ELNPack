@@ -25,6 +25,25 @@ pub struct Attachment {
 
 impl Attachment {
     /// Construct a new attachment with pre-sanitized metadata.
+    ///
+    /// The caller must provide a name that is already filesystem-safe and
+    /// unique within the archive.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use std::path::PathBuf;
+    /// use elnpack::models::attachment::Attachment;
+    ///
+    /// let att = Attachment::new(
+    ///     PathBuf::from("/tmp/note.txt"),
+    ///     "note.txt".into(),
+    ///     "text/plain".into(),
+    ///     "unavailable".into(),
+    ///     42,
+    /// );
+    /// assert_eq!(att.sanitized_name, "note.txt");
+    /// ```
     pub fn new(
         path: PathBuf,
         sanitized_name: String,
@@ -43,6 +62,23 @@ impl Attachment {
 }
 
 /// Ensure there are no duplicate archive paths produced by sanitized names.
+///
+/// # Errors
+///
+/// Returns an error when two attachments share the same `sanitized_name`.
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use std::path::PathBuf;
+/// use elnpack::models::attachment::{Attachment, assert_unique_sanitized_names};
+///
+/// let attachments = vec![
+///     Attachment::new(PathBuf::from("a.txt"), "a.txt".into(), "text/plain".into(), "unavailable".into(), 1),
+///     Attachment::new(PathBuf::from("b.txt"), "a.txt".into(), "text/plain".into(), "unavailable".into(), 1),
+/// ];
+/// assert!(assert_unique_sanitized_names(&attachments).is_err());
+/// ```
 pub fn assert_unique_sanitized_names(attachments: &[Attachment]) -> Result<()> {
     let mut seen = HashSet::new();
     for att in attachments {
