@@ -122,6 +122,9 @@ pub fn update(
             None
         }
         AttachmentsMsg::FilesPicked(paths) => {
+            if paths.is_empty() {
+                return None;
+            }
             for path in paths {
                 cmds.push(AttachmentsCommand::HashFile { path });
             }
