@@ -1982,40 +1982,7 @@ mod tests {
     }
 
     #[test]
-    fn removing_last_group_recreates_default_and_reassigns() {
-        let mut model = ExtraFieldsModel::default();
-        model.groups.push(ExtraFieldGroup {
-            id: 5,
-            name: "Only".into(),
-            position: 0,
-        });
-        model.fields.push(ExtraField {
-            label: "F".into(),
-            kind: ExtraFieldKind::Text,
-            value: "v".into(),
-            value_multi: Vec::new(),
-            options: vec![],
-            unit: None,
-            units: vec![],
-            position: None,
-            required: false,
-            description: None,
-            allow_multi_values: false,
-            blank_value_on_duplicate: false,
-            group_id: Some(5),
-            readonly: false,
-        });
-
-        let mut cmds = Vec::new();
-        let _ = update(&mut model, ExtraFieldsMsg::RemoveGroup(0), &mut cmds);
-
-        assert_eq!(model.groups.len(), 1);
-        assert_eq!(model.groups[0].name, "Default");
-        assert_eq!(model.fields[0].group_id, Some(model.groups[0].id));
-    }
-
-    #[test]
-    fn removing_only_group_renames_to_default() {
+    fn removing_only_group_renames_to_default_preserves_id() {
         let mut model = ExtraFieldsModel::default();
         model.groups.push(ExtraFieldGroup {
             id: 7,
