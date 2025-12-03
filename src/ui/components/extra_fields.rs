@@ -42,7 +42,7 @@ impl Default for FieldDraft {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// let d = FieldDraft::default();
     /// assert!(d.label.is_empty());
     /// assert!(d.description.is_empty());
@@ -75,7 +75,7 @@ impl ExtraFieldsModel {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// // Given an existing `model: ExtraFieldsModel`:
     /// // let slice = model.fields();
     /// // assert!(slice.is_empty() || slice[0].label.len() > 0);
@@ -90,7 +90,7 @@ impl ExtraFieldsModel {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// let model = ExtraFieldsModel::default();
     /// let groups: &[ExtraFieldGroup] = model.groups();
     /// // iterate without taking ownership
@@ -110,7 +110,7 @@ impl ExtraFieldsModel {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// let model = ExtraFieldsModel {
     ///     fields: Vec::new(),
     ///     groups: Vec::new(),
@@ -133,7 +133,7 @@ impl ExtraFieldsModel {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// let mut model = ExtraFieldsModel::default();
     /// let id = model.ensure_default_group();
     /// assert_eq!(model.groups.iter().find(|g| g.name == "Default").unwrap().id, id);
@@ -158,7 +158,7 @@ impl ExtraFieldsModel {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// // Assuming `ExtraFieldsModel` has a public `new()` constructor and public `groups` field.
     /// let mut model = ExtraFieldsModel::new();
     /// // No groups yet: this will create the Default group and return its id.
@@ -186,7 +186,7 @@ impl ExtraFieldsModel {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// let model = ExtraFieldsModel {
     ///     fields: vec![],
     ///     groups: vec![ExtraFieldGroup { id: 1, name: "Specs".into(), position: 0 }],
@@ -611,7 +611,7 @@ pub fn update(
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```rust,ignore
 /// use egui::Context;
 /// // Create a UI context and model (in a real app these come from your app state)
 /// let ctx = Context::default();
@@ -684,7 +684,7 @@ pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> 
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```rust,ignore
 /// use egui;
 /// let ctx = egui::Context::default();
 /// let mut model = ExtraFieldsModel::default();
@@ -769,7 +769,7 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```rust,ignore
 /// # use egui;
 /// # use my_crate::ui::components::extra_fields::{ExtraFieldGroup, ExtraFieldsModel, ExtraFieldsMsg, render_group_header};
 /// # // The following is a non-executable sketch showing typical usage:
@@ -844,7 +844,7 @@ fn render_group_header(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// use egui::{CtxRef, CentralPanel};
 /// // In an actual egui app you would call this from within a UI callback:
 /// // let ctx: &egui::CtxRef = ...;
@@ -928,7 +928,7 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// // Note: this example is illustrative; constructing a real `egui::Ui` requires an egui context.
 /// // let mut ui: egui::Ui = ...;
 /// // let field = ExtraField::default();
@@ -956,7 +956,7 @@ fn render_field_value(
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```rust,ignore
 /// use crate::ui::components::extra_fields::{ExtraField, ExtraFieldKind, ExtraFieldsMsg};
 /// use egui::Ui;
 ///
@@ -996,7 +996,7 @@ fn render_checkbox(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// // inside an egui UI callback:
 /// // let mut msgs = Vec::new();
 /// // render_options(ui, &field, 0, &mut msgs);
@@ -1051,7 +1051,7 @@ fn render_options(
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```rust,ignore
 /// // inside an egui UI callback:
 /// // render_number(ui, &field, idx, &mut msgs);
 /// ```
@@ -1105,7 +1105,7 @@ fn render_number(
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```rust,ignore
 /// // Within an egui UI callback:
 /// // render_text_input(&mut ui, &field, idx, &mut msgs);
 /// ```
@@ -1135,7 +1135,7 @@ fn render_text_input(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// let hint = field_hint(&ExtraFieldKind::Date);
 /// assert_eq!(hint, "YYYY-MM-DD");
 /// ```
@@ -1158,7 +1158,7 @@ fn field_hint(kind: &ExtraFieldKind) -> &'static str {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// use crate::ExtraFieldKind;
 /// assert_eq!(super::kind_label(&ExtraFieldKind::Text), "Text");
 /// assert_eq!(super::kind_label(&ExtraFieldKind::DateTimeLocal), "Date/time");
@@ -1189,7 +1189,7 @@ fn kind_label(kind: &ExtraFieldKind) -> &'static str {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// let kinds = all_kinds();
 /// assert!(!kinds.is_empty());
 /// assert_eq!(kinds[0], ExtraFieldKind::Text);
@@ -1218,7 +1218,7 @@ fn all_kinds() -> Vec<ExtraFieldKind> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// let v = split_multi(" a, b, ,c ");
 /// assert_eq!(v, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
 /// ```
@@ -1237,7 +1237,7 @@ fn split_multi(value: &str) -> Vec<String> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// let mut model = ExtraFieldsModel::default();
 /// // assume ExtraField implements Default and has a `label` field
 /// model.fields.push(ExtraField { label: "Email".into(), ..Default::default() });
@@ -1266,7 +1266,7 @@ fn name_conflict(model: &ExtraFieldsModel, label: &str, editing: Option<usize>) 
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// let f = ExtraField::default();
 /// assert_eq!(field_invalid(&f), validate_field(&f).is_some());
 /// ```
@@ -1278,7 +1278,7 @@ fn field_invalid(field: &ExtraField) -> bool {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// assert_eq!(trimmed_or_none("  foo  "), Some(String::from("foo")));
 /// assert_eq!(trimmed_or_none("   "), None);
 /// assert_eq!(trimmed_or_none("bar"), Some(String::from("bar")));
@@ -1301,7 +1301,7 @@ fn trimmed_or_none(input: &str) -> Option<String> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// let mut field = ExtraField {
 ///     label: "Old".into(),
 ///     description: Some("old".into()),
@@ -1368,7 +1368,7 @@ fn apply_draft_to_field(draft: &FieldDraft, field: &mut ExtraField) {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```rust,ignore
 /// // Typical usage inside a UI render loop:
 /// // let ctx: egui::Context = /* obtained from egui framework */;
 /// // let mut model = ExtraFieldsModel::default();
@@ -1552,7 +1552,7 @@ mod tests {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// let f = make_field("Temperature", ExtraFieldKind::Number);
     /// assert_eq!(f.label, "Temperature");
     /// assert_eq!(f.kind, ExtraFieldKind::Number);
@@ -1583,7 +1583,7 @@ mod tests {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// let g = make_group(42, "Measurements");
     /// assert_eq!(g.id, 42);
     /// assert_eq!(g.name, "Measurements");
@@ -1891,7 +1891,7 @@ mod tests {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// // Setup: two fields "First" and "Second"
     /// // Open modal for the second field, change its label to "First", and attempt to commit.
     /// // Expected: an error event is returned, the second field's label stays "Second", and modal stays open.

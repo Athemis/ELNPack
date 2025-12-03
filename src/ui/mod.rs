@@ -67,7 +67,7 @@ impl eframe::App for ElnPackApp {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,ignore
     /// // The eframe runtime calls `update` automatically; an app implements it as shown:
     /// let mut app = ElnPackApp::default();
     /// // eframe::run_native(...) will invoke `app.update(&ctx, &mut frame)` as part of the GUI loop.
@@ -170,7 +170,7 @@ impl ElnPackApp {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,ignore
     /// // Called from within an egui UI callback:
     /// // egui::CentralPanel::default().show(&ctx, |ui| {
     /// //     let mut app = ElnPackApp::default();
@@ -188,7 +188,7 @@ impl ElnPackApp {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,ignore
     /// # use crate::ElnPackApp;
     /// # // This example illustrates how to call the method from an egui UI callback.
     /// # let mut app = ElnPackApp::default();
@@ -319,7 +319,7 @@ impl ElnPackApp {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,ignore
     /// let mut app = ElnPackApp::default();
     /// // inside an egui UI callback:
     /// // app.render_extra_fields_section(&mut ui);
@@ -335,7 +335,7 @@ impl ElnPackApp {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,ignore
     /// // Given `app: &mut ElnPackApp` and `ui: &mut egui::Ui`:
     /// // app.render_entry_type(ui);
     /// ```

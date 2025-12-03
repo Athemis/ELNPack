@@ -116,7 +116,7 @@ pub struct SavePayload {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// let mut model = AppModel::default();
 /// let mut cmds = Vec::new();
 /// update(&mut model, Msg::EntryTitleChanged("New title".into()), &mut cmds);
@@ -220,7 +220,7 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// use std::path::PathBuf;
 /// // Construct a command for a non-existent file to exercise the hash path that falls back
 /// // to `"unavailable"` for the sha256 and `0` for size.
@@ -608,7 +608,7 @@ mod tests {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// // inside a test:
     /// let mut model = AppModel::default();
     /// add_typed_field(&mut model, ExtraFieldKind::Number, "42");

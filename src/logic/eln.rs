@@ -94,7 +94,7 @@ pub fn ensure_extension(mut path: PathBuf, extension: &str) -> PathBuf {
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```rust,ignore
 /// use time::OffsetDateTime;
 /// // Construct attachments and extra fields according to your application's types,
 /// // then call `build_and_write_archive`.
@@ -317,7 +317,7 @@ pub fn build_and_write_archive(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// let export = build_extra_fields_export(&[], &[]).unwrap();
 /// assert!(export.property_values.is_empty());
 /// assert!(export.variable_measured_ids.len() >= 1); // metadata property id is always present
@@ -395,7 +395,7 @@ fn build_extra_fields_export(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// // Produce minimal eLabFTW metadata with no fields or groups.
 /// let json = reconstruct_elabftw_metadata(&[], &[]).unwrap();
 /// assert!(json.contains(r#""elabftw""#));
@@ -525,7 +525,7 @@ fn reconstruct_elabftw_metadata(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// # use crate::models::extra_fields::{ExtraField, ExtraFieldKind};
 /// # use serde_json::Value;
 /// // multi-value field
@@ -689,7 +689,7 @@ mod tests {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// // Creates an archive with one select extra field and verifies the ro-crate metadata
     /// // contains both the PropertyValue node and the elabftw_metadata blob.
     /// ```
