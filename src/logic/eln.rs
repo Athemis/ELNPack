@@ -516,15 +516,12 @@ fn reconstruct_elabftw_metadata(
     Ok(json)
 }
 
-/// Convert a field's value into the most appropriate JSON type.
-/// Convert an ExtraField's value into a serde_json::Value suitable for export.
+/// Convert an `ExtraField` value into a serde_json::Value suitable for export.
 ///
 /// The result is:
 /// - a JSON array of strings if the field allows multiple values and `value_multi` is non-empty;
 /// - a JSON string for numeric and default kinds (numbers are exported as strings for compatibility);
 /// - a JSON number when the kind is `Items`, `Experiments`, or `Users` and the value parses as an integer; otherwise a string.
-///
-/// The `shape` parameter is accepted for API compatibility but is not used by this function.
 ///
 /// # Examples
 ///
