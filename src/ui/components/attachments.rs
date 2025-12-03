@@ -122,6 +122,9 @@ pub fn update(
             None
         }
         AttachmentsMsg::FilesPicked(paths) => {
+            if paths.is_empty() {
+                return None;
+            }
             for path in paths {
                 cmds.push(AttachmentsCommand::HashFile { path });
             }
@@ -465,7 +468,6 @@ fn commit_filename_edit(model: &mut AttachmentsModel) -> Option<AttachmentsEvent
 }
 
 /// Return true when the path extension is a supported raster or SVG image.
-/// Return true when the path extension is a supported raster or SVG image.
 fn is_image(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
@@ -477,7 +479,6 @@ fn is_image(path: &Path) -> bool {
         })
 }
 
-/// Return true when the path extension is SVG.
 /// Return true when the path extension is SVG.
 fn is_svg(path: &Path) -> bool {
     path.extension()
