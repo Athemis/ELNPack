@@ -350,7 +350,7 @@ fn build_extra_fields_export(
             "valueReference".into(),
             serde_json::Value::String(field.kind.as_str().to_string()),
         );
-        node.insert("value".into(), value_to_json(field, ValueShape::Property));
+        node.insert("value".into(), value_to_json(field));
 
         if let Some(unit) = &field.unit {
             node.insert("unitText".into(), serde_json::Value::String(unit.clone()));
@@ -464,7 +464,7 @@ fn reconstruct_elabftw_metadata(
                 ),
             );
         } else {
-            obj.insert("value".into(), value_to_json(field, ValueShape::Metadata));
+            obj.insert("value".into(), value_to_json(field));
         }
 
         if let Some(position) = field.position {
@@ -517,13 +517,6 @@ fn reconstruct_elabftw_metadata(
 }
 
 /// Convert a field's value into the most appropriate JSON type.
-enum ValueShape {
-    /// Shape used in PropertyValue nodes.
-    Property,
-    /// Shape used in the embedded eLabFTW metadata JSON.
-    Metadata,
-}
-
 /// Convert an ExtraField's value into a serde_json::Value suitable for export.
 ///
 /// The result is:
@@ -546,7 +539,7 @@ enum ValueShape {
 ///     kind: ExtraFieldKind::Items,
 ///     ..Default::default()
 /// };
-/// let v = crate::logic::eln::value_to_json(&f_multi, crate::logic::eln::ValueShape::Property);
+/// let v = crate::logic::eln::value_to_json(&f_multi);
 /// assert_eq!(v, Value::Array(vec![Value::String("a".into()), Value::String("b".into())]));
 ///
 /// // numeric kind exported as string
@@ -557,10 +550,10 @@ enum ValueShape {
 ///     kind: ExtraFieldKind::Number,
 ///     ..Default::default()
 /// };
-/// let v2 = crate::logic::eln::value_to_json(&f_num, crate::logic::eln::ValueShape::Property);
+/// let v2 = crate::logic::eln::value_to_json(&f_num);
 /// assert_eq!(v2, Value::String("3.14".into()));
 /// ```
-fn value_to_json(field: &ExtraField, _shape: ValueShape) -> serde_json::Value {
+fn value_to_json(field: &ExtraField) -> serde_json::Value {
     if field.allow_multi_values && !field.value_multi.is_empty() {
         return serde_json::Value::Array(
             field
