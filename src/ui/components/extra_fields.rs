@@ -675,7 +675,7 @@ pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> 
 ///
 /// Renders each group in `model.groups` as a collapsible header containing its fields; when there are
 /// no groups and no fields a muted placeholder label is shown. User actions in the rendered controls
-/// (for example "Add field to &lt;group&gt;") are pushed into `msgs`.
+/// (for example "Add field to `<group>`") are pushed into `msgs`.
 ///
 /// # Examples
 ///

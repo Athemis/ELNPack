@@ -526,21 +526,39 @@ fn reconstruct_elabftw_metadata(
 /// # use crate::models::extra_fields::{ExtraField, ExtraFieldKind};
 /// # use serde_json::Value;
 /// let f_multi = ExtraField {
-///     value: "".to_string(),
-///     value_multi: vec!["a".into(), "b".into()],
-///     allow_multi_values: true,
+///     label: "Multi".into(),
 ///     kind: ExtraFieldKind::Items,
-///     ..Default::default()
+///     value: String::new(),
+///     value_multi: vec!["a".into(), "b".into()],
+///     options: Vec::new(),
+///     unit: None,
+///     units: Vec::new(),
+///     position: None,
+///     required: false,
+///     description: None,
+///     allow_multi_values: true,
+///     blank_value_on_duplicate: false,
+///     group_id: None,
+///     readonly: false,
 /// };
 /// let v = crate::logic::eln::value_to_json(&f_multi);
 /// assert_eq!(v, Value::Array(vec![Value::String("a".into()), Value::String("b".into())]));
 ///
 /// let f_num = ExtraField {
+///     label: "Number".into(),
+///     kind: ExtraFieldKind::Number,
 ///     value: "3.14".to_string(),
 ///     value_multi: Vec::new(),
+///     options: Vec::new(),
+///     unit: None,
+///     units: Vec::new(),
+///     position: None,
+///     required: false,
+///     description: None,
 ///     allow_multi_values: false,
-///     kind: ExtraFieldKind::Number,
-///     ..Default::default()
+///     blank_value_on_duplicate: false,
+///     group_id: None,
+///     readonly: false,
 /// };
 /// let v2 = crate::logic::eln::value_to_json(&f_num);
 /// assert_eq!(v2, Value::String("3.14".into()));

@@ -222,7 +222,7 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
 ///
 /// ```rust,ignore
 /// use std::path::PathBuf;
-/// let cmd = crate::mvu::Command::HashFile { path: PathBuf::from("nonexistent"), _retry: 0 };
+/// let cmd = crate::mvu::Command::HashFile { path: PathBuf::from("nonexistent"), _retry: false };
 /// match crate::mvu::run_command(cmd) {
 ///     crate::mvu::Msg::Attachments(crate::mvu::AttachmentsMsg::HashComputed { sha256, size, .. }) => {
 ///         assert_eq!(sha256, "unavailable");
