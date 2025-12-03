@@ -36,13 +36,13 @@ impl Attachment {
     /// use elnpack::models::attachment::Attachment;
     ///
     /// let att = Attachment::new(
-    ///     PathBuf::from(\"/tmp/note.txt\"),
-    ///     \"note.txt\".into(),
-    ///     \"text/plain\".into(),
-    ///     \"unavailable\".into(),
+    ///     PathBuf::from("/tmp/note.txt"),
+    ///     "note.txt".into(),
+    ///     "text/plain".into(),
+    ///     "unavailable".into(),
     ///     42,
     /// );
-    /// assert_eq!(att.sanitized_name, \"note.txt\");
+    /// assert_eq!(att.sanitized_name, "note.txt");
     /// ```
     pub fn new(
         path: PathBuf,
@@ -74,8 +74,8 @@ impl Attachment {
 /// use elnpack::models::attachment::{Attachment, assert_unique_sanitized_names};
 ///
 /// let attachments = vec![
-///     Attachment::new(PathBuf::from(\"a.txt\"), \"a.txt\".into(), \"text/plain\".into(), \"unavailable\".into(), 1),
-///     Attachment::new(PathBuf::from(\"b.txt\"), \"a.txt\".into(), \"text/plain\".into(), \"unavailable\".into(), 1),
+///     Attachment::new(PathBuf::from("a.txt"), "a.txt".into(), "text/plain".into(), "unavailable".into(), 1),
+///     Attachment::new(PathBuf::from("b.txt"), "a.txt".into(), "text/plain".into(), "unavailable".into(), 1),
 /// ];
 /// assert!(assert_unique_sanitized_names(&attachments).is_err());
 /// ```

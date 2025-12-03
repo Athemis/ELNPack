@@ -20,8 +20,8 @@
 /// ```rust,ignore
 /// use elnpack::utils::sanitize_component;
 ///
-/// assert_eq!(sanitize_component(\"Ångström data.csv\"), \"Angstrom_data.csv\");
-/// assert_eq!(sanitize_component(\"CON\"), \"CON_\");
+/// assert_eq!(sanitize_component("Ångström data.csv"), "Angstrom_data.csv");
+/// assert_eq!(sanitize_component("CON"), "CON_");
 /// ```
 pub fn sanitize_component(value: &str) -> String {
     // Step 1: transliterate to ASCII to avoid multi-byte surprises.

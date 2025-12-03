@@ -222,8 +222,6 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
 ///
 /// ```rust,ignore
 /// use std::path::PathBuf;
-/// // Construct a command for a non-existent file to exercise the hash path that falls back
-/// // to `"unavailable"` for the sha256 and `0` for size.
 /// let cmd = crate::mvu::Command::HashFile { path: PathBuf::from("nonexistent"), _retry: 0 };
 /// match crate::mvu::run_command(cmd) {
 ///     crate::mvu::Msg::Attachments(crate::mvu::AttachmentsMsg::HashComputed { sha256, size, .. }) => {
@@ -609,7 +607,6 @@ mod tests {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// // inside a test:
     /// let mut model = AppModel::default();
     /// add_typed_field(&mut model, ExtraFieldKind::Number, "42");
     /// assert_eq!(model.extra_fields.fields.len(), 1);

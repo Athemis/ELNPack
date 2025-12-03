@@ -76,9 +76,11 @@ impl ExtraFieldsModel {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// // Given an existing `model: ExtraFieldsModel`:
-    /// // let slice = model.fields();
-    /// // assert!(slice.is_empty() || slice[0].label.len() > 0);
+    /// use elnpack::ui::components::extra_fields::ExtraFieldsModel;
+    ///
+    /// let model = ExtraFieldsModel::default();
+    /// let slice = model.fields();
+    /// assert!(slice.is_empty());
     /// ```
     pub fn fields(&self) -> &[ExtraField] {
         &self.fields
@@ -93,7 +95,6 @@ impl ExtraFieldsModel {
     /// ```rust,ignore
     /// let model = ExtraFieldsModel::default();
     /// let groups: &[ExtraFieldGroup] = model.groups();
-    /// // iterate without taking ownership
     /// for g in groups {
     ///     println!("{}", g.name);
     /// }
@@ -159,13 +160,10 @@ impl ExtraFieldsModel {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// // Assuming `ExtraFieldsModel` has a public `new()` constructor and public `groups` field.
     /// let mut model = ExtraFieldsModel::new();
-    /// // No groups yet: this will create the Default group and return its id.
     /// let default_id = model.lowest_position_group_id();
     /// assert!(model.groups.iter().any(|g| g.id == default_id));
     ///
-    /// // When multiple groups exist, returns the one with the lowest position (tie-broken by id).
     /// model.groups.push(ExtraFieldGroup { id: 10, position: 1, name: "A".into() });
     /// model.groups.push(ExtraFieldGroup { id: 5, position: 1, name: "B".into() });
     /// let chosen = model.lowest_position_group_id();
@@ -613,13 +611,10 @@ pub fn update(
 ///
 /// ```rust,ignore
 /// use egui::Context;
-/// // Create a UI context and model (in a real app these come from your app state)
 /// let ctx = Context::default();
 /// let mut model = crate::ui::components::extra_fields::ExtraFieldsModel::default();
-/// // Render once to collect messages (in a real app this happens inside your frame)
 /// let mut ui = ctx.begin_frame(Default::default());
 /// let msgs = crate::ui::components::extra_fields::view(&mut ui, &model);
-/// // msgs now contains any actions the user performed during the render
 /// ```
 pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> {
     let mut msgs = Vec::new();
@@ -680,7 +675,7 @@ pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> 
 ///
 /// Renders each group in `model.groups` as a collapsible header containing its fields; when there are
 /// no groups and no fields a muted placeholder label is shown. User actions in the rendered controls
-/// (for example "Add field to <group>") are pushed into `msgs`.
+/// (for example "Add field to &lt;group&gt;") are pushed into `msgs`.
 ///
 /// # Examples
 ///
@@ -694,7 +689,6 @@ pub fn view(ui: &mut egui::Ui, model: &ExtraFieldsModel) -> Vec<ExtraFieldsMsg> 
 ///     render_fields(ui, &model, &mut msgs);
 /// });
 ///
-/// // No interaction in this example, so no messages were produced.
 /// assert!(msgs.is_empty());
 /// ```
 fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<ExtraFieldsMsg>) {
@@ -777,8 +771,6 @@ fn render_fields(ui: &mut egui::Ui, model: &ExtraFieldsModel, msgs: &mut Vec<Ext
 /// # let group = ExtraFieldGroup { id: 1, name: "Default".into(), position: 0 };
 /// # let model = ExtraFieldsModel::default();
 /// let mut msgs = Vec::new();
-/// // render_group_header(&mut ui, &group, &mut msgs, &model);
-/// // After calling, `msgs` may contain messages produced by user interaction.
 /// ```
 fn render_group_header(
     ui: &mut egui::Ui,
@@ -846,13 +838,6 @@ fn render_group_header(
 ///
 /// ```rust,ignore
 /// use egui::{CtxRef, CentralPanel};
-/// // In an actual egui app you would call this from within a UI callback:
-/// // let ctx: &egui::CtxRef = ...;
-/// // CentralPanel::default().show(ctx, |ui| {
-/// //     let field = ExtraField::default(); // construct a test field
-/// //     let mut msgs = Vec::new();
-/// //     render_field(ui, &field, 0, &mut msgs);
-/// // });
 /// ```
 fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Vec<ExtraFieldsMsg>) {
     let invalid = field_invalid(field);
@@ -929,11 +914,10 @@ fn render_field(ui: &mut egui::Ui, field: &ExtraField, idx: usize, msgs: &mut Ve
 /// # Examples
 ///
 /// ```rust,ignore
-/// // Note: this example is illustrative; constructing a real `egui::Ui` requires an egui context.
-/// // let mut ui: egui::Ui = ...;
-/// // let field = ExtraField::default();
-/// // let mut msgs = Vec::new();
-/// // render_field_value(&mut ui, &field, 0, &mut msgs);
+/// use elnpack::ui::components::extra_fields::{render_field_value, ExtraField, ExtraFieldKind};
+///
+/// let field = ExtraField { label: "Field".into(), kind: ExtraFieldKind::Text, ..Default::default() };
+/// let mut msgs = Vec::new();
 /// ```
 fn render_field_value(
     ui: &mut egui::Ui,
@@ -957,19 +941,16 @@ fn render_field_value(
 /// # Examples
 ///
 /// ```rust,ignore
-/// use crate::ui::components::extra_fields::{ExtraField, ExtraFieldKind, ExtraFieldsMsg};
-/// use egui::Ui;
+/// use elnpack::ui::components::extra_fields::{render_checkbox, ExtraField, ExtraFieldKind, ExtraFieldsMsg};
 ///
-/// // Inside an egui UI callback:
 /// let field = ExtraField {
 ///     label: "Enabled".into(),
 ///     value: "on".into(),
 ///     kind: ExtraFieldKind::Checkbox,
 ///     ..Default::default()
 /// };
-/// let mut msgs = Vec::new();
-/// // render_checkbox(&mut ui, &field, 0, &mut msgs);
-/// // If the user toggles the checkbox, msgs will receive a ToggleCheckbox message.
+/// let mut msgs: Vec<ExtraFieldsMsg> = Vec::new();
+/// assert!(msgs.is_empty());
 /// ```
 fn render_checkbox(
     ui: &mut egui::Ui,
@@ -997,9 +978,11 @@ fn render_checkbox(
 /// # Examples
 ///
 /// ```rust,ignore
-/// // inside an egui UI callback:
-/// // let mut msgs = Vec::new();
-/// // render_options(ui, &field, 0, &mut msgs);
+/// use elnpack::ui::components::extra_fields::{render_options, ExtraField, ExtraFieldKind, ExtraFieldsMsg};
+///
+/// let field = ExtraField { label: "Choice".into(), kind: ExtraFieldKind::Select, options: vec!["a".into()], ..Default::default() };
+/// let mut msgs: Vec<ExtraFieldsMsg> = Vec::new();
+/// assert!(msgs.is_empty());
 /// ```
 fn render_options(
     ui: &mut egui::Ui,
@@ -1052,8 +1035,11 @@ fn render_options(
 /// # Examples
 ///
 /// ```rust,ignore
-/// // inside an egui UI callback:
-/// // render_number(ui, &field, idx, &mut msgs);
+/// use elnpack::ui::components::extra_fields::{render_number, ExtraField, ExtraFieldKind, ExtraFieldsMsg};
+///
+/// let field = ExtraField { label: "Value".into(), kind: ExtraFieldKind::Number, units: vec!["ms".into()], ..Default::default() };
+/// let mut msgs: Vec<ExtraFieldsMsg> = Vec::new();
+/// assert!(msgs.is_empty());
 /// ```
 fn render_number(
     ui: &mut egui::Ui,
@@ -1106,8 +1092,11 @@ fn render_number(
 /// # Examples
 ///
 /// ```rust,ignore
-/// // Within an egui UI callback:
-/// // render_text_input(&mut ui, &field, idx, &mut msgs);
+/// use elnpack::ui::components::extra_fields::{render_text_input, ExtraField, ExtraFieldKind, ExtraFieldsMsg};
+///
+/// let field = ExtraField { label: "Text".into(), kind: ExtraFieldKind::Text, ..Default::default() };
+/// let mut msgs: Vec<ExtraFieldsMsg> = Vec::new();
+/// assert!(msgs.is_empty());
 /// ```
 fn render_text_input(
     ui: &mut egui::Ui,
@@ -1239,13 +1228,10 @@ fn split_multi(value: &str) -> Vec<String> {
 ///
 /// ```rust,ignore
 /// let mut model = ExtraFieldsModel::default();
-/// // assume ExtraField implements Default and has a `label` field
 /// model.fields.push(ExtraField { label: "Email".into(), ..Default::default() });
 ///
-/// // New label "email" conflicts with existing "Email"
 /// assert!(name_conflict(&model, "email", None));
 ///
-/// // When editing the existing field, exclude its index to avoid a self-conflict
 /// assert!(!name_conflict(&model, "email", Some(0)));
 /// ```
 fn name_conflict(model: &ExtraFieldsModel, label: &str, editing: Option<usize>) -> bool {
@@ -1369,12 +1355,7 @@ fn apply_draft_to_field(draft: &FieldDraft, field: &mut ExtraField) {
 /// # Examples
 ///
 /// ```rust,ignore
-/// // Typical usage inside a UI render loop:
-/// // let ctx: egui::Context = /* obtained from egui framework */;
-/// // let mut model = ExtraFieldsModel::default();
-/// // let mut msgs = Vec::new();
 /// render_field_modal(&ctx, &model, &mut msgs);
-/// // Process `msgs` through the component's update function afterwards.
 /// ```
 fn render_field_modal(
     ctx: &egui::Context,
@@ -1892,9 +1873,6 @@ mod tests {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// // Setup: two fields "First" and "Second"
-    /// // Open modal for the second field, change its label to "First", and attempt to commit.
-    /// // Expected: an error event is returned, the second field's label stays "Second", and modal stays open.
     /// ```
     #[test]
     fn duplicate_name_blocks_edit() {

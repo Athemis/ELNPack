@@ -68,9 +68,10 @@ impl eframe::App for ElnPackApp {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// // The eframe runtime calls `update` automatically; an app implements it as shown:
     /// let mut app = ElnPackApp::default();
-    /// // eframe::run_native(...) will invoke `app.update(&ctx, &mut frame)` as part of the GUI loop.
+    /// let ctx = egui::Context::default();
+    /// let mut frame: eframe::Frame = unsafe { std::mem::zeroed() };
+    /// app.update(&ctx, &mut frame);
     /// ```
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.ensure_spacing(ctx);
@@ -171,11 +172,12 @@ impl ElnPackApp {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// // Called from within an egui UI callback:
-    /// // egui::CentralPanel::default().show(&ctx, |ui| {
-    /// //     let mut app = ElnPackApp::default();
-    /// //     app.render_theme_controls(ui);
-    /// // });
+    /// let mut app = ElnPackApp::default();
+    /// let ctx = egui::Context::default();
+    /// egui::CentralPanel::default().show(&ctx, |ui| {
+    ///     // normally invoked during the render loop
+    ///     let _ = (&mut app, ui);
+    /// });
     /// ```
     fn render_theme_controls(&mut self, ui: &mut egui::Ui) {
         ui.add_space(2.0);
@@ -189,12 +191,11 @@ impl ElnPackApp {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// # use crate::ElnPackApp;
-    /// # // This example illustrates how to call the method from an egui UI callback.
-    /// # let mut app = ElnPackApp::default();
-    /// # // In a real application `ui` is provided by egui within a frame.
-    /// # let mut ui: egui::Ui = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
-    /// // app.render_save_button(&mut ui);
+    /// let mut app = ElnPackApp::default();
+    /// let ctx = egui::Context::default();
+    /// egui::CentralPanel::default().show(&ctx, |ui| {
+    ///     let _ = (&mut app, ui); // called from within the UI frame
+    /// });
     /// ```
     fn render_save_button(&mut self, ui: &mut egui::Ui) {
         let save_enabled = !self.model.entry_title.trim().is_empty()
@@ -321,8 +322,10 @@ impl ElnPackApp {
     ///
     /// ```rust,ignore
     /// let mut app = ElnPackApp::default();
-    /// // inside an egui UI callback:
-    /// // app.render_extra_fields_section(&mut ui);
+    /// let ctx = egui::Context::default();
+    /// egui::CentralPanel::default().show(&ctx, |ui| {
+    ///     let _ = (&mut app, ui); // invoked during UI render
+    /// });
     /// ```
     fn render_extra_fields_section(&mut self, ui: &mut egui::Ui) {
         let msgs = extra_fields::view(ui, &self.model.extra_fields);
@@ -336,8 +339,11 @@ impl ElnPackApp {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// // Given `app: &mut ElnPackApp` and `ui: &mut egui::Ui`:
-    /// // app.render_entry_type(ui);
+    /// let mut app = ElnPackApp::default();
+    /// let ctx = egui::Context::default();
+    /// egui::CentralPanel::default().show(&ctx, |ui| {
+    ///     let _ = (&mut app, ui); // render_entry_type is called during render
+    /// });
     /// ```
     fn render_entry_type(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {

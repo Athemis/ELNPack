@@ -20,8 +20,8 @@ impl Keywords {
     /// ```rust,ignore
     /// use elnpack::models::keywords::Keywords;
     ///
-    /// let kw = Keywords::new(vec![\"DNA\".into(), \"dna\".into(), \"RNA\".into()]);
-    /// assert_eq!(kw.items(), &[\"DNA\", \"RNA\"]);
+    /// let kw = Keywords::new(vec!["DNA".into(), "dna".into(), "RNA".into()]);
+    /// assert_eq!(kw.items(), &["DNA", "RNA"]);
     /// ```
     pub fn new(items: Vec<String>) -> Self {
         let mut kw = Self { items };
@@ -35,8 +35,8 @@ impl Keywords {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// let kw = elnpack::models::keywords::Keywords::new(vec![\"A\".into()]);
-    /// assert_eq!(kw.items(), &[\"A\"]);
+    /// let kw = elnpack::models::keywords::Keywords::new(vec!["A".into()]);
+    /// assert_eq!(kw.items(), &["A"]);
     /// ```
     pub fn items(&self) -> &[String] {
         &self.items
@@ -47,9 +47,9 @@ impl Keywords {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// let kw = elnpack::models::keywords::Keywords::new(vec![\"X\".into()]);
+    /// let kw = elnpack::models::keywords::Keywords::new(vec!["X".into()]);
     /// let owned = kw.into_vec();
-    /// assert_eq!(owned, vec![\"X\".to_string()]);
+    /// assert_eq!(owned, vec!["X".to_string()]);
     /// ```
     pub fn into_vec(self) -> Vec<String> {
         self.items

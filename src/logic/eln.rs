@@ -96,8 +96,6 @@ pub fn ensure_extension(mut path: PathBuf, extension: &str) -> PathBuf {
 ///
 /// ```rust,ignore
 /// use time::OffsetDateTime;
-/// // Construct attachments and extra fields according to your application's types,
-/// // then call `build_and_write_archive`.
 /// let output = std::path::Path::new("example.eln");
 /// let title = "My Experiment";
 /// let body = "# Notes\n\nExperiment body";
@@ -396,7 +394,6 @@ fn build_extra_fields_export(
 /// # Examples
 ///
 /// ```rust,ignore
-/// // Produce minimal eLabFTW metadata with no fields or groups.
 /// let json = reconstruct_elabftw_metadata(&[], &[]).unwrap();
 /// assert!(json.contains(r#""elabftw""#));
 /// assert!(json.contains(r#""extra_fields""#));
@@ -528,7 +525,6 @@ fn reconstruct_elabftw_metadata(
 /// ```rust,ignore
 /// # use crate::models::extra_fields::{ExtraField, ExtraFieldKind};
 /// # use serde_json::Value;
-/// // multi-value field
 /// let f_multi = ExtraField {
 ///     value: "".to_string(),
 ///     value_multi: vec!["a".into(), "b".into()],
@@ -539,7 +535,6 @@ fn reconstruct_elabftw_metadata(
 /// let v = crate::logic::eln::value_to_json(&f_multi);
 /// assert_eq!(v, Value::Array(vec![Value::String("a".into()), Value::String("b".into())]));
 ///
-/// // numeric kind exported as string
 /// let f_num = ExtraField {
 ///     value: "3.14".to_string(),
 ///     value_multi: Vec::new(),
@@ -686,13 +681,6 @@ mod tests {
     /// - the experiment node's `variableMeasured` contains both a per-field `PropertyValue` and the metadata `PropertyValue`,
     /// - the per-field `PropertyValue` for the "Detector" field has the expected `@type`, `valueReference`, `value`, and `unitText`,
     /// - the `elabftw_metadata` blob is present and includes the "Detector" field with the expected `type` and `value`.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// // Creates an archive with one select extra field and verifies the ro-crate metadata
-    /// // contains both the PropertyValue node and the elabftw_metadata blob.
-    /// ```
     #[test]
     fn build_and_write_archive_writes_elabftw_style_extra_fields() {
         use tempfile::TempDir;
