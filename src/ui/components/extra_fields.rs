@@ -24,6 +24,7 @@ struct FieldDraft {
     label: String,
     description: String,
     required: bool,
+    readonly: bool,
     allow_multi_values: bool,
     options: Vec<String>,
     units: Vec<String>,
@@ -46,6 +47,7 @@ impl Default for FieldDraft {
     /// assert!(d.label.is_empty());
     /// assert!(d.description.is_empty());
     /// assert_eq!(d.required, false);
+    /// assert_eq!(d.readonly, false);
     /// assert_eq!(d.allow_multi_values, false);
     /// assert!(d.options.is_empty());
     /// assert!(d.units.is_empty());
@@ -57,6 +59,7 @@ impl Default for FieldDraft {
             label: String::new(),
             description: String::new(),
             required: false,
+            readonly: false,
             allow_multi_values: false,
             options: Vec::new(),
             units: Vec::new(),
@@ -249,6 +252,7 @@ pub enum ExtraFieldsMsg {
     DraftLabelChanged(String),
     DraftDescChanged(String),
     DraftRequiredToggled(bool),
+    DraftReadonlyToggled(bool),
     DraftAllowMultiToggled(bool),
     DraftOptionChanged {
         index: usize,
@@ -355,6 +359,7 @@ pub fn update(
                     label: f.label.clone(),
                     description: f.description.clone().unwrap_or_default(),
                     required: f.required,
+                    readonly: f.readonly,
                     allow_multi_values: f.allow_multi_values,
                     options: f.options.clone(),
                     units: f.units.clone(),
@@ -386,6 +391,12 @@ pub fn update(
         ExtraFieldsMsg::DraftRequiredToggled(val) => {
             if let Some(d) = model.modal_draft.as_mut() {
                 d.required = val;
+            }
+            None
+        }
+        ExtraFieldsMsg::DraftReadonlyToggled(val) => {
+            if let Some(d) = model.modal_draft.as_mut() {
+                d.readonly = val;
             }
             None
         }
@@ -968,12 +979,14 @@ fn render_checkbox(
     msgs: &mut Vec<ExtraFieldsMsg>,
 ) {
     let mut checked = field.value == "on";
-    if ui.checkbox(&mut checked, "Checked").changed() {
-        msgs.push(ExtraFieldsMsg::ToggleCheckbox {
-            index: idx,
-            checked,
-        });
-    }
+    ui.add_enabled_ui(!field.readonly, |ui| {
+        if ui.checkbox(&mut checked, "Checked").changed() {
+            msgs.push(ExtraFieldsMsg::ToggleCheckbox {
+                index: idx,
+                checked,
+            });
+        }
+    });
 }
 
 /// Renders selectable options for a select/radio field and emits messages when the selection changes.
@@ -1001,30 +1014,34 @@ fn render_options(
         } else {
             field.value_multi.clone()
         };
-        for opt in &field.options {
-            let mut is_on = chosen.contains(opt);
-            if ui.checkbox(&mut is_on, opt).changed() {
-                if is_on {
-                    chosen.push(opt.clone());
-                } else {
-                    chosen.retain(|v| v != opt);
+        ui.add_enabled_ui(!field.readonly, |ui| {
+            for opt in &field.options {
+                let mut is_on = chosen.contains(opt);
+                if ui.checkbox(&mut is_on, opt).changed() {
+                    if is_on {
+                        chosen.push(opt.clone());
+                    } else {
+                        chosen.retain(|v| v != opt);
+                    }
+                    msgs.push(ExtraFieldsMsg::UpdateMulti {
+                        index: idx,
+                        values: chosen.clone(),
+                    });
                 }
-                msgs.push(ExtraFieldsMsg::UpdateMulti {
-                    index: idx,
-                    values: chosen.clone(),
-                });
             }
-        }
+        });
     } else {
         let mut current = field.value.clone();
-        for opt in &field.options {
-            if ui.radio_value(&mut current, opt.clone(), opt).clicked() {
-                msgs.push(ExtraFieldsMsg::EditValue {
-                    index: idx,
-                    value: opt.clone(),
-                });
+        ui.add_enabled_ui(!field.readonly, |ui| {
+            for opt in &field.options {
+                if ui.radio_value(&mut current, opt.clone(), opt).clicked() {
+                    msgs.push(ExtraFieldsMsg::EditValue {
+                        index: idx,
+                        value: opt.clone(),
+                    });
+                }
             }
-        }
+        });
     }
 }
 
@@ -1326,6 +1343,7 @@ fn apply_draft_to_field(draft: &FieldDraft, field: &mut ExtraField) {
     }
     field.description = trimmed_or_none(&draft.description);
     field.required = draft.required;
+    field.readonly = draft.readonly;
     field.allow_multi_values = draft.allow_multi_values;
     field.group_id = draft.group_id;
 
@@ -1434,6 +1452,11 @@ fn render_field_modal(
             let mut required = draft.required;
             if ui.checkbox(&mut required, "Required").changed() {
                 msgs.push(ExtraFieldsMsg::DraftRequiredToggled(required));
+            }
+            ui.add_space(4.0);
+            let mut readonly = draft.readonly;
+            if ui.checkbox(&mut readonly, "Read-only").changed() {
+                msgs.push(ExtraFieldsMsg::DraftReadonlyToggled(readonly));
             }
 
             ui.add_space(8.0);
