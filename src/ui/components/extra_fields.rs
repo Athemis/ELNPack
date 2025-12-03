@@ -579,6 +579,7 @@ pub fn update(
                 if removing_last {
                     if let Some(g) = model.groups.get_mut(idx) {
                         g.name = "Default".into();
+                        // Field group_ids remain unchanged since we're renaming, not removing
                         for f in model.fields.iter_mut() {
                             if f.group_id == Some(group.id) {
                                 f.group_id = Some(g.id);
