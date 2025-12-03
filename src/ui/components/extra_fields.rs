@@ -1665,7 +1665,7 @@ mod tests {
     }
 
     #[test]
-    fn group_display_name_falls_back_to_id() {
+    fn group_display_name_unknown_is_default() {
         let mut model = ExtraFieldsModel::default();
         model.groups.push(make_group(1, "One"));
 
