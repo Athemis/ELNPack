@@ -1253,12 +1253,12 @@ fn split_multi(value: &str) -> Vec<String> {
 /// assert!(!name_conflict(&model, "email", Some(0)));
 /// ```
 fn name_conflict(model: &ExtraFieldsModel, label: &str, editing: Option<usize>) -> bool {
-    let key = label.trim().to_lowercase();
+    let key = label.trim();
     if key.is_empty() {
         return false;
     }
     model.fields.iter().enumerate().any(|(idx, f)| {
-        idx != editing.unwrap_or(usize::MAX) && f.label.trim().eq_ignore_ascii_case(&key)
+        idx != editing.unwrap_or(usize::MAX) && f.label.trim().eq_ignore_ascii_case(key)
     })
 }
 
