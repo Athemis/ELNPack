@@ -65,6 +65,7 @@ jobs:
             multilib: false
             toolchain: stable
             build_std_flag: ""
+            install_target: true
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             archive: zip
@@ -74,6 +75,7 @@ jobs:
             multilib: false
             toolchain: stable
             build_std_flag: ""
+            install_target: true
           - runner: windows-latest
             target: x86_64-win7-windows-msvc
             archive: zip
@@ -83,6 +85,7 @@ jobs:
             multilib: false
             toolchain: nightly
             build_std_flag: "-Z build-std"
+            install_target: false
           - runner: ubuntu-latest
             target: i686-unknown-linux-gnu
             archive: tar.gz
@@ -92,6 +95,7 @@ jobs:
             multilib: true
             toolchain: stable
             build_std_flag: ""
+            install_target: true
           - runner: windows-latest
             target: i686-pc-windows-msvc
             archive: zip
@@ -101,6 +105,7 @@ jobs:
             multilib: false
             toolchain: stable
             build_std_flag: ""
+            install_target: true
           - runner: windows-latest
             target: i686-win7-windows-msvc
             archive: zip
@@ -110,6 +115,7 @@ jobs:
             multilib: false
             toolchain: nightly
             build_std_flag: "-Z build-std"
+            install_target: false
     runs-on: ${{ matrix.runner }}
     env:
       TARGET: ${{ matrix.target }}
@@ -135,7 +141,10 @@ jobs:
         uses: dtolnay/rust-toolchain@0b1efabc08b657293548b77fb76cc02d26091c7e
         with:
           toolchain: ${{ matrix.toolchain }}
-          target: ${{ matrix.target }}
+
+      - name: Add target
+        if: matrix.install_target
+        run: rustup target add ${{ matrix.target }} --toolchain ${{ matrix.toolchain }}
 
       - name: Add rust-src component
         if: matrix.build_std_flag != ''
