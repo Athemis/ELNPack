@@ -15,7 +15,7 @@ Thanks for your interest in improving ELNPack! This guide keeps contributions co
 ## Coding Style
 
 - Follow rustfmt defaults.
-- Add SPDX headers to new source files:
+- Add SPDX headers to new **source** files (Rust); configs/docs are covered via `REUSE.toml`:
   ```
   // SPDX-License-Identifier: MIT
   // SPDX-FileCopyrightText: 2025 Your Name
@@ -25,11 +25,23 @@ Thanks for your interest in improving ELNPack! This guide keeps contributions co
 ## Commit & PR Guidelines
 
 - Use Conventional Commits (e.g., `feat: ...`, `fix: ...`, `docs: ...`).
+- Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+- Examples: `feat: add new feature`; `fix(ui): correct button alignment`; `docs: update README`.
 - Include a short PR description:
   - What changed
   - How to test
   - Screenshots for UI tweaks
 - Add tests when fixing bugs or adding logic.
+
+## Git hooks
+
+Repository hooks live in `.githooks`. Run `./scripts/install-git-hooks.sh` once to point `core.hooksPath` there.
+
+- `commit-msg` — validates commit messages follow [Conventional Commits](https://www.conventionalcommits.org/).
+- `pre-commit` — runs `cargo fmt` (writes changes), `cargo clippy`, and `cargo test`; set `SKIP_PRE_COMMIT=1` to bypass locally.
+- `pre-push` — re-validates commit messages for pushed commits (catches rebases that skipped `commit-msg`).
+
+`commit-msg` and `pre-push` share `validate-commit-msg.sh` for consistent checks.
 
 ## Filing Issues
 

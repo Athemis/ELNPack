@@ -80,27 +80,7 @@ This repository follows the [REUSE Software](https://reuse.software/) specificat
 
 ## Contributing
 
-We welcome issues and PRs! See [CONTRIBUTING](CONTRIBUTING.md) for coding standards, testing checklist, and commit conventions.
-
-### Git hooks
-
-Repository hooks live in `.githooks`. Run `./scripts/install-git-hooks.sh` once to point `core.hooksPath` there.
-
-The repository includes three git hooks:
-
-1. **`commit-msg`** — Validates commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) specification at commit time
-2. **`pre-commit`** — Runs `cargo fmt` (writes changes), `cargo clippy`, and `cargo test` before each commit (set `SKIP_PRE_COMMIT=1` to bypass locally)
-3. **`pre-push`** — Validates all commits being pushed follow Conventional Commits, preventing malformed commits from reaching the remote (e.g., those that bypassed `commit-msg` during rebases)
-
-Both `commit-msg` and `pre-push` use shared validation logic from `validate-commit-msg.sh` to ensure consistent enforcement.
-
-Valid commit types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
-
-Example commit messages:
-
-- `feat: add new feature`
-- `fix(ui): correct button alignment`
-- `docs: update README`
+We welcome issues and PRs! See [CONTRIBUTING](CONTRIBUTING.md) for coding standards, testing checklist, git hooks, and commit conventions.
 
 ## FAQ
 
