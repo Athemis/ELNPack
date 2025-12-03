@@ -940,49 +940,26 @@ fn render_field_value(
 }
 
 /// Renders a checkbox for a boolean extra field and queues a ToggleCheckbox message when its state changes.
-
 ///
-
 /// The checkbox reflects the field's `value` being `"on"` and, when toggled by the user, appends
-
 /// `ExtraFieldsMsg::ToggleCheckbox { index, checked }` to `msgs`.
-
 ///
-
 /// # Examples
-
 ///
-
 /// ```no_run
-
 /// use crate::ui::components::extra_fields::{ExtraField, ExtraFieldKind, ExtraFieldsMsg};
-
 /// use egui::Ui;
-
 ///
-
 /// // Inside an egui UI callback:
-
-/// // let mut ui: Ui = ...;
-
 /// let field = ExtraField {
-
 ///     label: "Enabled".into(),
-
 ///     value: "on".into(),
-
 ///     kind: ExtraFieldKind::Checkbox,
-
 ///     ..Default::default()
-
 /// };
-
 /// let mut msgs = Vec::new();
-
 /// // render_checkbox(&mut ui, &field, 0, &mut msgs);
-
 /// // If the user toggles the checkbox, msgs will receive a ToggleCheckbox message.
-
 /// ```
 fn render_checkbox(
     ui: &mut egui::Ui,

@@ -119,6 +119,7 @@ impl ExtraField {
 /// - `Number`: returns `Some("invalid_number")` if the non-empty value is not a valid floating-point number.
 /// - `Items`, `Experiments`, `Users`: return `Some("invalid_integer")` if the non-empty value is not a valid integer.
 /// - `Email`: returns `Some("invalid_email")` if the non-empty value is not a valid email address.
+///
 /// For other kinds or when the value is empty (and not required), validation returns `None`.
 ///
 /// # Returns

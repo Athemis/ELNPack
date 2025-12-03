@@ -122,6 +122,7 @@ pub fn ensure_extension(mut path: PathBuf, extension: &str) -> PathBuf {
 ///     body_format,
 /// ).unwrap();
 /// ```
+#[allow(clippy::too_many_arguments)] // Builder needs explicit, validated inputs; grouping would obscure the contract.
 pub fn build_and_write_archive(
     output: &Path,
     title: &str,
