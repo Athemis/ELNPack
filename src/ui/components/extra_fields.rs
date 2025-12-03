@@ -313,6 +313,9 @@ pub fn update(
             model.groups = groups;
             model.editing_group = None;
             model.editing_group_buffer.clear();
+            model.modal_open = false;
+            model.modal_draft = None;
+            model.editing_field = None;
             Some(ExtraFieldsEvent {
                 message: format!(
                     "Imported {} field(s) from {}",
