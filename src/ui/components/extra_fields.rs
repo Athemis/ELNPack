@@ -1720,6 +1720,8 @@ mod tests {
         assert!(model.fields.is_empty());
     }
 
+    // Field removal: covered by `remove_field_drops_entry`; other tests focus on modal edits and group reassignment.
+
     #[test]
     fn modal_save_updates_field() {
         let mut model = ExtraFieldsModel::default();
@@ -2056,39 +2058,5 @@ mod tests {
             .unwrap()
             .id;
         assert_eq!(model.fields[0].group_id, Some(default_id));
-    }
-
-    #[test]
-    fn remove_field_updates_model() {
-        let mut model = ExtraFieldsModel::default();
-        let mut cmds = Vec::new();
-        update(
-            &mut model,
-            ExtraFieldsMsg::ImportLoaded {
-                fields: vec![ExtraField {
-                    label: "One".into(),
-                    kind: ExtraFieldKind::Text,
-                    value: "a".into(),
-                    value_multi: Vec::new(),
-                    options: vec![],
-                    unit: None,
-                    units: vec![],
-                    position: None,
-                    required: false,
-                    description: None,
-                    allow_multi_values: false,
-                    blank_value_on_duplicate: false,
-                    group_id: None,
-                    readonly: false,
-                }],
-                groups: vec![],
-                source: PathBuf::from("sample.json"),
-            },
-            &mut cmds,
-        );
-
-        assert_eq!(model.fields.len(), 1);
-        let _ = update(&mut model, ExtraFieldsMsg::RemoveField(0), &mut Vec::new());
-        assert!(model.fields.is_empty());
     }
 }
