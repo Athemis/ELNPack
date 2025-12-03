@@ -7,11 +7,15 @@ use std::path::PathBuf;
 
 use crate::logic::eln::{ArchiveGenre, build_and_write_archive};
 use crate::models::attachment::Attachment;
+use crate::models::extra_fields::{ExtraField, ExtraFieldGroup};
 use crate::models::keywords::Keywords;
 use crate::ui::components::attachments::{
     self, AttachmentsCommand, AttachmentsModel, AttachmentsMsg,
 };
 use crate::ui::components::datetime_picker::{self, DateTimeModel, DateTimeMsg};
+use crate::ui::components::extra_fields::{
+    self, ExtraFieldsCommand, ExtraFieldsModel, ExtraFieldsMsg,
+};
 use crate::ui::components::keywords::{self, KeywordsModel, KeywordsMsg};
 use crate::ui::components::markdown::{MarkdownModel, MarkdownMsg};
 
@@ -30,6 +34,8 @@ pub struct AppModel {
     pub attachments: AttachmentsModel,
     /// Keywords editor state.
     pub keywords: KeywordsModel,
+    /// Imported eLabFTW extra fields metadata.
+    pub extra_fields: ExtraFieldsModel,
     /// Date/time picker state.
     pub datetime: DateTimeModel,
     /// Latest status message to display.
@@ -60,6 +66,7 @@ pub enum Msg {
     Markdown(MarkdownMsg),
     Attachments(AttachmentsMsg),
     Keywords(KeywordsMsg),
+    ExtraFields(ExtraFieldsMsg),
     DateTime(DateTimeMsg),
 }
 
@@ -68,6 +75,7 @@ pub enum Command {
     PickFiles,
     HashFile { path: PathBuf, _retry: bool },
     LoadThumbnail { path: PathBuf, _retry: bool },
+    PickExtraFieldsFile,
     SaveArchive(SavePayload),
 }
 
@@ -87,11 +95,33 @@ pub struct SavePayload {
     pub genre: ArchiveGenre,
     /// Normalized keywords.
     pub keywords: Vec<String>,
+    /// Imported extra fields metadata.
+    pub extra_fields: Vec<ExtraField>,
+    pub extra_groups: Vec<ExtraFieldGroup>,
     /// Stored body format (HTML or Markdown).
     pub body_format: crate::logic::eln::BodyFormat,
 }
 
-/// Update the application model and enqueue commands.
+/// Update the top-level application state in place and append any produced commands.
+///
+/// This applies `msg` to `model`, mutating its fields as required, and pushes any resulting
+/// `Command`s onto `cmds`. Side effects (file IO, hashing, thumbnails, saves) are represented
+/// as `Command` values and are not executed by this function.
+///
+/// # Parameters
+///
+/// - `model`: mutable application state to update.
+/// - `msg`: the message describing the change to apply.
+/// - `cmds`: vector to receive any commands produced while handling the message.
+///
+/// # Examples
+///
+/// ```
+/// let mut model = AppModel::default();
+/// let mut cmds = Vec::new();
+/// update(&mut model, Msg::EntryTitleChanged("New title".into()), &mut cmds);
+/// assert_eq!(model.entry_title, "New title");
+/// ```
 pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
     match msg {
         Msg::EntryTitleChanged(text) => model.entry_title = text,
@@ -158,6 +188,17 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
                 surface_event(model, event.message, event.is_error);
             }
         }
+        Msg::ExtraFields(m) => {
+            let mut extra_cmds = Vec::new();
+            if let Some(event) = extra_fields::update(&mut model.extra_fields, m, &mut extra_cmds) {
+                surface_event(model, event.message, event.is_error);
+            }
+            for c in extra_cmds {
+                match c {
+                    ExtraFieldsCommand::PickMetadataFile => cmds.push(Command::PickExtraFieldsFile),
+                }
+            }
+        }
         Msg::DateTime(m) => datetime_picker::update(&mut model.datetime, m),
         Msg::SaveRequested(output_path) => match validate_for_save(model, output_path) {
             Ok(payload) => cmds.push(Command::SaveArchive(payload)),
@@ -171,7 +212,27 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
     }
 }
 
-/// Execute a command synchronously (single-threaded for now) and return a resulting message.
+/// Execute a `Command` and produce the resulting `Msg`.
+///
+/// This function performs the command's blocking side effects (for example: opening file
+/// dialogs, reading files, hashing, generating thumbnails, or writing an archive) and
+/// returns the message that represents the command's outcome.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::PathBuf;
+/// // Construct a command for a non-existent file to exercise the hash path that falls back
+/// // to `"unavailable"` for the sha256 and `0` for size.
+/// let cmd = crate::mvu::Command::HashFile { path: PathBuf::from("nonexistent"), _retry: 0 };
+/// match crate::mvu::run_command(cmd) {
+///     crate::mvu::Msg::Attachments(crate::mvu::AttachmentsMsg::HashComputed { sha256, size, .. }) => {
+///         assert_eq!(sha256, "unavailable");
+///         assert_eq!(size, 0);
+///     }
+///     other => panic!("unexpected result: {:?}", other),
+/// }
+/// ```
 pub fn run_command(cmd: Command) -> Msg {
     match cmd {
         Command::PickFiles => {
@@ -180,6 +241,33 @@ pub fn run_command(cmd: Command) -> Msg {
                 .pick_files()
                 .unwrap_or_default();
             Msg::Attachments(AttachmentsMsg::FilesPicked(files))
+        }
+        Command::PickExtraFieldsFile => {
+            let file = rfd::FileDialog::new()
+                .set_title("Select eLabFTW metadata JSON")
+                .add_filter("JSON", &["json"])
+                .pick_file();
+
+            match file {
+                Some(path) => match std::fs::read_to_string(&path) {
+                    Ok(content) => {
+                        match crate::models::extra_fields::parse_elabftw_extra_fields(&content) {
+                            Ok(import) => Msg::ExtraFields(ExtraFieldsMsg::ImportLoaded {
+                                fields: import.fields,
+                                groups: import.groups,
+                                source: path,
+                            }),
+                            Err(err) => {
+                                Msg::ExtraFields(ExtraFieldsMsg::ImportFailed(err.to_string()))
+                            }
+                        }
+                    }
+                    Err(err) => Msg::ExtraFields(ExtraFieldsMsg::ImportFailed(format!(
+                        "Failed to read metadata file: {err}"
+                    ))),
+                },
+                None => Msg::ExtraFields(ExtraFieldsMsg::ImportCancelled),
+            }
         }
         Command::HashFile { path, _retry: _ } => {
             let sha256 = crate::utils::hash_file(&path).unwrap_or_else(|_| "unavailable".into());
@@ -204,6 +292,8 @@ pub fn run_command(cmd: Command) -> Msg {
                 &payload.title,
                 &payload.body,
                 &payload.attachments,
+                &payload.extra_fields,
+                &payload.extra_groups,
                 payload.performed_at,
                 payload.genre,
                 &payload.keywords,
@@ -246,6 +336,19 @@ fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePaylo
     crate::models::attachment::assert_unique_sanitized_names(&attachment_meta)
         .map_err(|e| e.to_string())?;
 
+    for field in model.extra_fields.fields() {
+        if let Some(err) = crate::models::extra_fields::validate_field(field) {
+            let msg = match err {
+                "required" => format!("Field '{}' is required.", field.label),
+                "invalid_url" => format!("Field '{}' must be a valid http/https URL.", field.label),
+                "invalid_number" => format!("Field '{}' must be a valid number.", field.label),
+                "invalid_integer" => format!("Field '{}' must be a valid integer ID.", field.label),
+                _ => format!("Field '{}' is invalid.", field.label),
+            };
+            return Err(msg);
+        }
+    }
+
     Ok(SavePayload {
         output: output_path,
         title,
@@ -254,6 +357,8 @@ fn validate_for_save(model: &AppModel, output_path: PathBuf) -> Result<SavePaylo
         performed_at,
         genre: model.archive_genre,
         keywords: keywords.into_vec(),
+        extra_fields: model.extra_fields.fields().to_vec(),
+        extra_groups: model.extra_fields.groups().to_vec(),
         body_format: model.body_format,
     })
 }
@@ -263,6 +368,8 @@ mod tests {
     #![allow(clippy::field_reassign_with_default)]
 
     use super::*;
+    use crate::models::extra_fields::ExtraFieldKind;
+    use crate::ui::components::extra_fields::ExtraFieldsMsg;
     use std::path::PathBuf;
     use tempfile::TempDir;
 
@@ -372,5 +479,177 @@ mod tests {
         model.pending_commands = model.pending_commands.saturating_sub(1);
 
         assert_eq!(model.pending_commands, 0);
+    }
+
+    #[test]
+    fn validate_rejects_invalid_url_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has URL".into();
+        model.markdown.text = "Body".into();
+
+        add_url_field(&mut model, "htp://example");
+
+        match validate_for_save(&model, PathBuf::from("/tmp/out.eln")) {
+            Err(err) => assert!(err.contains("valid http/https URL")),
+            Ok(_) => panic!("validation should fail for invalid URL"),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_valid_url_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has URL".into();
+        model.markdown.text = "Body".into();
+
+        add_url_field(&mut model, "https://example.com/path");
+
+        let res = validate_for_save(&model, PathBuf::from("/tmp/out.eln"));
+
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_invalid_number_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has number".into();
+        model.markdown.text = "Body".into();
+
+        add_typed_field(&mut model, ExtraFieldKind::Number, "abc");
+
+        match validate_for_save(&model, PathBuf::from("/tmp/out.eln")) {
+            Err(err) => assert!(err.contains("valid number")),
+            Ok(_) => panic!("validation should fail for invalid number"),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_valid_number_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has number".into();
+        model.markdown.text = "Body".into();
+
+        add_typed_field(&mut model, ExtraFieldKind::Number, "42.5");
+
+        let res = validate_for_save(&model, PathBuf::from("/tmp/out.eln"));
+
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_invalid_integer_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has int".into();
+        model.markdown.text = "Body".into();
+
+        add_typed_field(&mut model, ExtraFieldKind::Items, "12.3");
+
+        match validate_for_save(&model, PathBuf::from("/tmp/out.eln")) {
+            Err(err) => assert!(err.contains("valid integer ID")),
+            Ok(_) => panic!("validation should fail for invalid integer"),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_valid_integer_field() {
+        let mut model = AppModel::default();
+        model.entry_title = "Has int".into();
+        model.markdown.text = "Body".into();
+
+        add_typed_field(&mut model, ExtraFieldKind::Users, "12345");
+
+        let res = validate_for_save(&model, PathBuf::from("/tmp/out.eln"));
+
+        assert!(res.is_ok());
+    }
+
+    fn add_url_field(model: &mut AppModel, value: &str) {
+        let mut cmds = Vec::new();
+
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::StartAddField { group_id: None }),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::DraftLabelChanged("URL".into())),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::DraftKindChanged(ExtraFieldKind::Url)),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::CommitFieldModal),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::EditValue {
+                index: 0,
+                value: value.into(),
+            }),
+            &mut cmds,
+        );
+
+        assert!(
+            cmds.is_empty(),
+            "URL field setup should not enqueue commands"
+        );
+    }
+
+    /// Adds an extra field to the model using the same steps the UI uses for typed fields in tests.
+    ///
+    /// This helper drives the extra-fields workflow to create a field of the given `kind` with the
+    /// provided `value` and commits it into the model. It asserts that no top-level Commands are
+    /// enqueued during the process.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // inside a test:
+    /// let mut model = AppModel::default();
+    /// add_typed_field(&mut model, ExtraFieldKind::Number, "42");
+    /// assert_eq!(model.extra_fields.fields.len(), 1);
+    /// assert_eq!(model.extra_fields.fields[0].value.as_deref(), Some("42"));
+    /// ```
+    fn add_typed_field(model: &mut AppModel, kind: ExtraFieldKind, value: &str) {
+        let mut cmds = Vec::new();
+
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::StartAddField { group_id: None }),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::DraftLabelChanged("Field".into())),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::DraftKindChanged(kind)),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::CommitFieldModal),
+            &mut cmds,
+        );
+        update(
+            model,
+            Msg::ExtraFields(ExtraFieldsMsg::EditValue {
+                index: 0,
+                value: value.into(),
+            }),
+            &mut cmds,
+        );
+
+        assert!(
+            cmds.is_empty(),
+            "typed field setup should not enqueue commands"
+        );
     }
 }

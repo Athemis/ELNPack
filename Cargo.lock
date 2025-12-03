@@ -1165,16 +1165,29 @@ dependencies = [
  "egui",
  "egui-phosphor",
  "egui_extras",
+ "email_address",
  "image",
  "mime_guess",
  "pulldown-cmark",
  "rfd",
+ "serde",
  "serde_json",
  "sha2",
  "tempfile",
  "time",
+ "url",
  "usvg",
+ "uuid",
  "zip",
+]
+
+[[package]]
+name = "email_address"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e079f19b08ca6239f47f8ba8509c11cf3ea30095831f7fed61441475edd8c449"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -3899,6 +3912,7 @@ version = "1.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f87b8aa10b915a06587d0dec516c282ff295b475d94abf425d62b57710070a2"
 dependencies = [
+ "getrandom",
  "js-sys",
  "serde",
  "wasm-bindgen",

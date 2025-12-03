@@ -33,6 +33,13 @@ SPDX-FileCopyrightText: 2025 Alexander Minges
 - `cargo test` — run the test suite (add tests as you extend logic).
 - `cargo build --release` — produce an optimized binary for distribution.
 
+### Layering enforcement (MVU)
+
+- UI components (`src/ui/`, `src/ui/components/*`) stay side-effect free; they emit messages only.
+- Validation and state transitions live in `src/mvu/` (and component `update` fns) or in model/logic modules (`src/models/`, `src/logic/`).
+- IO happens in commands executed by `run_command`; do not perform IO in view/update.
+- When adding validation, prefer a pure helper in models and reuse it in both UI highlighting and save-time checks.
+
 ## Documentation & Reference Lookup
 
 - Use the Context7 MCP when you need library or API documentation: resolve the library id, then fetch docs via the Context7 MCP get-library-docs endpoint.
@@ -70,6 +77,7 @@ SPDX-FileCopyrightText: 2025 Alexander Minges
 - **`src/utils/`**: Helpers (`sanitize_component`, `hash_file`).
 - **`src/models/`**: Pure data/validation (`attachment`, `keywords`).
 - **`src/logic/eln.rs`**: ELN RO-Crate build/write, metadata, suggested archive name. Conforms to RO-Crate 1.2 and ELN File Format spec; uses pre-sanitized names from attachments. No UI deps.
+- Extra fields export: archives emit eLabFTW-style PropertyValue nodes (`pv://` v4 ids) linked via `variableMeasured`, include a metadata blob PropertyValue with reconstructed `elabftw_metadata` (with `display_main_text`).
 
 ## Testing Guidelines
 
