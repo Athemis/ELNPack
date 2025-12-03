@@ -1074,26 +1074,28 @@ fn render_number(
         }
         if !field.units.is_empty() {
             let mut current_unit = field.unit.clone().unwrap_or_default();
-            egui::ComboBox::from_id_salt(format!("extra-unit-{}", idx))
-                .width(90.0)
-                .selected_text(if current_unit.is_empty() {
-                    "Unit"
-                } else {
-                    &current_unit
-                })
-                .show_ui(ui, |ui| {
-                    for unit in &field.units {
-                        if ui
-                            .selectable_value(&mut current_unit, unit.clone(), unit)
-                            .clicked()
-                        {
-                            msgs.push(ExtraFieldsMsg::SelectUnit {
-                                index: idx,
-                                unit: unit.clone(),
-                            });
+            ui.add_enabled_ui(!disabled, |ui| {
+                egui::ComboBox::from_id_salt(format!("extra-unit-{}", idx))
+                    .width(90.0)
+                    .selected_text(if current_unit.is_empty() {
+                        "Unit"
+                    } else {
+                        &current_unit
+                    })
+                    .show_ui(ui, |ui| {
+                        for unit in &field.units {
+                            if ui
+                                .selectable_value(&mut current_unit, unit.clone(), unit)
+                                .clicked()
+                            {
+                                msgs.push(ExtraFieldsMsg::SelectUnit {
+                                    index: idx,
+                                    unit: unit.clone(),
+                                });
+                            }
                         }
-                    }
-                });
+                    });
+            });
         }
     });
 }
