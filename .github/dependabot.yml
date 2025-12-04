@@ -8,13 +8,6 @@
 
 version: 2
 updates:
-  # Maintain dependencies for Cargo
-  - package-ecosystem: cargo
-    directory: "/"
-    schedule:
-      interval: daily
-    open-pull-requests-limit: 10
-
   # Enable version updates for Rust
   - package-ecosystem: "rust-toolchain" # See documentation for possible values
     directory: "/" # Location of package manifests
