@@ -13,6 +13,7 @@ A lightweight electronic lab notebook (ELN) entry packager built with [Rust](htt
 - Simple **Markdown** editor with quick-insert toolbar
 - **Attachments** panel with image thumbnails, duplicate detection and filename sanitization
 - Keywords editor, supporting mass import of comma-separated keywords
+- **Metadata** editor, allowing users to add custom metadata fields ad import from eLabFTW extra field JSON files
 
 ## Filename Sanitization & Editing
 
