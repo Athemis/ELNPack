@@ -11,9 +11,58 @@ ci = "github"
 installers = []
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "i686-unknown-linux-gnu", "x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+# Distribute as tar.gz on UNIX platforms
+unix-archive = ".tar.gz"
 
 [dist.github-custom-runners]
 x86_64-pc-windows-msvc = "windows-latest"
 i686-pc-windows-msvc = "windows-latest"
 x86_64-unknown-linux-gnu = "ubuntu-latest"
 i686-unknown-linux-gnu = "ubuntu-latest"
+
+[[dist.extra-artifacts]]
+# Builds for tier 3 target win7
+artifacts = ["dist/x86_64/elnpack-x86_64-win7-windows-msvc.zip", "dist/i686/elnpack-i686-win7-windows-msvc.zip"]
+
+# Needs custom cargo flags, bundling of assets; builds both x86_64 and i686
+build = [
+  "powershell",
+  "-NoProfile",
+  "-ExecutionPolicy", "Bypass",
+  "-Command",
+  '''
+  $ErrorActionPreference = "Stop"
+
+  # Install nightly toolchain and components
+  rustup toolchain install nightly
+  rustup component add rust-src --toolchain nightly
+  rustup target add x86_64-win7-windows-msvc --toolchain nightly
+  rustup target add i686-win7-windows-msvc --toolchain nightly
+
+  # Build 64-bit Win7 binary
+  cargo +nightly build -Z build-std --target x86_64-win7-windows-msvc --release
+
+  New-Item -ItemType Directory -Force -Path "dist\x86_64" | Out-Null
+
+  # Copy files and package artifact
+  Copy-Item "target\x86_64-win7-windows-msvc\release\elnpack.exe" "dist\x86_64\elnpack.exe"
+  Copy-Item "LICENSE" "dist\x86_64\LICENSE"
+  Copy-Item "README.md" "dist\x86_64\README.md"
+
+  Compress-Archive -Path "dist\x86_64\elnpack.exe","dist\x86_64\LICENSE","dist\x86_64\README.md" `
+                   -DestinationPath "dist\x86_64\elnpack-x86_64-win7-windows-msvc.zip" -Force
+
+  # Build 32-bit Win7 binary
+  cargo +nightly build -Z build-std --target i686-win7-windows-msvc --release
+
+  New-Item -ItemType Directory -Force -Path "dist\i686" | Out-Null
+
+  # Copy files and package artifact
+  Copy-Item "target\i686-win7-windows-msvc\release\elnpack.exe" "dist\i686\elnpack.exe"
+  Copy-Item "LICENSE" "dist\i686\LICENSE"
+  Copy-Item "README.md" "dist\i686\README.md"
+
+  Compress-Archive -Path "dist\i686\elnpack.exe","dist\i686\LICENSE","dist\i686\README.md" `
+                   -DestinationPath "dist\i686\elnpack-i686-win7-windows-msvc.zip" -Force
+  '''
+]
