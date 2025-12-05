@@ -10,10 +10,10 @@ A lightweight electronic lab notebook (ELN) entry packager built with [Rust](htt
 
 ## Features
 
-- Simple **Markdown** editor with quick-insert toolbar — choose Markdown or HTML at export time
+- Simple **Markdown** editor with quick-insert toolbar - choose Markdown or HTML at export time
 - **Attachments** panel with image thumbnails, duplicate detection by sanitized name and SHA-256, and filename sanitization
 - Keywords editor, supporting mass import of comma-separated keywords
-- **Metadata** editor with eLabFTW-style extra fields/groups (import, edit, validate) — exports per-field `PropertyValue` nodes plus an `elabftw_metadata` blob for RO-Crate/ELN File Format compatibility
+- **Metadata** editor with eLabFTW-style extra fields/groups (import, edit, validate) - exports per-field `PropertyValue` nodes plus an `elabftw_metadata` blob for RO-Crate/ELN File Format compatibility
 
 ## Installation
 
