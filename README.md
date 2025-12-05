@@ -6,14 +6,34 @@
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Athemis/ELNPack/total)
 ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Athemis/ELNPack/latest/total)
 
-A lightweight electronic lab notebook (ELN) entry packager built with [Rust](https://rust-lang.org), [egui](https://www.egui.rs), and [RO-Crate](https://www.researchobject.org/ro-crate) metadata. Users can write Markdown notes, attach files, add keywords, and export a `.eln` archive (see [The ELN Consortium](https://the.elnconsortium.org)) containing the experiment text plus attachments and RO-Crate metadata. `.eln` archives can be imported into many ELNs; ELNPack currently focuses on compatibility with [eLabFTW](https://www.elabftw.net).
+A lightweight electronic lab notebook (ELN) entry packager built with [Rust](https://rust-lang.org), [egui](https://www.egui.rs), and [RO-Crate](https://www.researchobject.org/ro-crate) metadata. Users can write Markdown notes, attach files, add keywords, and export an `.eln` archive (see [The ELN Consortium](https://the.elnconsortium.org)) containing the experiment text plus attachments and RO-Crate metadata. `.eln` archives can be imported into many ELNs; ELNPack currently focuses on compatibility with [eLabFTW](https://www.elabftw.net).
 
 ## Features
 
-- Simple **Markdown** editor with quick-insert toolbar — choose Markdown or HTML at export time
+- Simple **Markdown** editor with quick-insert toolbar - choose Markdown or HTML at export time
 - **Attachments** panel with image thumbnails, duplicate detection by sanitized name and SHA-256, and filename sanitization
 - Keywords editor, supporting mass import of comma-separated keywords
-- **Metadata** editor with eLabFTW-style extra fields/groups (import, edit, validate) — exports per-field `PropertyValue` nodes plus an `elabftw_metadata` blob for RO-Crate/ELN File Format compatibility
+- **Metadata** editor with eLabFTW-style extra fields/groups (import, edit, validate) - exports per-field `PropertyValue` nodes plus an `elabftw_metadata` blob for RO-Crate/ELN File Format compatibility
+
+## Installation
+
+- Download the latest release artifacts from GitHub Releases (pick the archive matching your OS/CPU: Linux tar.gz, Windows zip, macOS zip). Binaries are **not code-signed**, so Windows SmartScreen and macOS Gatekeeper may prompt; on macOS, right-click → Open to allow.
+- Windows: tested on Windows 10+ (x86_64/i686 MSVC). Install the latest VC++ Redistributable if your system lacks the Universal CRT.
+- macOS: tested on current macOS releases for Intel and Apple Silicon; relies only on built-in system frameworks.
+- Linux: built against glibc (e.g., Ubuntu 20.04+ / glibc ≥ 2.31). On minimal images ensure `libc6`, `libgcc-s1`, and `libm` are present.
+
+## Platforms & runtime prerequisites
+
+- Prebuilt release artifacts target Windows (x86_64/i686 MSVC, Windows 10+), Linux (x86_64/i686/aarch64 GNU, glibc), and macOS (arm64/x86_64). You can also build locally with Cargo.
+- Linux builds link only against glibc, libm, and libgcc_s (typical on mainstream distros). If you’re on an ultra-minimal image, ensure `libc6`, `libgcc-s1`, and `libm` are present.
+- macOS builds rely only on built-in system frameworks.
+- Windows builds rely on system DLLs available on Windows 10+ (`kernel32`, `user32`, `gdi32`, `uxtheme`, `opengl32`, API set DLLs). On older or stripped-down installs missing the Universal CRT, install the latest VC++ Redistributable: [x64](https://aka.ms/vs/17/release/vc_redist.x64.exe) / [x86](https://aka.ms/vs/17/release/vc_redist.x86.exe).
+
+## Quickstart
+
+1. Launch the app (`cargo run` or run the downloaded binary).
+2. Enter a title, write your note, add keywords, metadata, and attachments.
+3. Click **Save** to pick an output path; the archive is exported as `.eln` with RO-Crate metadata.
 
 ## Filename Sanitization & Editing
 
@@ -34,6 +54,15 @@ You can edit attachment filenames by clicking the **pencil button** (🖊) next 
 
 All edited filenames are automatically sanitized using the same rules above. Duplicate filenames are prevented, and validation errors are shown in the status bar.
 
+## Development
+
+Quick start: `cargo fmt && cargo test` before sending changes, and `cargo run` to launch. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow and release automation notes.
+
+## Building Release
+
+- Local release binary: `cargo build --release`
+- Tagged releases are built via cargo-dist in CI, producing installers/artifacts for Linux, macOS, and Windows.
+
 ## Project Layout
 
 - `src/main.rs` — entry; calls `app::run()` to launch eframe/egui.
@@ -46,28 +75,10 @@ All edited filenames are automatically sanitized using the same rules above. Dup
 - `src/utils/` — helpers (`sanitize_component`, `hash_file`).
 - Tests: colocated unit tests plus integration tests under `tests/` (if added).
 
-## Development
+## Security & Privacy
 
-Quick start: `cargo fmt && cargo test` before sending changes, and `cargo run` to launch. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow and release automation notes.
-
-## Building Release
-
-- Local release binary: `cargo build --release`
-- Tagged releases are built via cargo-dist in CI, producing installers/artifacts for Linux, macOS, and Windows.
-
-## Installation
-
-- Download the latest release artifacts from GitHub Releases (pick the archive matching your OS/CPU: Linux tar.gz, Windows zip, macOS zip). Binaries are **not code-signed**, so Windows SmartScreen and macOS Gatekeeper may prompt; on macOS, right-click → Open to allow.
-- Windows: tested on Windows 10+ (x86_64/i686 MSVC). Install the latest VC++ Redistributable if your system lacks the Universal CRT.
-- macOS: tested on current macOS releases for Intel and Apple Silicon; relies only on built-in system frameworks.
-- Linux: built against glibc (e.g., Ubuntu 20.04+ / glibc ≥ 2.31). On minimal images ensure `libc6`, `libgcc-s1`, and `libm` are present.
-
-## Platforms & runtime prerequisites
-
-- Prebuilt release artifacts target Windows (x86_64/i686 MSVC, Windows 10+), Linux (x86_64/i686/aarch64 GNU, glibc), and macOS (arm64/x86_64). You can also build locally with Cargo.
-- Linux builds link only against glibc, libm, and libgcc_s (typical on mainstream distros). If you’re on an ultra-minimal image, ensure `libc6`, `libgcc-s1`, and `libm` are present.
-- macOS builds rely only on built-in system frameworks.
-- Windows builds rely on system DLLs available on Windows 10+ (`kernel32`, `user32`, `gdi32`, `uxtheme`, `opengl32`, API set DLLs). On older or stripped-down installs missing the Universal CRT, install the [latest Microsoft VC++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version).
+- ELNPack runs locally and does not make outbound network requests.
+- File dialogs use native OS pickers; archives are written only to user-selected locations.
 
 ## License
 
@@ -75,7 +86,7 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 Source files include SPDX headers:
 
-```
+```rust
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2025 <Actual Author Name>
 ```
@@ -88,18 +99,9 @@ This repository follows the [REUSE Software](https://reuse.software/) specificat
 - Source files carry SPDX headers as shown above, so tools can automatically detect license and copyright.
 - If additional licenses are needed in the future, the corresponding texts will be placed under a `LICENSES/` directory according to REUSE conventions.
 
-## Security & Privacy
-
-- ELNPack runs locally and does not make outbound network requests.
-- File dialogs use native OS pickers; archives are written only to user-selected locations.
-
-## Contributing
-
-We welcome issues and PRs! See [CONTRIBUTING](CONTRIBUTING.md) for coding standards, testing checklist, git hooks, and commit conventions.
-
 ## FAQ
 
-- **Why is there a AGENTS.md? Is ELNPack AI created?**
+- **Why is there an AGENTS.md? Is ELNPack AI created?**
 
   Short answer: No, ELNPack is not AI created. However, I'd like to use available AI tools
   to provide support in e.g. bug solving, quality control and documentation. AGENTS.md is read and
