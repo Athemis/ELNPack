@@ -48,7 +48,7 @@ All edited filenames are automatically sanitized using the same rules above. Dup
 
 ## Development
 
-Quick start: `cargo fmt && cargo test` before sending changes, and `cargo run` to launch. See `CONTRIBUTING.md` for the full workflow and release automation notes.
+Quick start: `cargo fmt && cargo test` before sending changes, and `cargo run` to launch. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow and release automation notes.
 
 ## Building Release
 
