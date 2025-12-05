@@ -1,24 +1,26 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
+about: Suggest an idea for ELNPack (Rust/egui desktop app)
 title: ""
 labels: ""
 assignees: ""
 ---
 
-<!--
-SPDX-License-Identifier: MIT
-SPDX-FileCopyrightText: 2025 Alexander Minges
--->
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+**Problem / use case**
+What user problem are we solving? Include any ELN/RO-Crate/eLabFTW interop requirements.
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+**Proposed solution**
+What you want to happen. Include rough UX flow; mockups welcome.
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+**Acceptance criteria**
+List 2–4 bullet points that would define “done”.
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+**Target platforms**
+Which OSes matter here? (Windows/macOS/Linux)
+
+**Alternatives considered**
+Other approaches you thought about.
+
+**Performance or UX notes**
+Any constraints (startup time, dialog expectations).
