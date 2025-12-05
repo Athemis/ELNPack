@@ -239,11 +239,19 @@ fn render_editing_keyword(ui: &mut egui::Ui, model: &KeywordsModel, msgs: &mut V
         return;
     }
 
-    if ui.button("✔").on_hover_text("Save").clicked() {
+    if ui
+        .button(egui_phosphor::regular::CHECK)
+        .on_hover_text("Save")
+        .clicked()
+    {
         msgs.push(KeywordsMsg::CommitEdit);
     }
 
-    if ui.button("✕").on_hover_text("Cancel").clicked() {
+    if ui
+        .button(egui_phosphor::regular::X)
+        .on_hover_text("Cancel")
+        .clicked()
+    {
         msgs.push(KeywordsMsg::CancelEdit);
     }
 }
