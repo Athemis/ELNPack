@@ -6,28 +6,31 @@
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Athemis/ELNPack/total)
 ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Athemis/ELNPack/latest/total)
 
-A lightweight electronic lab notebook (ELN) entry packager built with [Rust](https://rust-lang.org), [egui](https://www.egui.rs), and [RO-Crate](https://www.researchobject.org/ro-crate) metadata. Users can write Markdown notes, attach files, add keywords, and export a `.eln` archive (see [The ELN Consortium](https://the.elnconsortium.org)) containing the experiment text plus attachments and RO-Crate metadata. `.eln` archives can be imported into a wide range of ELNs, the current focus of ELNPack is however compatibility with [eLabFTW](https://www.elabftw.net).
+A lightweight electronic lab notebook (ELN) entry packager built with [Rust](https://rust-lang.org), [egui](https://www.egui.rs), and [RO-Crate](https://www.researchobject.org/ro-crate) metadata. Users can write Markdown notes, attach files, add keywords, and export a `.eln` archive (see [The ELN Consortium](https://the.elnconsortium.org)) containing the experiment text plus attachments and RO-Crate metadata. `.eln` archives can be imported into many ELNs; ELNPack currently focuses on compatibility with [eLabFTW](https://www.elabftw.net).
 
 ## Features
 
-- Simple **Markdown** editor with quick-insert toolbar
-- **Attachments** panel with image thumbnails, duplicate detection and filename sanitization
+- Simple **Markdown** editor with quick-insert toolbar — choose Markdown or HTML at export time
+- **Attachments** panel with image thumbnails, duplicate detection by sanitized name and SHA-256, and filename sanitization
 - Keywords editor, supporting mass import of comma-separated keywords
-- **Metadata** editor, allowing users to add custom metadata fields ad import from eLabFTW extra field JSON files
+- **Metadata** editor with eLabFTW-style extra fields/groups (import, edit, validate) — exports per-field `PropertyValue` nodes plus an `elabftw_metadata` blob for RO-Crate/ELN File Format compatibility
 
 ## Filename Sanitization & Editing
 
 When you attach files, ELNPack automatically sanitizes filenames to ensure cross-platform compatibility. The sanitization process:
 
 1. Transliterates Unicode characters (e.g., `Café` → `Cafe`)
-2. Replaces separators and special characters with underscores
-3. Guards against Windows reserved names (e.g., `CON`, `PRN`, `AUX`)
+2. Collapses runs of separators/dots to a single `_`/`.` and trims trailing dots/spaces
+3. Replaces other special characters with underscores
+4. Falls back to `eln_entry` for empty/dot-only names and appends “_” to Windows reserved basenames (e.g., `CON` → `CON_`)
 
 When a filename is sanitized, the attachments panel displays a **⚠ WARNING** icon next to the sanitized name. Hover over the icon to see the original → sanitized transformation.
 
+Attachments are also rehashed before saving to catch tampering between selection and export. Duplicate attachments are skipped if either the sanitized name or SHA-256 digest matches an existing item.
+
 ### Editing Filenames
 
-You can edit attachment filenames by clicking the **pencil button** (🖊) next to any filename. The inline editor allows you to rename files before creating the archive
+You can edit attachment filenames by clicking the **pencil button** (🖊) next to any filename. The inline editor allows you to rename files before creating the archive.
 
 All edited filenames are automatically sanitized using the same rules above. Duplicate filenames are prevented, and validation errors are shown in the status bar.
 
@@ -45,17 +48,12 @@ All edited filenames are automatically sanitized using the same rules above. Dup
 
 ## Development
 
-- Run: `cargo run`
-- Check: `cargo check`
-- Lint: `cargo clippy --all-targets --all-features`
-- Format: `cargo fmt`
-- Test: `cargo test`
+Quick start: `cargo fmt && cargo test` before sending changes, and `cargo run` to launch. See `CONTRIBUTING.md` for the full workflow and release automation notes.
 
 ## Building Release
 
-```
-cargo build --release
-```
+- Local release binary: `cargo build --release`
+- Tagged releases are built via cargo-dist in CI, producing installers/artifacts for Linux, macOS, and Windows.
 
 ## License
 
@@ -81,9 +79,10 @@ This repository follows the [REUSE Software](https://reuse.software/) specificat
 - ELNPack runs locally and does not make outbound network requests.
 - File dialogs use native OS pickers; archives are written only to user-selected locations.
 
-## Windows prerequisites
+## Platforms & Windows prerequisites
 
-- The binaries rely on the Microsoft Visual C++ Redistributable v14. On Windows 10+, install the latest package from Microsoft: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
+- Prebuilt release artifacts target Windows (x86_64/i686 MSVC), Linux (x86_64/i686/aarch64 GNU), and macOS (arm64/x86_64). You can also build locally with Cargo.
+- Windows binaries rely on the Microsoft Visual C++ Redistributable v14. On Windows 10+, install the latest package from Microsoft: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
 - For Windows 7 targets (`*-win7-windows-msvc`), use the older 2015–2019 redistributable which still supports Win7:
   - x64: https://aka.ms/vs/16/release/vc_redist.x64.exe
   - x86: https://aka.ms/vs/16/release/vc_redist.x86.exe
@@ -100,14 +99,3 @@ We welcome issues and PRs! See [CONTRIBUTING](CONTRIBUTING.md) for coding standa
   Short answer: No, ELNPack is not AI created. However, I'd like to use available AI tools
   to provide support in e.g. bug solving, quality control and documentation. AGENTS.md is read and
   understood by most of these tools.
-
-## License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE).
-
-Source files include SPDX headers:
-
-```
-// SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2025 <Actual Author Name>
-```
