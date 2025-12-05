@@ -62,6 +62,13 @@ Quick start: `cargo fmt && cargo test` before sending changes, and `cargo run` t
 - macOS: tested on current macOS releases for Intel and Apple Silicon; relies only on built-in system frameworks.
 - Linux: built against glibc (e.g., Ubuntu 20.04+ / glibc ≥ 2.31). On minimal images ensure `libc6`, `libgcc-s1`, and `libm` are present.
 
+## Platforms & runtime prerequisites
+
+- Prebuilt release artifacts target Windows (x86_64/i686 MSVC, Windows 10+), Linux (x86_64/i686/aarch64 GNU, glibc), and macOS (arm64/x86_64). You can also build locally with Cargo.
+- Linux builds link only against glibc, libm, and libgcc_s (typical on mainstream distros). If you’re on an ultra-minimal image, ensure `libc6`, `libgcc-s1`, and `libm` are present.
+- macOS builds rely only on built-in system frameworks.
+- Windows builds rely on system DLLs available on Windows 10+ (`kernel32`, `user32`, `gdi32`, `uxtheme`, `opengl32`, API set DLLs). On older or stripped-down installs missing the Universal CRT, install the [latest Microsoft VC++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version).
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE).
@@ -85,13 +92,6 @@ This repository follows the [REUSE Software](https://reuse.software/) specificat
 
 - ELNPack runs locally and does not make outbound network requests.
 - File dialogs use native OS pickers; archives are written only to user-selected locations.
-
-## Platforms & runtime prerequisites
-
-- Prebuilt release artifacts target Windows (x86_64/i686 MSVC, Windows 10+), Linux (x86_64/i686/aarch64 GNU, glibc), and macOS (arm64/x86_64). You can also build locally with Cargo.
-- Linux builds link only against glibc, libm, and libgcc_s (typical on mainstream distros). If you’re on an ultra-minimal image, ensure `libc6`, `libgcc-s1`, and `libm` are present.
-- macOS builds rely only on built-in system frameworks.
-- Windows builds rely on system DLLs available on Windows 10+ (`kernel32`, `user32`, `gdi32`, `uxtheme`, `opengl32`, API set DLLs). On older or stripped-down installs missing the Universal CRT, install the [latest Microsoft VC++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version).
 
 ## Contributing
 
