@@ -27,7 +27,7 @@ A lightweight electronic lab notebook (ELN) entry packager built with [Rust](htt
 - Prebuilt release artifacts target Windows (x86_64/i686 MSVC, Windows 10+), Linux (x86_64/i686/aarch64 GNU, glibc), and macOS (arm64/x86_64). You can also build locally with Cargo.
 - Linux builds link only against glibc, libm, and libgcc_s (typical on mainstream distros). If you’re on an ultra-minimal image, ensure `libc6`, `libgcc-s1`, and `libm` are present.
 - macOS builds rely only on built-in system frameworks.
-- Windows builds rely on system DLLs available on Windows 10+ (`kernel32`, `user32`, `gdi32`, `uxtheme`, `opengl32`, API set DLLs). On older or stripped-down installs missing the Universal CRT, install the latest VC++ Redistributable: [x64](https://aka.ms/vs/17/release/vc_redist.x64.exe) / [x86](https://aka.ms/vs/17/release/vc_redist.x86.exe).
+- Windows builds rely on system DLLs available on Windows 10+ (`kernel32`, `user32`, `gdi32`, `uxtheme`, `opengl32`, API set DLLs). On older or stripped-down installs missing the Universal CRT, install the latest VC++ Redistributable: [x64](https://aka.ms/vs/18/release/vc_redist.x64.exe) / [x86](https://aka.ms/vs/18/release/vc_redist.x86.exe).
 
 ## Quickstart
 
