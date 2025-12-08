@@ -26,6 +26,9 @@
 # Debug artifacts
 *.dSYM/
 
+# mdBook build output
+docs/user-guide/book/
+
 # profiling data
 *.profraw
 *.profdata
