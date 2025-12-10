@@ -1,0 +1,8 @@
+[book]
+title = "ELNPack User Guide"
+authors = ["ELNPack Team"]
+language = "en"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "ayu"
