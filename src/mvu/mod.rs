@@ -224,11 +224,7 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
         }
         Msg::HelpOpened(result) => match result {
             Ok(()) => surface_event(model, "Help opened in browser.".into(), false),
-            Err(err) => surface_event(
-                model,
-                format!("Could not open help page: {err}"),
-                true,
-            ),
+            Err(err) => surface_event(model, format!("Could not open help page: {err}"), true),
         },
     }
 }
