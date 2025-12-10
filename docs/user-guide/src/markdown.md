@@ -19,7 +19,6 @@
 2. Use the editor for the experiment description, steps, and results. The resulting Markdown is by default converted to HTML when exporting the ELN archive.
 
 > [!TIP]
->
 > - You can use all features of [CommonMark](https://commonmark.org) with some additional Markdown extensions like tables and math.
 > - Use raw HTML in the Markdown code for more advanced formatting. Keep in mind though that HTML is sanitized when exporting the ELN archive to prevent XSS attacks which may remove **potentially unsafe** HTML tags (e.g., `<script>`).
 
