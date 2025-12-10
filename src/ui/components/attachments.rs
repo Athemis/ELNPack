@@ -46,6 +46,7 @@ pub struct AttachmentsModel {
     attachments: Vec<AttachmentItem>,
     thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
     thumbnail_failures: HashSet<PathBuf>,
+    thumbnail_loading: HashSet<PathBuf>,
     hashes: HashSet<String>,
     editing_index: Option<usize>,
     editing_buffer: String,
@@ -134,7 +135,10 @@ pub fn update(
             })
         }
         AttachmentsMsg::LoadThumbnail(path) => {
-            cmds.push(AttachmentsCommand::LoadThumbnail { path });
+            // Avoid queuing duplicate thumbnail loads.
+            if model.thumbnail_loading.insert(path.clone()) {
+                cmds.push(AttachmentsCommand::LoadThumbnail { path });
+            }
             None
         }
         AttachmentsMsg::HashComputed {
@@ -154,11 +158,13 @@ pub fn update(
             })
         }
         AttachmentsMsg::ThumbnailReady { path, texture } => {
-            model.thumbnail_cache.insert(path, texture);
+            model.thumbnail_cache.insert(path.clone(), texture);
+            model.thumbnail_loading.remove(&path);
             None
         }
         AttachmentsMsg::ThumbnailFailed { path } => {
-            model.thumbnail_failures.insert(path);
+            model.thumbnail_failures.insert(path.clone());
+            model.thumbnail_loading.remove(&path);
             None
         }
         AttachmentsMsg::Remove(index) => {
@@ -259,10 +265,10 @@ fn render_attachment_list(
                 let thumb_rect = ui.allocate_space(egui::vec2(96.0, 72.0)).1;
 
                 if is_image(&path) {
-                    if !model.thumbnail_failures.contains(&path) {
+                    if !model.thumbnail_failures.contains(&path)
+                        && !model.thumbnail_loading.contains(&path)
+                    {
                         msgs.push(AttachmentsMsg::LoadThumbnail(path.clone()));
-                    } else {
-                        render_placeholder_icon(ui, thumb_rect, icon_for_mime);
                     }
                     // Always show a placeholder while the image is loading or failed.
                     render_placeholder_icon(ui, thumb_rect, icon_for_mime);
