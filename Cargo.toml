@@ -1,6 +1,6 @@
 [package]
 name = "elnpack"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "Lightweight electronic lab notebook (ELN) entry packager that creates .eln archives with Markdown notes, attachments, and RO-Crate metadata."
 license = "MIT"
