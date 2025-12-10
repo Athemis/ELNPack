@@ -34,3 +34,7 @@ ELNPack is a desktop app for creating [ELN archives](https://the.elnconsortium.o
 - Describe your experiment using metadata. Import existing metadata from eLabFTW extra field JSON files.
 - Attach arbitrary files.
 - Export an ELN archive compatible with eLabFTW.
+
+## License
+
+This User Guide is licensed under the Creative Commons Attribution 4.0 International License ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
