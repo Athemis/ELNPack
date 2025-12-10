@@ -104,6 +104,7 @@ impl eframe::App for ElnPackApp {
             ui.horizontal(|ui| {
                 ui.heading("ELN Entry");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    self.render_help_button(ui);
                     self.render_theme_controls(ui);
                     ui.separator();
                     self.render_save_button(ui);
@@ -164,6 +165,19 @@ impl ElnPackApp {
     fn render_theme_controls(&mut self, ui: &mut egui::Ui) {
         ui.add_space(2.0);
         egui::widgets::global_theme_preference_switch(ui);
+    }
+
+    /// Render a compact help button that opens the hosted user guide in a browser tab.
+    fn render_help_button(&mut self, ui: &mut egui::Ui) {
+        ui.add_space(2.0);
+        let button = egui::Button::new(egui_phosphor::regular::QUESTION);
+        if ui
+            .add(button)
+            .on_hover_text("Open the ELNPack user guide")
+            .clicked()
+        {
+            self.inbox.push(Msg::OpenHelp);
+        }
     }
 
     /// Renders the "Save ELN archive" button and, when activated, opens a file-save dialog to request saving the current entry.

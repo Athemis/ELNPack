@@ -54,6 +54,8 @@ pub enum Msg {
     SaveRequested(PathBuf),
     SaveCancelled,
     SaveCompleted(Result<PathBuf, String>),
+    OpenHelp,
+    HelpOpened(Result<(), String>),
     ThumbnailDecoded {
         path: PathBuf,
         image: eframe::egui::ColorImage,
@@ -76,6 +78,7 @@ pub enum Command {
     HashFile { path: PathBuf, _retry: bool },
     LoadThumbnail { path: PathBuf, _retry: bool },
     PickExtraFieldsFile,
+    OpenUrl { url: String },
     SaveArchive(SavePayload),
 }
 
@@ -209,6 +212,24 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
             Ok(path) => surface_event(model, format!("Archive saved: {}", path.display()), false),
             Err(err) => surface_event(model, format!("Failed to save archive:\n\n{err}"), true),
         },
+        Msg::OpenHelp => {
+            cmds.push(Command::OpenUrl {
+                url: "https://athemis.github.io/ELNPack/".to_string(),
+            });
+            surface_event(
+                model,
+                "Opening ELNPack user guide in your browser…".into(),
+                false,
+            );
+        }
+        Msg::HelpOpened(result) => match result {
+            Ok(()) => surface_event(model, "Help opened in browser.".into(), false),
+            Err(err) => surface_event(
+                model,
+                format!("Could not open help page: {err}"),
+                true,
+            ),
+        },
     }
 }
 
@@ -299,6 +320,10 @@ pub fn run_command(cmd: Command) -> Msg {
             )
             .map(|_| payload.output.clone());
             Msg::SaveCompleted(res.map_err(|e| e.to_string()))
+        }
+        Command::OpenUrl { url } => {
+            let res = open::that(url).map(|_| ());
+            Msg::HelpOpened(res.map_err(|e| e.to_string()))
         }
     }
 }
