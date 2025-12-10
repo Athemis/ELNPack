@@ -8,6 +8,8 @@
 
 A lightweight electronic lab notebook (ELN) entry packager built with [Rust](https://rust-lang.org), [egui](https://www.egui.rs), and [RO-Crate](https://www.researchobject.org/ro-crate) metadata. Users can write Markdown notes, attach files, add keywords, and export an `.eln` archive (see [The ELN Consortium](https://the.elnconsortium.org)) containing the experiment text plus attachments and RO-Crate metadata. `.eln` archives can be imported into many ELNs; ELNPack currently focuses on compatibility with [eLabFTW](https://www.elabftw.net).
 
+For detailed usage instructions, see the **[User Guide](https://athemis.github.io/ELNPack/)**.
+
 ## Features
 
 - Simple **Markdown** editor with quick-insert toolbar - choose Markdown or HTML at export time
