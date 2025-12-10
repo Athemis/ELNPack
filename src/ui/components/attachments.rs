@@ -11,7 +11,7 @@ use egui_extras::image::load_svg_bytes_with_size;
 use usvg::Options;
 
 use crate::models::attachment::Attachment;
-use crate::utils::sanitize_component;
+use crate::utils::{icon_for, sanitize_component};
 
 /// User-selected attachment with original path and sanitized display name.
 pub struct AttachmentItem {
@@ -248,16 +248,27 @@ fn render_attachment_list(
         };
 
         ui.horizontal(|ui| {
+            let icon_for_mime = icon_for(&mime, &path);
+
             let _thumb_slot = if let Some(texture) = model.thumbnail_cache.get(&path) {
                 let size = texture.size_vec2();
                 let max = 96.0;
                 let scale = (max / size.x).min(max / size.y).min(1.0);
                 ui.add(egui::Image::new((texture.id(), size * scale))).rect
             } else {
-                if !model.thumbnail_failures.contains(&path) && is_image(&path) {
-                    msgs.push(AttachmentsMsg::LoadThumbnail(path.clone()));
+                let thumb_rect = ui.allocate_space(egui::vec2(96.0, 72.0)).1;
+
+                if is_image(&path) {
+                    if !model.thumbnail_failures.contains(&path) {
+                        msgs.push(AttachmentsMsg::LoadThumbnail(path.clone()));
+                    } else {
+                        render_placeholder_icon(ui, thumb_rect, icon_for_mime);
+                    }
+                } else {
+                    render_placeholder_icon(ui, thumb_rect, icon_for_mime);
                 }
-                ui.allocate_space(egui::vec2(96.0, 72.0)).1
+
+                thumb_rect
             };
 
             ui.vertical(|ui| {
@@ -507,6 +518,28 @@ fn format_bytes(bytes: u64) -> String {
     } else {
         format!("{value:.1} {}", UNITS[unit])
     }
+}
+
+/// Render a centered placeholder icon inside the provided rectangle.
+fn render_placeholder_icon(ui: &mut egui::Ui, rect: egui::Rect, icon: &'static str) {
+    let painter = ui.painter();
+    let color = ui.visuals().weak_text_color();
+    let mut font_id = egui::TextStyle::Heading.resolve(ui.style());
+    font_id.size *= 1.6;
+    painter.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        icon,
+        font_id,
+        color,
+    );
+    // Light outline to hint at the thumbnail slot.
+    painter.rect_stroke(
+        rect,
+        4.0,
+        egui::Stroke::new(1.0, color),
+        egui::StrokeKind::Inside,
+    );
 }
 
 /// Load and resize an image to a thumbnail-friendly `ColorImage`.
