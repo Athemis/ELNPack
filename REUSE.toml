@@ -30,14 +30,12 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2025 Alexander Minges"
 SPDX-License-Identifier = "MIT"
 
-[[annotations]]
-path = "**/*.json"
-precedence = "aggregate"
-SPDX-FileCopyrightText = "2025 Alexander Minges"
-SPDX-License-Identifier = "MIT"
+
+
+
 
 [[annotations]]
-path = "**/*.nix"
-precedence = "aggregate"
+path = "docs/user-guide/**"
+precedence = "override"
 SPDX-FileCopyrightText = "2025 Alexander Minges"
-SPDX-License-Identifier = "MIT"
+SPDX-License-Identifier = "CC-BY-4.0"
