@@ -264,6 +264,8 @@ fn render_attachment_list(
                     } else {
                         render_placeholder_icon(ui, thumb_rect, icon_for_mime);
                     }
+                    // Always show a placeholder while the image is loading or failed.
+                    render_placeholder_icon(ui, thumb_rect, icon_for_mime);
                 } else {
                     render_placeholder_icon(ui, thumb_rect, icon_for_mime);
                 }
