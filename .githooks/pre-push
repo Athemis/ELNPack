@@ -6,6 +6,12 @@ set -euo pipefail
 # Pre-push hook to validate that all commits being pushed follow Conventional Commits
 # This prevents malformed commits that may have bypassed commit-msg hook during rebases
 
+# Optional escape hatch
+if [[ ${SKIP_PRE_PUSH:-0} == 1 ]]; then
+    echo "[pre-push] skipped via SKIP_PRE_PUSH"
+    exit 0
+fi
+
 # Source shared validation logic
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/validate-commit-msg.sh"
@@ -15,36 +21,42 @@ url="$2"
 
 has_errors=0
 
+# Track already-checked commits to avoid duplicate linting across multiple refs
+declare -A SEEN_COMMITS=()
+
 # Read stdin to get the refs being pushed
 while read local_ref local_sha remote_ref remote_sha; do
-  if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
-    # Deleting a branch, skip validation
-    continue
-  fi
-
-  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
-    # New branch, check all commits
-    range="$local_sha"
-  else
-    # Updating existing branch, check new commits only
-    range="$remote_sha..$local_sha"
-  fi
-
-  # Get all commit messages in the range
-  while IFS= read -r commit_msg; do
-    if ! validate_commit_msg "$commit_msg"; then
-      print_error "$commit_msg"
-      echo >&2
-      has_errors=1
+    if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        # Deleting a branch, skip validation
+        continue
     fi
-  done < <(git log --format=%s "$range")
+
+    # For this local tip, get all commits that are reachable from it
+    # but NOT reachable from any remote ref (i.e. truly new to the remote side)
+    while IFS= read -r line; do
+        # line format: "<sha> <subject>"
+        commit_sha="${line%% *}"
+        commit_msg="${line#* }"
+
+        # Skip if we've already checked this commit (can be reachable from multiple refs)
+        if [[ -n "${SEEN_COMMITS[$commit_sha]:-}" ]]; then
+            continue
+        fi
+        SEEN_COMMITS["$commit_sha"]=1
+
+        if ! validate_commit_msg "$commit_msg"; then
+            print_error "$commit_msg"
+            echo >&2
+            has_errors=1
+        fi
+    done < <(git log --format='%H %s' "$local_sha" --not --remotes)
 done
 
 if [ $has_errors -eq 1 ]; then
-  echo >&2
-  echo "Push rejected due to invalid commit messages." >&2
-  echo "Please fix the commit messages using 'git rebase -i' or 'git commit --amend'." >&2
-  exit 1
+    echo >&2
+    echo "Push rejected due to invalid commit messages." >&2
+    echo "Please fix the commit messages using 'git rebase -i' or 'git commit --amend'." >&2
+    exit 1
 fi
 
 exit 0
