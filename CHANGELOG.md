@@ -6,6 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.1.1] - 2025-12-10
+
+### 🚀 Features
+
+- Add help button opening the user guide ([#27](https://github.com/Athemis/ELNPack/pull/27))
+- Add MIME-aware file icons ([#28](https://github.com/Athemis/ELNPack/pull/28))
+
+### 🐛 Bug Fixes
+
+- _(ui)_ Replace keyword editor unicode buttons with phosphor icons (#24)
+- _(ci)_ Use semver notation for mdbook
+- Only check new commits in pre-push hook
+
+### 🚜 Refactor
+
+### 📚 Documentation
+
+- Add GitHub downloads badges to README.md
+- Update features section in README.md
+- Update README.md and CONTRIBUTING.md
+- Update README install/runtime notes
+- Link README to contributing guide
+- Update Windows VC++ Redistributable link in README.md
+- Reorder sections in README
+- Update README
+- Update Windows VC++ Redistributable URLs
+- Add user guide ([#26](https://github.com/Athemis/ELNPack/pull/26))
+- Add link to user guide
+- Add license information to user guide
+
+### 🎨 Styling
+
+### 🧪 Testing
+
+### ⚙️ Miscellaneous Tasks
+
+- Add Apache License 2.0 file
+- Update issue/PR templates
+- Trigger mdBook build only on relevant docs changes
+- Add CC-BY 4.0 license and update REUSE configuration
+- Add REUSE lint step to CI workflow
+- Bump version to 0.1.1
+
 ## [0.1.0] - 2025-12-03
 
 ### 🚀 Features
@@ -44,10 +88,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Show empty metadata groups and support add-group/add-field flow
 - Add fields from group context and default section
 - Auto-create default group when adding first metadata field
-- *(ui)* Hide empty default section; only show when ungrouped fields exist
+- _(ui)_ Hide empty default section; only show when ungrouped fields exist
 - Allow choosing field type when creating extra fields
-- *(ui)* Prevent deleting the last extra-field group
-- *(ui)* Make extra-field groups collapsible
+- _(ui)_ Prevent deleting the last extra-field group
+- _(ui)_ Make extra-field groups collapsible
 - Enforce unique extra-field names with inline warning
 - Block save on empty required extra fields and highlight them
 - Disable save until required extra fields are filled
@@ -63,8 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Sanitize html and filenames
 - Tighten archive name sanitization
-- *(datetime)* Align default picker with local time and clarify ui
-- *(editor)* Fix styling of text selections
+- _(datetime)_ Align default picker with local time and clarify ui
+- _(editor)_ Fix styling of text selections
 - Keep file extensions; improve filename sanitation
 - Always reassign fields to a Default group when removing groups
 - Reuse existing group when adding fields and simplify group picker
@@ -81,12 +125,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unify markdown style application helpers
 - Simplify attachments panel layout
 - Simplify attachments and fix all clippy warnings
-- *(ui)* Extract keywords and datetime picker components
+- _(ui)_ Extract keywords and datetime picker components
 - Align project layout with MVU structure
 - Extract shared validation logic for git hooks
-- *(ui)* Reuse a shared toggle switch and separate multi-select control
-- *(ui)* Streamline metadata field layout and unit handling
-- *(ui)* Refactor group header rendering with improved layout
+- _(ui)_ Reuse a shared toggle switch and separate multi-select control
+- _(ui)_ Streamline metadata field layout and unit handling
+- _(ui)_ Refactor group header rendering with improved layout
 - Centralize extra field validation for ui and save paths
 - Deduplicate extra field trimming helpers
 - Centralize extra field group helpers
@@ -121,7 +165,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use phosphor icons for heading selection
 - Drop RichText for icon display
 - Add icon to save button
-- *(ui)* Modify extra fields metadata import UI labels
+- _(ui)_ Modify extra fields metadata import UI labels
 - Add missing newlines at end of files
 - Fix clippy warnings
 - Rename test to clarify group display name fallback behavior
@@ -149,7 +193,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update AGENTS.md
 - Rename LICENSE.md to LICENSE
 - Update copyright statement in LICENSE
-- *(license)* Add SPDX headers and fix copyright holder
+- _(license)_ Add SPDX headers and fix copyright holder
 - Update README
 - Add CI workflow and GitHub project templates
 - Add initial Dependabot configuration
