@@ -249,10 +249,10 @@ jobs:
             | xargs -0 -r sha256sum >> SHA256SUMS
 
       - name: Generate changelog with git-cliff
-        uses: orhun/git-cliff-action@v2
+        uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
-          args: --tag ${{ github.ref_name }} --output release_notes.md
+          args: --vv --tag ${{ github.ref_name }} --strip header --output release_notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
