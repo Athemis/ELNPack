@@ -252,16 +252,24 @@ jobs:
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
-          args: --vv --tag ${{ github.ref_name }} --strip header --output release_notes.md
+          args: -vv --tag ${{ github.ref_name }} --strip header --output release_notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Collect release files
+        id: release_files
+        run: |
+          find dist -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "SHA256SUMS" \) -print | sort > release_files.txt
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          cat release_files.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          cat release_files.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: |
-            dist/**/*
+          files: ${{ steps.release_files.outputs.files }}
           draft: false
           generate_release_notes: false
           body_path: release_notes.md
