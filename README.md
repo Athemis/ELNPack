@@ -19,17 +19,17 @@ For detailed usage instructions, see the **[User Guide](https://athemis.github.i
 
 ## Installation
 
-- Download the latest release artifacts from GitHub Releases (pick the archive matching your OS/CPU: Linux tar.gz, Windows zip, macOS zip). Binaries are **not code-signed**, so Windows SmartScreen and macOS Gatekeeper may prompt; on macOS, right-click → Open to allow.
-- Windows: tested on Windows 10+ (x86_64/i686 MSVC). Install the latest VC++ Redistributable if your system lacks the Universal CRT.
+- Download the latest release artifacts from GitHub Releases (pick the archive matching your OS/CPU: Linux tar.gz, Windows zip, macOS tar.gz). Binaries are **not code-signed**, so Windows SmartScreen and macOS Gatekeeper may prompt; on macOS, right-click → Open to allow.
+- Windows: tested on Windows 10+ (x86_64 MSVC). Install the latest VC++ Redistributable if your system lacks the Universal CRT.
 - macOS: tested on current macOS releases for Intel and Apple Silicon; relies only on built-in system frameworks.
 - Linux: built against glibc (e.g., Ubuntu 20.04+ / glibc ≥ 2.31). On minimal images ensure `libc6`, `libgcc-s1`, and `libm` are present.
 
 ## Platforms & runtime prerequisites
 
-- Prebuilt release artifacts target Windows (x86_64/i686 MSVC, Windows 10+), Linux (x86_64/i686/aarch64 GNU, glibc), and macOS (arm64/x86_64). You can also build locally with Cargo.
+- Prebuilt release artifacts target Windows (x86_64/i686 MSVC, Windows 10+), Linux (x86_64/i686 glibc), and macOS (arm64/x86_64). You can also build locally with Cargo.
 - Linux builds link only against glibc, libm, and libgcc_s (typical on mainstream distros). If you’re on an ultra-minimal image, ensure `libc6`, `libgcc-s1`, and `libm` are present.
 - macOS builds rely only on built-in system frameworks.
-- Windows builds rely on system DLLs available on Windows 10+ (`kernel32`, `user32`, `gdi32`, `uxtheme`, `opengl32`, API set DLLs). On older or stripped-down installs missing the Universal CRT, install the latest VC++ Redistributable: [x64](https://aka.ms/vs/18/release/vc_redist.x64.exe) / [x86](https://aka.ms/vs/18/release/vc_redist.x86.exe).
+- Windows builds rely on system DLLs available on Windows 10+ (`kernel32`, `user32`, `gdi32`, `uxtheme`, `opengl32`, API set DLLs). On older installs missing the Universal CRT, install the latest VC++ Redistributable: [x64](https://aka.ms/vs/18/release/vc_redist.x64.exe).
 
 ## Quickstart
 
@@ -63,7 +63,8 @@ Quick start: `cargo fmt && cargo test` before sending changes, and `cargo run` t
 ## Building Release
 
 - Local release binary: `cargo build --release`
-- Tagged releases are built via cargo-dist in CI, producing installers/artifacts for Linux, macOS, and Windows.
+- Tagged releases (refs `v*`) trigger `.github/workflows/release.yml` to lint/test and build artifacts for Linux (x86_64/i686), macOS (arm64/x86_64), and Windows (x86_64/i686); git-cliff generates the release notes from commits.
+- Release prep helper: `scripts/create_release.sh <version>` bumps workspace version and can commit/tag; use `--no-commit` or `--no-tag` to skip. Push commit (if any) first, then push the tag to start the pipeline.
 
 ## Project Layout
 
