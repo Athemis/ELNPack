@@ -76,7 +76,7 @@ if ((CREATE_COMMIT)); then
     fi
     # Use Git's own NUL pathspec ingestion; avoids brittle parsing.
     git status --porcelain -z --untracked-files=no |
-        git add --pathspec-from-file=- --null
+        git add --pathspec-from-file=- --pathspec-file-nul
     git commit -m "Bump version to ${VERSION}"
 fi
 
