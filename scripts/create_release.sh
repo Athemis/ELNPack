@@ -74,9 +74,13 @@ if ((CREATE_COMMIT)); then
         echo "No changes detected after version bump; aborting commit." >&2
         exit 1
     fi
-    # Use Git's own NUL pathspec ingestion; avoids brittle parsing.
-    git status --porcelain -z --untracked-files=no |
-        git add --pathspec-from-file=- --pathspec-file-nul
+    # Filter status entries to extract pathspecs (skip status flags).
+    printf '%s' "${status_output}" \
+      | while IFS= read -r -d '' entry; do
+            path="${entry:3}"
+            printf '%s\0' "$path"
+        done \
+      | git add --pathspec-from-file=- --pathspec-file-nul
     git commit -m "Bump version to ${VERSION}"
 fi
 
