@@ -4,6 +4,7 @@
 
 # Helper for manual, tag-based releases.
 # - Bumps workspace version via cargo-edit
+# - Generates full changelog with git-cliff
 # - Optionally commits and tags
 # Usage: scripts/create_release.sh <version> [--no-commit] [--no-tag]
 
@@ -42,6 +43,10 @@ if ! cargo set-version --help >/dev/null 2>&1; then
     echo "cargo-edit missing: install with 'cargo install cargo-edit'" >&2
     exit 1
 fi
+if ! command -v git-cliff >/dev/null 2>&1; then
+    echo "git-cliff missing: install with 'cargo install git-cliff'" >&2
+    exit 1
+fi
 # Working tree must be clean: no unstaged, no staged, no untracked files.
 if ! git diff --quiet --stat; then
     echo "Unstaged changes present; stash/commit before bumping." >&2
@@ -64,6 +69,8 @@ fi
 
 echo "Setting workspace version to ${VERSION}"
 cargo set-version --workspace "${VERSION}"
+echo "Generating full changelog with git-cliff"
+git-cliff --config cliff.toml --output CHANGELOG.md --verbose
 
 git status --short
 
@@ -78,6 +85,7 @@ if ((CREATE_COMMIT)); then
         exit 1
     fi
     git add -- "${paths[@]}"
+    git add CHANGELOG.md
     git commit -m "chore(release): bump version to ${VERSION}"
 fi
 
