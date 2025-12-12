@@ -69,7 +69,10 @@ git status --short
 
 if ((CREATE_COMMIT)); then
     # Stage only the files touched by the version bump (NUL-safe, handles renames/copies).
-    mapfile -d '' paths < <(git diff --name-only -z --no-ext-diff --untracked-files=no)
+    paths=()
+    while IFS= read -r -d '' entry; do
+        paths+=("${entry:3}")
+    done < <(git status --porcelain -z --untracked-files=no)
     if (( ${#paths[@]} == 0 )); then
         echo "No changes detected after version bump; aborting commit." >&2
         exit 1
