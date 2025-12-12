@@ -35,9 +35,9 @@ Thanks for your interest in improving ELNPack! This guide keeps contributions co
 
 ## Release & Delivery
 
-- Automated draft releases: `release-plz` runs on every push to `main`, opening a PR that bumps versions and changelog (see `.github/workflows/release-plz.yml`).
-- Tagged releases: pushing a semver-ish tag triggers cargo-dist (`.github/workflows/release.yml`) to build/upload artifacts for Linux (x86_64/i686/aarch64 GNU), macOS (arm64/x86_64), and Windows (x86_64/i686 MSVC), and to create the GitHub Release.
-- CI matrix: standard `ci.yml` runs fmt → clippy → test → `cargo doc --no-deps`; keep PRs green by matching these locally.
+- Tagged releases: pushing a semver-ish tag (`v*`) triggers `.github/workflows/release.yml` to lint/test and build/upload artifacts for Linux (x86_64/i686), macOS (arm64/x86_64), and Windows (x86_64/i686). Release notes are generated via git-cliff.
+- Release helper: `scripts/create_release.sh <version>` bumps workspace version, optionally commits, and tags. Push the tag to start the pipeline.
+- CI matrix: `ci.yml` runs fmt → clippy → test → `cargo doc --no-deps`; keep PRs green by matching these locally.
 
 ## Git hooks
 
