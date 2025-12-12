@@ -252,7 +252,7 @@ jobs:
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
-          args: -vv --tag ${{ github.ref_name }} --strip header --output release_notes.md
+          args: -vv --tag ${{ github.ref_name }} --latest --strip header --output release_notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
