@@ -64,7 +64,7 @@ Quick start: `cargo fmt && cargo test` before sending changes, and `cargo run` t
 
 - Local release binary: `cargo build --release`
 - Tagged releases (refs `v*`) trigger `.github/workflows/release.yml` to lint/test and build artifacts for Linux (x86_64/i686), macOS (arm64/x86_64), and Windows (x86_64/i686); git-cliff generates the release notes from commits.
-- Release prep helper: `scripts/create_release.sh <version>` bumps workspace version, commits, and tags; push the tag to start the pipeline.
+- Release prep helper: `scripts/create_release.sh <version>` bumps workspace version and can commit/tag; use `--no-commit` or `--no-tag` to skip. Push commit (if any) first, then push the tag to start the pipeline.
 
 ## Project Layout
 
