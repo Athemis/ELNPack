@@ -218,12 +218,15 @@ impl ElnPackApp {
         ui.label("Title");
         ui.add_space(4.0);
         let mut title = self.model.entry_title.clone();
-        if ui
-            .add(
-                egui::TextEdit::singleline(&mut title)
-                    .hint_text("e.g., Cell viability assay day 3"),
-            )
-            .changed()
+        let title_response = ui.add(
+            egui::TextEdit::singleline(&mut title).hint_text("e.g., Cell viability assay day 3"),
+        );
+
+        if title_response.changed()
+            || (title_response.lost_focus()
+                && ui.input(|inp| {
+                    inp.key_pressed(egui::Key::Enter) || inp.key_pressed(egui::Key::Tab)
+                }))
         {
             self.inbox.push(Msg::EntryTitleChanged(title));
         }

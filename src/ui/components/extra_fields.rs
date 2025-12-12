@@ -1051,7 +1051,12 @@ fn render_number(
         let mut val = field.value.clone();
         let disabled = field.readonly;
         let resp = ui.add_enabled(!disabled, egui::TextEdit::singleline(&mut val));
-        if resp.changed() {
+        if resp.changed()
+            || (resp.lost_focus()
+                && ui.input(|inp| {
+                    inp.key_pressed(egui::Key::Enter) || inp.key_pressed(egui::Key::Tab)
+                }))
+        {
             msgs.push(ExtraFieldsMsg::EditValue {
                 index: idx,
                 value: val,
@@ -1110,7 +1115,10 @@ fn render_text_input(
         !disabled,
         egui::TextEdit::singleline(&mut val).hint_text(field_hint(&field.kind)),
     );
-    if resp.changed() {
+    if resp.changed()
+        || (resp.lost_focus()
+            && ui.input(|inp| inp.key_pressed(egui::Key::Enter) || inp.key_pressed(egui::Key::Tab)))
+    {
         msgs.push(ExtraFieldsMsg::EditValue {
             index: idx,
             value: val,
@@ -1386,8 +1394,17 @@ fn render_field_modal(
 
             ui.label("Title");
             let mut title = draft.label.clone();
-            if ui.text_edit_singleline(&mut title).changed() {
+            let title_resp = ui.text_edit_singleline(&mut title);
+            if title_resp.changed() {
                 msgs.push(ExtraFieldsMsg::DraftLabelChanged(title));
+            }
+
+            // Save on Enter key for better UX
+            if title_resp.lost_focus()
+                && ui.input(|inp| inp.key_pressed(egui::Key::Enter))
+                && can_save
+            {
+                msgs.push(ExtraFieldsMsg::CommitFieldModal);
             }
             // Reserve space even when no conflict to avoid layout jump.
             ui.add_space(2.0);

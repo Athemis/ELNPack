@@ -275,6 +275,11 @@ fn render_modal(ctx: &egui::Context, model: &KeywordsModel, msgs: &mut Vec<Keywo
                 msgs.push(KeywordsMsg::ModalInputChanged(input.clone()));
             }
 
+            // Add keywords on Enter key for better UX
+            if resp.lost_focus() && ui.input(|inp| inp.key_pressed(egui::Key::Enter)) {
+                msgs.push(KeywordsMsg::AddFromModal);
+            }
+
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 if ui.button("Add").clicked() {
