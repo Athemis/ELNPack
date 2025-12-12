@@ -30,10 +30,6 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2025 Alexander Minges"
 SPDX-License-Identifier = "MIT"
 
-
-
-
-
 [[annotations]]
 path = "docs/user-guide/**"
 precedence = "override"
