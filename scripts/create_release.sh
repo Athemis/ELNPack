@@ -78,7 +78,7 @@ if ((CREATE_COMMIT)); then
         exit 1
     fi
     git add -- "${paths[@]}"
-    git commit -m "Bump version to ${VERSION}"
+    git commit -m "chore(release): bump version to ${VERSION}"
 fi
 
 if ((CREATE_TAG)); then
