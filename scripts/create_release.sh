@@ -34,6 +34,10 @@ if ! command -v cargo >/dev/null 2>&1; then
     echo "cargo is required" >&2
     exit 1
 fi
+if ! command -v git >/dev/null 2>&1; then
+    echo "git is required" >&2
+    exit 1
+fi
 if ! cargo set-version --help >/dev/null 2>&1; then
     echo "cargo-edit missing: install with 'cargo install cargo-edit'" >&2
     exit 1
@@ -64,16 +68,15 @@ cargo set-version --workspace "${VERSION}"
 git status --short
 
 if ((CREATE_COMMIT)); then
-    # Stage only the files touched by the version bump.
+    # Stage only the files touched by the version bump (NUL-safe, handles renames/copies).
     status_output=$(git status --porcelain -z --untracked-files=no)
     if [[ -z "${status_output}" ]]; then
         echo "No changes detected after version bump; aborting commit." >&2
         exit 1
     fi
-    while IFS= read -r -d '' entry; do
-        path="${entry:3}"
-        git add -- "$path"
-    done < <(printf '%s' "${status_output}")
+    # Use Git's own NUL pathspec ingestion; avoids brittle parsing.
+    git status --porcelain -z --untracked-files=no |
+        git add --pathspec-from-file=- --null
     git commit -m "Bump version to ${VERSION}"
 fi
 
