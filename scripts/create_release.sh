@@ -69,18 +69,12 @@ git status --short
 
 if ((CREATE_COMMIT)); then
     # Stage only the files touched by the version bump (NUL-safe, handles renames/copies).
-    status_output=$(git status --porcelain -z --untracked-files=no)
-    if [[ -z "${status_output}" ]]; then
+    mapfile -d '' paths < <(git diff --name-only -z --no-ext-diff --untracked-files=no)
+    if (( ${#paths[@]} == 0 )); then
         echo "No changes detected after version bump; aborting commit." >&2
         exit 1
     fi
-    # Filter status entries to extract pathspecs (skip status flags).
-    printf '%s' "${status_output}" \
-      | while IFS= read -r -d '' entry; do
-            path="${entry:3}"
-            printf '%s\0' "$path"
-        done \
-      | git add --pathspec-from-file=- --pathspec-file-nul
+    git add -- "${paths[@]}"
     git commit -m "Bump version to ${VERSION}"
 fi
 
