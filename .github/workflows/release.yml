@@ -246,7 +246,7 @@ jobs:
           : > SHA256SUMS
           find . -maxdepth 2 -type f \( -name "*.tar.gz" -o -name "*.zip" \) -print0 \
             | sort -z \
-            | xargs -0 sha256sum >> SHA256SUMS
+            | xargs -0 -r sha256sum >> SHA256SUMS
 
       - name: Generate changelog with git-cliff
         uses: orhun/git-cliff-action@v2

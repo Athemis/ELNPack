@@ -65,12 +65,15 @@ git status --short
 
 if ((CREATE_COMMIT)); then
     # Stage only the files touched by the version bump.
-    changed_files=$(git status --porcelain=v1 | awk '{print $2}')
-    if [[ -z "${changed_files}" ]]; then
+    status_output=$(git status --porcelain -z --untracked-files=no)
+    if [[ -z "${status_output}" ]]; then
         echo "No changes detected after version bump; aborting commit." >&2
         exit 1
     fi
-    git add ${changed_files}
+    while IFS= read -r -d '' entry; do
+        path="${entry:3}"
+        git add -- "$path"
+    done < <(printf '%s' "${status_output}")
     git commit -m "Bump version to ${VERSION}"
 fi
 
