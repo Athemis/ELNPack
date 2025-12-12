@@ -38,8 +38,23 @@ if ! cargo set-version --help >/dev/null 2>&1; then
     echo "cargo-edit missing: install with 'cargo install cargo-edit'" >&2
     exit 1
 fi
+# Working tree must be clean: no unstaged, no staged, no untracked files.
 if ! git diff --quiet --stat; then
-    echo "Working tree not clean; stash/commit before bumping." >&2
+    echo "Unstaged changes present; stash/commit before bumping." >&2
+    exit 1
+fi
+if ! git diff --cached --quiet; then
+    echo "Staged but uncommitted changes present; commit/reset before bumping." >&2
+    exit 1
+fi
+if git ls-files --others --exclude-standard --no-empty-directory | read -r _; then
+    echo "Untracked files present; clean or commit before bumping." >&2
+    exit 1
+fi
+
+# Refuse to overwrite an existing tag.
+if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+    echo "Tag ${TAG} already exists; aborting." >&2
     exit 1
 fi
 
@@ -49,11 +64,18 @@ cargo set-version --workspace "${VERSION}"
 git status --short
 
 if ((CREATE_COMMIT)); then
-    git commit -am "chore(release): ${TAG}"
+    # Stage only the files touched by the version bump.
+    changed_files=$(git status --porcelain=v1 | awk '{print $2}')
+    if [[ -z "${changed_files}" ]]; then
+        echo "No changes detected after version bump; aborting commit." >&2
+        exit 1
+    fi
+    git add ${changed_files}
+    git commit -m "Bump version to ${VERSION}"
 fi
 
 if ((CREATE_TAG)); then
-    git tag "${TAG}"
+    git tag -a "${TAG}" -m "Release ${TAG}"
 fi
 
 echo "Done. Push with: git push && git push origin ${TAG}"
