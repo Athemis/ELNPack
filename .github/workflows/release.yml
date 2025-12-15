@@ -215,7 +215,7 @@ jobs:
           Compress-Archive -Path "$pkgDir/*" -DestinationPath "elnpack-$safeRef-${env:TARGET}.zip"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: elnpack-${{ env.SAFE_REF }}-${{ matrix.target }}
           path: |
