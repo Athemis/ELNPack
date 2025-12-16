@@ -15,14 +15,14 @@ For detailed usage instructions, see the **[User Guide](https://athemis.github.i
 - Simple **Markdown** editor with quick-insert toolbar - choose Markdown or HTML at export time
 - **Attachments** panel with image thumbnails, duplicate detection by sanitized name and SHA-256, and filename sanitization
 - Keywords editor, supporting mass import of comma-separated keywords
-- **Metadata** editor with eLabFTW-style extra fields/groups (import, edit, validate) - exports per-field `PropertyValue` nodes plus an `elabftw_metadata` blob for RO-Crate/ELN File Format compatibility
+- **Metadata** editor with eLabFTW-style extra fields/groups (import, edit, validate) - exports per-field `PropertyValue` nodes plus a `elabftw_metadata` blob for RO-Crate/ELN File Format compatibility
 
 ## Installation
 
 - Download the latest release artifacts from GitHub Releases (pick the archive matching your OS/CPU: Linux tar.gz, Windows zip, macOS tar.gz). Binaries are **not code-signed**, so Windows SmartScreen and macOS Gatekeeper may prompt; on macOS, right-click → Open to allow.
-- Windows: tested on Windows 10+ (x86_64 MSVC). Install the latest VC++ Redistributable if your system lacks the Universal CRT.
-- macOS: tested on current macOS releases for Intel and Apple Silicon; relies only on built-in system frameworks.
-- Linux: built against glibc (e.g., Ubuntu 20.04+ / glibc ≥ 2.31). On minimal images ensure `libc6`, `libgcc-s1`, and `libm` are present.
+- Windows: tested on Windows 10+ (x86_64 MSVC).
+- macOS: tested on current macOS releases for Intel and Apple Silicon.
+- Linux: built against glibc (e.g., Ubuntu 20.04+ / glibc ≥ 2.31).
 
 ## Platforms & runtime prerequisites
 
@@ -77,11 +77,6 @@ Quick start: `cargo fmt && cargo test` before sending changes, and `cargo run` t
 - `src/models/` — pure data/validation (`attachment`, `keywords`).
 - `src/utils/` — helpers (`sanitize_component`, `hash_file`).
 - Tests: colocated unit tests plus integration tests under `tests/` (if added).
-
-## Security & Privacy
-
-- ELNPack runs locally and does not make outbound network requests.
-- File dialogs use native OS pickers; archives are written only to user-selected locations.
 
 ## License
 
