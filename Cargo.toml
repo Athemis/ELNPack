@@ -37,7 +37,7 @@ email_address = "0.2"
 open = "5"
 
 [dev-dependencies]
-tempfile = "3.14"
+tempfile = "3.24"
 
 [profile.release]
 lto = "thin"
