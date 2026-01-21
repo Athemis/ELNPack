@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use eframe::egui;
 use egui_extras::image::load_svg_bytes_with_size;
-use usvg::Options;
+use resvg::usvg::Options;
 
 use crate::models::attachment::Attachment;
 use crate::utils::{icon_for, sanitize_component};
