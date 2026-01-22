@@ -2,6 +2,7 @@
 name = "elnpack"
 version = "0.1.3"
 edition = "2024"
+rust-version = "1.92.0"
 description = "Lightweight electronic lab notebook (ELN) entry packager that creates .eln archives with Markdown notes, attachments, and RO-Crate metadata."
 license = "MIT"
 authors = ["Alexander Minges"]
