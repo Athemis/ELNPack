@@ -50,7 +50,7 @@ chmod +x elnpack
 
 ### Prerequisites
 
-- [Installed](https://www.rust-lang.org/tools/install) and working stable Rust compiler toolchain (≥ 1.85.0; Rust 2024)
+- [Installed](https://www.rust-lang.org/tools/install) and working stable Rust compiler toolchain (≥ 1.92.0; Rust 2024)
 - You intend to build for a [supported build target](https://doc.rust-lang.org/beta/rustc/platform-support.html).
 
 ### Build & Run

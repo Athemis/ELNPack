@@ -4,7 +4,7 @@ Thanks for your interest in improving ELNPack! This guide keeps contributions co
 
 ## Development Workflow
 
-- Use stable Rust
+- Use stable Rust (MSRV is 1.92.0)
 - Run locally before opening a PR:
   - `cargo fmt`
   - `cargo clippy --all-targets --all-features`
