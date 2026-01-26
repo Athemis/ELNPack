@@ -28,7 +28,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "tiff", "gif", "webp"] }
 pulldown-cmark = "0.13"
 # Keep resvg at 0.45.x to match egui_extras 0.33.x (prevents usvg version mismatch).
-resvg = { version = "0.45", default-features = false }
+resvg = { version = "0.46", default-features = false }
 crossbeam-channel = "0.5"
 egui-phosphor = { version = "0.11", default-features = false, features = ["regular"] }
 ammonia = "4.1"
