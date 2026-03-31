@@ -30,7 +30,7 @@ pulldown-cmark = "0.13"
 # Keep resvg at 0.45.x to match egui_extras 0.33.x (prevents usvg version mismatch).
 resvg = { version = "0.45", default-features = false }
 crossbeam-channel = "0.5"
-egui-phosphor = { version = "0.11", default-features = false, features = ["regular"] }
+egui-phosphor = { version = "0.12", default-features = false, features = ["regular"] }
 ammonia = "4.1"
 deunicode = "1.6"
 url = { version = "2", default-features = false, features = ["std"] }
