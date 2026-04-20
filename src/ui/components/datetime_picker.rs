@@ -3,9 +3,9 @@
 
 //! DateTime picker converted to MVU-style model/update/view.
 
-use chrono::{Datelike, Local, NaiveDate, TimeZone, Timelike, Utc};
 use eframe::egui;
 use egui_extras::DatePickerButton;
+use jiff::{Zoned, civil::Date as CivilDate, tz::TimeZone};
 use time::OffsetDateTime;
 
 /// Format an integer as a two-digit string (00-99).
@@ -16,7 +16,7 @@ fn format_two(n: i32) -> String {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DateTimeModel {
     /// Selected calendar date (local).
-    pub date: NaiveDate,
+    pub date: CivilDate,
     /// Selected hour (0-23).
     pub hour: i32,
     /// Selected minute (0-59).
@@ -25,13 +25,12 @@ pub struct DateTimeModel {
 
 impl Default for DateTimeModel {
     fn default() -> Self {
-        let now = Local::now();
-        let today = now.date_naive();
+        let now = Zoned::now();
 
         Self {
-            date: today,
-            hour: now.hour() as i32,
-            minute: now.minute() as i32,
+            date: now.date(),
+            hour: i32::from(now.hour()),
+            minute: i32::from(now.minute()),
         }
     }
 }
@@ -40,7 +39,7 @@ impl Default for DateTimeModel {
 #[allow(clippy::enum_variant_names)]
 pub enum DateTimeMsg {
     /// Update the date field.
-    SetDate(NaiveDate),
+    SetDate(CivilDate),
     /// Update the hour field.
     SetHour(i32),
     /// Update the minute field.
@@ -126,18 +125,14 @@ pub fn to_offset_datetime(model: &DateTimeModel) -> Result<OffsetDateTime, Strin
         return Err("Minute must be 0-59".into());
     }
 
-    let naive =
-        chrono::NaiveDate::from_ymd_opt(model.date.year(), model.date.month(), model.date.day())
-            .and_then(|d| d.and_hms_opt(model.hour as u32, model.minute as u32, 0))
-            .ok_or_else(|| "Invalid calendar date or time".to_string())?;
-
-    let local_dt = Local
-        .from_local_datetime(&naive)
-        .single()
-        .ok_or_else(|| "Invalid local date/time (likely skipped by offset)".to_string())?;
-
-    let utc_ts = local_dt.with_timezone(&Utc).timestamp();
-    let utc_dt = OffsetDateTime::from_unix_timestamp(utc_ts)
+    let datetime = model.date.at(model.hour as i8, model.minute as i8, 0, 0);
+    let zoned = datetime
+        .to_zoned(TimeZone::system())
+        .map_err(|_| "Invalid local date/time (likely skipped by offset)".to_string())?;
+    let timestamp = zoned.timestamp();
+    let unix_nanos = i128::from(timestamp.as_second()) * 1_000_000_000
+        + i128::from(timestamp.subsec_nanosecond());
+    let utc_dt = OffsetDateTime::from_unix_timestamp_nanos(unix_nanos)
         .map_err(|e| format!("Failed to construct timestamp: {e}"))?;
 
     Ok(utc_dt)
@@ -145,16 +140,15 @@ pub fn to_offset_datetime(model: &DateTimeModel) -> Result<OffsetDateTime, Strin
 
 /// Update the model fields to the current local date and time.
 fn set_to_now(model: &mut DateTimeModel) {
-    let now = Local::now();
-    model.date = now.date_naive();
-    model.hour = now.hour() as i32;
-    model.minute = now.minute() as i32;
+    let now = Zoned::now();
+    model.date = now.date();
+    model.hour = i32::from(now.hour());
+    model.minute = i32::from(now.minute());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::NaiveDate;
 
     #[test]
     fn default_datetime_is_now() {
@@ -166,7 +160,7 @@ mod tests {
     #[test]
     fn set_to_now_updates_all_fields() {
         let mut picker = DateTimeModel {
-            date: NaiveDate::from_ymd_opt(2000, 1, 1).unwrap(),
+            date: CivilDate::new(2000, 1, 1).unwrap(),
             hour: 0,
             minute: 0,
         };
@@ -181,8 +175,8 @@ mod tests {
     fn to_offset_datetime_handles_dst_transitions() {
         // Note: This tests the actual edge case that CAN occur through the UI.
         // During DST transitions, certain times don't exist (spring forward)
-        // or are ambiguous (fall back). The chrono library handles this with
-        // .single() which returns None for ambiguous/non-existent times.
+        // or are ambiguous (fall back). Jiff surfaces these cases as an error
+        // when converting a civil datetime into a zoned datetime.
         //
         // In most timezones, this is unlikely to affect users since they're
         // selecting times in the past for experiment timestamps, but we should
@@ -191,8 +185,8 @@ mod tests {
         // This test documents the behavior rather than asserting specific values,
         // since DST rules vary by timezone and locale.
         let picker = DateTimeModel {
-            date: NaiveDate::from_ymd_opt(2024, 3, 10).unwrap(), // Common DST date
-            hour: 2,                                             // Common DST transition hour
+            date: CivilDate::new(2024, 3, 10).unwrap(), // Common DST date
+            hour: 2,                                    // Common DST transition hour
             minute: 30,
         };
 
@@ -211,7 +205,7 @@ mod tests {
     #[test]
     fn to_offset_datetime_succeeds_with_valid_input() {
         let picker = DateTimeModel {
-            date: NaiveDate::from_ymd_opt(2024, 6, 15).unwrap(),
+            date: CivilDate::new(2024, 6, 15).unwrap(),
             hour: 14,
             minute: 30,
         };
