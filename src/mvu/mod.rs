@@ -58,11 +58,8 @@ pub enum Msg {
     HelpOpened(Result<(), String>),
     ThumbnailDecoded {
         path: PathBuf,
+        request_id: u64,
         image: eframe::egui::ColorImage,
-    },
-    ThumbnailReady {
-        path: PathBuf,
-        texture: eframe::egui::TextureHandle,
     },
     DismissError,
     Markdown(MarkdownMsg),
@@ -76,7 +73,11 @@ pub enum Msg {
 pub enum Command {
     PickFiles,
     HashFile { path: PathBuf, _retry: bool },
-    LoadThumbnail { path: PathBuf, _retry: bool },
+    LoadThumbnail {
+        path: PathBuf,
+        _retry: bool,
+        request_id: u64,
+    },
     PickExtraFieldsFile,
     OpenUrl { url: String },
     SaveArchive(SavePayload),
@@ -150,41 +151,19 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
                         cmds.push(Command::LoadThumbnail {
                             path,
                             _retry: false,
+                            request_id: 0,
                         })
                     }
                 }
             }
         }
-        Msg::ThumbnailDecoded { path, image } => {
-            // Actual texture creation must happen in ui.rs where ctx is available.
-            // Here we just store the decoded image in a temporary placeholder via AttachmentsMsg.
-            // This Msg variant should be transformed before reaching update; keeping a no-op to avoid panic.
-            let _ = (path, image);
-        }
-        Msg::ThumbnailReady { path, texture } => {
-            let mut att_cmds = Vec::new();
-            if let Some(event) = attachments::update(
-                &mut model.attachments,
-                AttachmentsMsg::ThumbnailReady { path, texture },
-                &mut att_cmds,
-            ) {
-                surface_event(model, event.message, event.is_error);
-            }
-            for c in att_cmds {
-                match c {
-                    AttachmentsCommand::PickFiles => cmds.push(Command::PickFiles),
-                    AttachmentsCommand::HashFile { path } => cmds.push(Command::HashFile {
-                        path,
-                        _retry: false,
-                    }),
-                    AttachmentsCommand::LoadThumbnail { path } => {
-                        cmds.push(Command::LoadThumbnail {
-                            path,
-                            _retry: false,
-                        })
-                    }
-                }
-            }
+        Msg::ThumbnailDecoded {
+            path,
+            request_id,
+            image,
+        } => {
+            // Texture realization is staged in the UI runtime where an egui context exists.
+            let _ = (path, request_id, image);
         }
         Msg::Keywords(m) => {
             if let Some(event) = keywords::update(&mut model.keywords, m) {
@@ -295,10 +274,18 @@ pub fn run_command(cmd: Command) -> Msg {
                 mime,
             })
         }
-        Command::LoadThumbnail { path, _retry: _ } => {
+        Command::LoadThumbnail {
+            path,
+            _retry: _,
+            request_id,
+        } => {
             match attachments::load_image_thumbnail(&path) {
-                Ok(image) => Msg::ThumbnailDecoded { path, image },
-                Err(_) => Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path }),
+                Ok(image) => Msg::ThumbnailDecoded {
+                    path,
+                    request_id,
+                    image,
+                },
+                Err(_) => Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path, request_id }),
             }
         }
         Command::SaveArchive(payload) => {
@@ -463,7 +450,11 @@ mod tests {
 
         assert_eq!(cmds.len(), 1);
         match cmds.pop().unwrap() {
-            Command::LoadThumbnail { path: p, _retry } => {
+            Command::LoadThumbnail {
+                path: p,
+                _retry,
+                request_id: _,
+            } => {
                 assert_eq!(p, path);
             }
             _ => panic!("unexpected command"),
@@ -492,12 +483,51 @@ mod tests {
         let mut cmds2 = Vec::new();
         update(
             &mut model,
-            Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path }),
+            Msg::Attachments(AttachmentsMsg::ThumbnailFailed {
+                path,
+                request_id: 1,
+            }),
             &mut cmds2,
         );
         model.pending_commands = model.pending_commands.saturating_sub(1);
 
         assert_eq!(model.pending_commands, 0);
+    }
+
+    #[test]
+    fn thumbnail_failure_still_routes_through_attachment_messages() {
+        let msg = run_command(Command::LoadThumbnail {
+            path: PathBuf::from("missing.png"),
+            _retry: false,
+            request_id: 1,
+        });
+
+        assert!(matches!(
+            msg,
+            Msg::Attachments(AttachmentsMsg::ThumbnailFailed { .. })
+        ));
+    }
+
+    #[test]
+    fn thumbnail_available_message_clears_loading_state() {
+        let mut model = AppModel::default();
+        let path = PathBuf::from("image.png");
+        let mut cmds = Vec::new();
+
+        update(
+            &mut model,
+            Msg::Attachments(AttachmentsMsg::LoadThumbnail(path.clone())),
+            &mut cmds,
+        );
+        assert!(model.attachments.is_thumbnail_loading(&path));
+
+        update(
+            &mut model,
+            Msg::Attachments(AttachmentsMsg::ThumbnailAvailable { path: path.clone() }),
+            &mut Vec::new(),
+        );
+
+        assert!(!model.attachments.is_thumbnail_loading(&path));
     }
 
     #[test]
