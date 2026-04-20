@@ -56,6 +56,10 @@ pub enum Msg {
     SaveCompleted(Result<PathBuf, String>),
     OpenHelp,
     HelpOpened(Result<(), String>),
+    /// Decoded thumbnail image staged for UI-side texture realization.
+    ///
+    /// `ElnPackApp::realize_pending_thumbnail_textures` consumes this runtime message
+    /// before it should ever reach `mvu::update`.
     ThumbnailDecoded {
         path: PathBuf,
         request_id: u64,
@@ -72,14 +76,19 @@ pub enum Msg {
 /// Commands represent side-effects executed between frames.
 pub enum Command {
     PickFiles,
-    HashFile { path: PathBuf, _retry: bool },
+    HashFile {
+        path: PathBuf,
+        _retry: bool,
+    },
     LoadThumbnail {
         path: PathBuf,
         _retry: bool,
         request_id: u64,
     },
     PickExtraFieldsFile,
-    OpenUrl { url: String },
+    OpenUrl {
+        url: String,
+    },
     SaveArchive(SavePayload),
 }
 
@@ -162,7 +171,8 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
             request_id,
             image,
         } => {
-            // Texture realization is staged in the UI runtime where an egui context exists.
+            // Invariant: the UI runtime stages and realizes decoded thumbnails before
+            // this message should reach `mvu::update`; keep this arm as a no-op.
             let _ = (path, request_id, image);
         }
         Msg::Keywords(m) => {
@@ -278,16 +288,14 @@ pub fn run_command(cmd: Command) -> Msg {
             path,
             _retry: _,
             request_id,
-        } => {
-            match attachments::load_image_thumbnail(&path) {
-                Ok(image) => Msg::ThumbnailDecoded {
-                    path,
-                    request_id,
-                    image,
-                },
-                Err(_) => Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path, request_id }),
-            }
-        }
+        } => match attachments::load_image_thumbnail(&path) {
+            Ok(image) => Msg::ThumbnailDecoded {
+                path,
+                request_id,
+                image,
+            },
+            Err(_) => Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path, request_id }),
+        },
         Command::SaveArchive(payload) => {
             let res = build_and_write_archive(
                 &payload.output,

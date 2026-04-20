@@ -62,7 +62,13 @@ pub enum AttachmentsMsg {
         size: u64,
         mime: String,
     },
-    ThumbnailAvailable { path: PathBuf },
+    ThumbnailAvailable {
+        path: PathBuf,
+    },
+    /// Thumbnail load failed after runtime-shell request validation.
+    ///
+    /// `request_id` is informational for tracing; staleness is validated in the
+    /// UI runtime shell before this reducer sees the message.
     ThumbnailFailed {
         path: PathBuf,
         request_id: u64,
@@ -164,7 +170,11 @@ pub fn update(
             model.thumbnail_loading.remove(&path);
             None
         }
-        AttachmentsMsg::ThumbnailFailed { path, request_id: _ } => {
+        // Request validation happens in the UI runtime shell before this reducer runs.
+        AttachmentsMsg::ThumbnailFailed {
+            path,
+            request_id: _,
+        } => {
             model.thumbnail_failures.insert(path.clone());
             model.thumbnail_loading.remove(&path);
             None
@@ -263,11 +273,11 @@ fn render_attachment_list(
         ui.horizontal(|ui| {
             let icon_for_mime = icon_for(&mime, &path);
 
-            let _thumb_slot = if let Some(texture) = textures.get(&path) {
+            if let Some(texture) = textures.get(&path) {
                 let size = texture.size_vec2();
                 let max = 96.0;
                 let scale = (max / size.x).min(max / size.y).min(1.0);
-                ui.add(egui::Image::new((texture.id(), size * scale))).rect
+                ui.add(egui::Image::new((texture.id(), size * scale)));
             } else {
                 let thumb_rect = ui.allocate_space(egui::vec2(96.0, 72.0)).1;
 
@@ -282,9 +292,7 @@ fn render_attachment_list(
                 } else {
                     render_placeholder_icon(ui, thumb_rect, icon_for_mime);
                 }
-
-                thumb_rect
-            };
+            }
 
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
@@ -589,7 +597,7 @@ mod tests {
     use image::{ImageBuffer, Rgba};
     use tempfile::TempDir;
 
-    use super::{view, AttachmentsModel, AttachmentsMsg, is_image, load_image_thumbnail};
+    use super::{AttachmentsModel, AttachmentsMsg, is_image, load_image_thumbnail, view};
 
     // Ensures extension filtering matches documented formats and rejects others.
     #[test]
@@ -742,7 +750,11 @@ mod tests {
         );
         assert!(model.is_thumbnail_loading(&path));
 
-        super::update(&mut model, super::AttachmentsMsg::Remove(0), &mut Vec::new());
+        super::update(
+            &mut model,
+            super::AttachmentsMsg::Remove(0),
+            &mut Vec::new(),
+        );
         assert!(!model.is_thumbnail_loading(&path));
 
         assert!(model.add_path(path.clone()));

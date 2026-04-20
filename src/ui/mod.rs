@@ -7,7 +7,7 @@
 pub mod components;
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use eframe::egui;
 
@@ -159,7 +159,8 @@ impl ElnPackApp {
                     request_id,
                     image,
                 } => {
-                    self.pending_thumbnail_images.push((path, request_id, image));
+                    self.pending_thumbnail_images
+                        .push((path, request_id, image));
                 }
                 mvu::Msg::Attachments(attachments::AttachmentsMsg::ThumbnailFailed {
                     path,
@@ -208,7 +209,7 @@ impl ElnPackApp {
                             .get(*index)
                             .map(|item| item.path.clone())
                         {
-                            self.invalidate_thumbnail_runtime_state(&path);
+                            self.invalidate_thumbnail_runtime_state(path.as_path());
                         }
                     }
                     let mut commands = Vec::new();
@@ -242,10 +243,9 @@ impl ElnPackApp {
                 egui::TextureOptions::default(),
             );
             self.thumbnail_textures.insert(path.clone(), texture);
-            self.inbox
-                .push(Msg::Attachments(attachments::AttachmentsMsg::ThumbnailAvailable {
-                    path,
-                }));
+            self.inbox.push(Msg::Attachments(
+                attachments::AttachmentsMsg::ThumbnailAvailable { path },
+            ));
         }
     }
 
@@ -265,7 +265,7 @@ impl ElnPackApp {
             .retain(|(path, _, _)| paths.contains(path));
     }
 
-    fn invalidate_thumbnail_runtime_state(&mut self, path: &PathBuf) {
+    fn invalidate_thumbnail_runtime_state(&mut self, path: &Path) {
         self.thumbnail_textures.remove(path);
         self.active_thumbnail_requests.remove(path);
         self.pending_thumbnail_images
@@ -274,26 +274,31 @@ impl ElnPackApp {
 
     fn dispatch_commands(&mut self, commands: Vec<Command>) {
         for cmd in commands {
-            let cmd = match cmd {
+            match cmd {
                 Command::LoadThumbnail {
                     path,
                     _retry,
                     request_id: _,
                 } => {
                     let request_id = self.next_thumbnail_request_id;
-                    self.next_thumbnail_request_id += 1;
-                    self.active_thumbnail_requests.insert(path.clone(), request_id);
-                    Command::LoadThumbnail {
+                    let tracked_path = path.clone();
+                    let cmd = Command::LoadThumbnail {
                         path,
                         _retry,
                         request_id,
+                    };
+                    if self.cmd_tx.send(cmd).is_ok() {
+                        self.next_thumbnail_request_id += 1;
+                        self.active_thumbnail_requests
+                            .insert(tracked_path, request_id);
+                        self.model.pending_commands += 1;
                     }
                 }
-                other => other,
-            };
-
-            if self.cmd_tx.send(cmd).is_ok() {
-                self.model.pending_commands += 1;
+                other => {
+                    if self.cmd_tx.send(other).is_ok() {
+                        self.model.pending_commands += 1;
+                    }
+                }
             }
         }
     }
@@ -570,7 +575,8 @@ mod tests {
             &mut Vec::new(),
         );
 
-        app.pending_thumbnail_images.push((path.clone(), 1, sample_image()));
+        app.pending_thumbnail_images
+            .push((path.clone(), 1, sample_image()));
 
         let ctx = egui::Context::default();
         app.realize_pending_thumbnail_textures(&ctx);
@@ -602,7 +608,7 @@ mod tests {
             Msg::Attachments(AttachmentsMsg::Remove(0)),
             &mut Vec::new(),
         );
-        app.invalidate_thumbnail_runtime_state(&path);
+        app.invalidate_thumbnail_runtime_state(path.as_path());
 
         assert!(app.model.attachments.add_path(path.clone()));
         let mut cmds = Vec::new();
@@ -648,7 +654,7 @@ mod tests {
             Msg::Attachments(AttachmentsMsg::Remove(0)),
             &mut Vec::new(),
         );
-        app.invalidate_thumbnail_runtime_state(&path);
+        app.invalidate_thumbnail_runtime_state(path.as_path());
 
         assert!(app.model.attachments.add_path(path.clone()));
         let mut cmds = Vec::new();
@@ -670,7 +676,10 @@ mod tests {
         app.process_runtime_messages();
 
         assert!(app.model.attachments.is_thumbnail_loading(&path));
-        assert_eq!(app.active_thumbnail_requests.get(&path), Some(&new_request_id));
+        assert_eq!(
+            app.active_thumbnail_requests.get(&path),
+            Some(&new_request_id)
+        );
     }
 
     #[test]
@@ -682,9 +691,10 @@ mod tests {
         let mut app = ElnPackApp::default();
         assert!(app.model.attachments.add_path(path.clone()));
 
-        app.inbox.push(Msg::Attachments(AttachmentsMsg::LoadThumbnail(
-            path.clone(),
-        )));
+        app.inbox
+            .push(Msg::Attachments(AttachmentsMsg::LoadThumbnail(
+                path.clone(),
+            )));
         app.inbox.push(Msg::Attachments(AttachmentsMsg::Remove(0)));
 
         app.process_runtime_messages();
