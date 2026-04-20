@@ -761,8 +761,8 @@ mod tests {
 
         let ctx = egui::Context::default();
         let mut out = Vec::new();
-        let _ = ctx.run(Default::default(), |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        let _ = ctx.run_ui(Default::default(), |ui| {
+            egui::CentralPanel::default().show_inside(ui, |ui| {
                 out = view(ui, &model, &HashMap::new());
             });
         });
@@ -782,8 +782,8 @@ mod tests {
         let ctx = egui::Context::default();
         let mut out = Vec::new();
 
-        let _ = ctx.run(Default::default(), |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        let _ = ctx.run_ui(Default::default(), |ui| {
+            egui::CentralPanel::default().show_inside(ui, |ui| {
                 out = view(ui, &model, &HashMap::new());
             });
         });
@@ -812,8 +812,8 @@ mod tests {
             ),
         );
 
-        let _ = ctx.run(Default::default(), |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
+        let _ = ctx.run_ui(Default::default(), |ui| {
+            egui::CentralPanel::default().show_inside(ui, |ui| {
                 out = view(ui, &model, &textures);
             });
         });
