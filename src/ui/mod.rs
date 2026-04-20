@@ -180,6 +180,25 @@ impl ElnPackApp {
                     );
                     self.dispatch_commands(commands);
                 }
+                Msg::Attachments(attachments::AttachmentsMsg::LoadThumbnail(path)) => {
+                    if !self
+                        .model
+                        .attachments
+                        .attachments()
+                        .iter()
+                        .any(|item| item.path == path)
+                    {
+                        continue;
+                    }
+
+                    let mut commands = Vec::new();
+                    mvu::update(
+                        &mut self.model,
+                        Msg::Attachments(attachments::AttachmentsMsg::LoadThumbnail(path)),
+                        &mut commands,
+                    );
+                    self.dispatch_commands(commands);
+                }
                 other => {
                     if let Msg::Attachments(attachments::AttachmentsMsg::Remove(index)) = &other {
                         if let Some(path) = self
@@ -652,5 +671,26 @@ mod tests {
 
         assert!(app.model.attachments.is_thumbnail_loading(&path));
         assert_eq!(app.active_thumbnail_requests.get(&path), Some(&new_request_id));
+    }
+
+    #[test]
+    fn removing_attachment_discards_queued_thumbnail_loads() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("thumb.png");
+        std::fs::write(&path, b"thumb-bytes").unwrap();
+
+        let mut app = ElnPackApp::default();
+        assert!(app.model.attachments.add_path(path.clone()));
+
+        app.inbox.push(Msg::Attachments(AttachmentsMsg::LoadThumbnail(
+            path.clone(),
+        )));
+        app.inbox.push(Msg::Attachments(AttachmentsMsg::Remove(0)));
+
+        app.process_runtime_messages();
+
+        assert!(!app.model.attachments.is_thumbnail_loading(&path));
+        assert!(!app.active_thumbnail_requests.contains_key(&path));
+        assert!(app.pending_thumbnail_images.is_empty());
     }
 }
