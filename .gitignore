@@ -58,5 +58,8 @@ target/
 Thumbs.db
 ehthumbs.db
 
+# Local git worktrees
+.worktrees/
+
 # SSH Keys
 id_ed25519*
