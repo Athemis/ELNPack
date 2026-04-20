@@ -40,11 +40,10 @@ impl AttachmentItem {
     }
 }
 
-/// MVU state for the attachments picker and thumbnail cache.
+/// MVU state for the attachments picker and thumbnail loading status.
 #[derive(Default)]
 pub struct AttachmentsModel {
     attachments: Vec<AttachmentItem>,
-    thumbnail_cache: HashMap<PathBuf, egui::TextureHandle>,
     thumbnail_failures: HashSet<PathBuf>,
     thumbnail_loading: HashSet<PathBuf>,
     hashes: HashSet<String>,
@@ -53,7 +52,6 @@ pub struct AttachmentsModel {
 }
 
 /// Messages emitted by the attachments view.
-// Debug omitted because TextureHandle is not Debug.
 pub enum AttachmentsMsg {
     RequestPickFiles,
     FilesPicked(Vec<PathBuf>),
@@ -64,10 +62,10 @@ pub enum AttachmentsMsg {
         size: u64,
         mime: String,
     },
-    ThumbnailReady {
+    ThumbnailAvailable {
         path: PathBuf,
-        texture: egui::TextureHandle,
     },
+    /// Thumbnail load failed after runtime-shell request validation.
     ThumbnailFailed {
         path: PathBuf,
     },
@@ -108,6 +106,12 @@ impl AttachmentsModel {
         let size = path.metadata().map(|m| m.len()).unwrap_or(0);
         let mime = guess_mime(&path);
         add_attachment_with_meta(self, path, sha256, size, mime)
+    }
+
+    /// Convenience helper for tests to inspect thumbnail loading state.
+    #[cfg(test)]
+    pub fn is_thumbnail_loading(&self, path: &Path) -> bool {
+        self.thumbnail_loading.contains(path)
     }
 }
 
@@ -157,11 +161,12 @@ pub fn update(
                 is_error: !added,
             })
         }
-        AttachmentsMsg::ThumbnailReady { path, texture } => {
-            model.thumbnail_cache.insert(path.clone(), texture);
+        AttachmentsMsg::ThumbnailAvailable { path } => {
+            model.thumbnail_failures.remove(&path);
             model.thumbnail_loading.remove(&path);
             None
         }
+        // Request validation happens in the UI runtime shell before this reducer runs.
         AttachmentsMsg::ThumbnailFailed { path } => {
             model.thumbnail_failures.insert(path.clone());
             model.thumbnail_loading.remove(&path);
@@ -197,7 +202,11 @@ pub fn update(
 }
 
 /// Render the attachments panel and return any messages triggered by user interaction.
-pub fn view(ui: &mut egui::Ui, model: &AttachmentsModel) -> Vec<AttachmentsMsg> {
+pub fn view(
+    ui: &mut egui::Ui,
+    model: &AttachmentsModel,
+    textures: &HashMap<PathBuf, egui::TextureHandle>,
+) -> Vec<AttachmentsMsg> {
     let mut msgs = Vec::new();
 
     let add_resp = ui.add(egui::Button::new(format!(
@@ -222,7 +231,7 @@ pub fn view(ui: &mut egui::Ui, model: &AttachmentsModel) -> Vec<AttachmentsMsg> 
                     egui::RichText::new("No attachments").color(egui::Color32::from_gray(150)),
                 );
             } else {
-                render_attachment_list(ui, model, &mut msgs);
+                render_attachment_list(ui, model, textures, &mut msgs);
             }
         });
 
@@ -233,6 +242,7 @@ pub fn view(ui: &mut egui::Ui, model: &AttachmentsModel) -> Vec<AttachmentsMsg> 
 fn render_attachment_list(
     ui: &mut egui::Ui,
     model: &AttachmentsModel,
+    textures: &HashMap<PathBuf, egui::TextureHandle>,
     msgs: &mut Vec<AttachmentsMsg>,
 ) {
     for index in 0..model.attachments.len() {
@@ -256,11 +266,11 @@ fn render_attachment_list(
         ui.horizontal(|ui| {
             let icon_for_mime = icon_for(&mime, &path);
 
-            let _thumb_slot = if let Some(texture) = model.thumbnail_cache.get(&path) {
+            if let Some(texture) = textures.get(&path) {
                 let size = texture.size_vec2();
                 let max = 96.0;
                 let scale = (max / size.x).min(max / size.y).min(1.0);
-                ui.add(egui::Image::new((texture.id(), size * scale))).rect
+                ui.add(egui::Image::new((texture.id(), size * scale)));
             } else {
                 let thumb_rect = ui.allocate_space(egui::vec2(96.0, 72.0)).1;
 
@@ -275,9 +285,7 @@ fn render_attachment_list(
                 } else {
                     render_placeholder_icon(ui, thumb_rect, icon_for_mime);
                 }
-
-                thumb_rect
-            };
+            }
 
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
@@ -427,11 +435,11 @@ fn add_attachment_with_meta(
     true
 }
 
-/// Remove an attachment and associated cache entries safely.
+/// Remove an attachment and associated thumbnail state safely.
 fn remove_attachment(model: &mut AttachmentsModel, index: usize) {
     if let Some(removed) = model.attachments.get(index) {
-        model.thumbnail_cache.remove(&removed.path);
         model.thumbnail_failures.remove(&removed.path);
+        model.thumbnail_loading.remove(&removed.path);
         if removed.sha256 != "unavailable" {
             model.hashes.remove(&removed.sha256);
         }
@@ -574,14 +582,15 @@ pub(crate) fn load_image_thumbnail(path: &Path) -> Result<egui::ColorImage, Stri
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::fs;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use eframe::egui::Color32;
     use image::{ImageBuffer, Rgba};
     use tempfile::TempDir;
 
-    use super::{AttachmentsModel, is_image, load_image_thumbnail};
+    use super::{AttachmentsModel, AttachmentsMsg, is_image, load_image_thumbnail, view};
 
     // Ensures extension filtering matches documented formats and rejects others.
     #[test]
@@ -692,5 +701,119 @@ mod tests {
         assert_eq!(model.attachments[0].sanitized_name, "Cafe_draft.md");
         assert_eq!(model.attachments[1].sanitized_name, "file.with.dots.tar.gz");
         assert_eq!(model.attachments[2].sanitized_name, "normal-file_123.txt");
+    }
+
+    #[test]
+    fn thumbnail_available_clears_loading_without_storing_texture_state() {
+        let path = PathBuf::from("/tmp/example.png");
+        let mut model = AttachmentsModel::default();
+        let mut cmds = Vec::new();
+
+        super::update(
+            &mut model,
+            super::AttachmentsMsg::LoadThumbnail(path.clone()),
+            &mut cmds,
+        );
+        assert!(model.thumbnail_loading.contains(&path));
+
+        let event = super::update(
+            &mut model,
+            super::AttachmentsMsg::ThumbnailAvailable { path: path.clone() },
+            &mut Vec::new(),
+        );
+
+        assert!(event.is_none());
+        assert!(!model.thumbnail_loading.contains(&path));
+        assert!(!model.thumbnail_failures.contains(&path));
+    }
+
+    #[test]
+    fn remove_clears_thumbnail_loading_for_readded_path() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("example.png");
+        fs::write(&path, b"same-file").unwrap();
+
+        let mut model = AttachmentsModel::default();
+        assert!(model.add_path(path.clone()));
+
+        super::update(
+            &mut model,
+            super::AttachmentsMsg::LoadThumbnail(path.clone()),
+            &mut Vec::new(),
+        );
+        assert!(model.is_thumbnail_loading(&path));
+
+        super::update(
+            &mut model,
+            super::AttachmentsMsg::Remove(0),
+            &mut Vec::new(),
+        );
+        assert!(!model.is_thumbnail_loading(&path));
+
+        assert!(model.add_path(path.clone()));
+
+        let ctx = egui::Context::default();
+        let mut out = Vec::new();
+        let _ = ctx.run_ui(Default::default(), |ui| {
+            egui::CentralPanel::default().show_inside(ui, |ui| {
+                out = view(ui, &model, &HashMap::new());
+            });
+        });
+
+        assert!(
+            out.iter()
+                .any(|msg| matches!(msg, AttachmentsMsg::LoadThumbnail(p) if p == &path))
+        );
+    }
+
+    #[test]
+    fn view_requests_thumbnail_when_image_has_no_cached_texture() {
+        let mut model = AttachmentsModel::default();
+        let path = PathBuf::from("example.png");
+        assert!(model.add_path(path.clone()));
+
+        let ctx = egui::Context::default();
+        let mut out = Vec::new();
+
+        let _ = ctx.run_ui(Default::default(), |ui| {
+            egui::CentralPanel::default().show_inside(ui, |ui| {
+                out = view(ui, &model, &HashMap::new());
+            });
+        });
+
+        assert!(
+            out.iter()
+                .any(|msg| matches!(msg, AttachmentsMsg::LoadThumbnail(p) if p == &path))
+        );
+    }
+
+    #[test]
+    fn view_uses_external_texture_cache_for_image_thumbnails() {
+        let mut model = AttachmentsModel::default();
+        let path = PathBuf::from("example.png");
+        assert!(model.add_path(path.clone()));
+
+        let ctx = egui::Context::default();
+        let mut out = Vec::new();
+        let mut textures = HashMap::new();
+        textures.insert(
+            path.clone(),
+            ctx.load_texture(
+                "cached-thumbnail",
+                egui::ColorImage::from_rgba_unmultiplied([1, 1], &[255, 255, 255, 255]),
+                egui::TextureOptions::default(),
+            ),
+        );
+
+        let _ = ctx.run_ui(Default::default(), |ui| {
+            egui::CentralPanel::default().show_inside(ui, |ui| {
+                out = view(ui, &model, &textures);
+            });
+        });
+
+        assert!(
+            !out.iter()
+                .any(|msg| matches!(msg, AttachmentsMsg::LoadThumbnail(p) if p == &path))
+        );
     }
 }
