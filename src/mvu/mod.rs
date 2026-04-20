@@ -65,6 +65,15 @@ pub enum Msg {
         request_id: u64,
         image: eframe::egui::ColorImage,
     },
+    /// Thumbnail load failure staged for UI-side request validation.
+    ///
+    /// `ElnPackApp::process_runtime_messages` validates the `request_id` against the
+    /// active shell-side request map before forwarding a simplified
+    /// [`AttachmentsMsg::ThumbnailFailed`] to `mvu::update`.
+    ThumbnailFailed {
+        path: PathBuf,
+        request_id: u64,
+    },
     DismissError,
     Markdown(MarkdownMsg),
     Attachments(AttachmentsMsg),
@@ -174,6 +183,11 @@ pub fn update(model: &mut AppModel, msg: Msg, cmds: &mut Vec<Command>) {
             // Invariant: the UI runtime stages and realizes decoded thumbnails before
             // this message should reach `mvu::update`; keep this arm as a no-op.
             let _ = (path, request_id, image);
+        }
+        Msg::ThumbnailFailed { path, request_id } => {
+            // Invariant: the UI runtime validates thumbnail failure request IDs and
+            // forwards only `AttachmentsMsg::ThumbnailFailed { path }`.
+            let _ = (path, request_id);
         }
         Msg::Keywords(m) => {
             if let Some(event) = keywords::update(&mut model.keywords, m) {
@@ -294,7 +308,7 @@ pub fn run_command(cmd: Command) -> Msg {
                 request_id,
                 image,
             },
-            Err(_) => Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path, request_id }),
+            Err(_) => Msg::ThumbnailFailed { path, request_id },
         },
         Command::SaveArchive(payload) => {
             let res = build_and_write_archive(
@@ -491,10 +505,7 @@ mod tests {
         let mut cmds2 = Vec::new();
         update(
             &mut model,
-            Msg::Attachments(AttachmentsMsg::ThumbnailFailed {
-                path,
-                request_id: 1,
-            }),
+            Msg::Attachments(AttachmentsMsg::ThumbnailFailed { path }),
             &mut cmds2,
         );
         model.pending_commands = model.pending_commands.saturating_sub(1);
@@ -510,10 +521,7 @@ mod tests {
             request_id: 1,
         });
 
-        assert!(matches!(
-            msg,
-            Msg::Attachments(AttachmentsMsg::ThumbnailFailed { .. })
-        ));
+        assert!(matches!(msg, Msg::ThumbnailFailed { .. }));
     }
 
     #[test]

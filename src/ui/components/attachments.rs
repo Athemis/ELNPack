@@ -66,12 +66,8 @@ pub enum AttachmentsMsg {
         path: PathBuf,
     },
     /// Thumbnail load failed after runtime-shell request validation.
-    ///
-    /// `request_id` is informational for tracing; staleness is validated in the
-    /// UI runtime shell before this reducer sees the message.
     ThumbnailFailed {
         path: PathBuf,
-        request_id: u64,
     },
     Remove(usize),
     StartEdit(usize),
@@ -171,10 +167,7 @@ pub fn update(
             None
         }
         // Request validation happens in the UI runtime shell before this reducer runs.
-        AttachmentsMsg::ThumbnailFailed {
-            path,
-            request_id: _,
-        } => {
+        AttachmentsMsg::ThumbnailFailed { path } => {
             model.thumbnail_failures.insert(path.clone());
             model.thumbnail_loading.remove(&path);
             None

@@ -162,10 +162,7 @@ impl ElnPackApp {
                     self.pending_thumbnail_images
                         .push((path, request_id, image));
                 }
-                mvu::Msg::Attachments(attachments::AttachmentsMsg::ThumbnailFailed {
-                    path,
-                    request_id,
-                }) => {
+                mvu::Msg::ThumbnailFailed { path, request_id } => {
                     if self.active_thumbnail_requests.get(&path).copied() != Some(request_id) {
                         continue;
                     }
@@ -173,10 +170,7 @@ impl ElnPackApp {
                     let mut commands = Vec::new();
                     mvu::update(
                         &mut self.model,
-                        Msg::Attachments(attachments::AttachmentsMsg::ThumbnailFailed {
-                            path,
-                            request_id,
-                        }),
+                        Msg::Attachments(attachments::AttachmentsMsg::ThumbnailFailed { path }),
                         &mut commands,
                     );
                     self.dispatch_commands(commands);
@@ -201,16 +195,15 @@ impl ElnPackApp {
                     self.dispatch_commands(commands);
                 }
                 other => {
-                    if let Msg::Attachments(attachments::AttachmentsMsg::Remove(index)) = &other {
-                        if let Some(path) = self
+                    if let Msg::Attachments(attachments::AttachmentsMsg::Remove(index)) = &other
+                        && let Some(path) = self
                             .model
                             .attachments
                             .attachments()
                             .get(*index)
                             .map(|item| item.path.clone())
-                        {
-                            self.invalidate_thumbnail_runtime_state(path.as_path());
-                        }
+                    {
+                        self.invalidate_thumbnail_runtime_state(path.as_path());
                     }
                     let mut commands = Vec::new();
                     mvu::update(&mut self.model, other, &mut commands);
@@ -668,11 +661,10 @@ mod tests {
         assert_ne!(old_request_id, new_request_id);
         assert!(app.model.attachments.is_thumbnail_loading(&path));
 
-        app.inbox
-            .push(Msg::Attachments(AttachmentsMsg::ThumbnailFailed {
-                path: path.clone(),
-                request_id: old_request_id,
-            }));
+        app.inbox.push(Msg::ThumbnailFailed {
+            path: path.clone(),
+            request_id: old_request_id,
+        });
         app.process_runtime_messages();
 
         assert!(app.model.attachments.is_thumbnail_loading(&path));
