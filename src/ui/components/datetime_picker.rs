@@ -6,6 +6,7 @@
 use chrono::{Datelike, Local, NaiveDate, TimeZone, Timelike, Utc};
 use eframe::egui;
 use egui_extras::DatePickerButton;
+use jiff::civil::Date as CivilDate;
 use time::OffsetDateTime;
 
 /// Format an integer as a two-digit string (00-99).
@@ -64,12 +65,12 @@ pub fn view(model: &DateTimeModel, ui: &mut egui::Ui) -> Vec<DateTimeMsg> {
     let mut msgs = Vec::new();
 
     ui.horizontal(|ui| {
-        let mut date = model.date;
+        let mut date = to_civil_date(model.date);
         if ui
             .add(DatePickerButton::new(&mut date).show_icon(true))
             .changed()
         {
-            msgs.push(DateTimeMsg::SetDate(date));
+            msgs.push(DateTimeMsg::SetDate(from_civil_date(date)));
         }
         ui.add_space(8.0);
 
@@ -149,6 +150,22 @@ fn set_to_now(model: &mut DateTimeModel) {
     model.date = now.date_naive();
     model.hour = now.hour() as i32;
     model.minute = now.minute() as i32;
+}
+
+/// Convert a chrono date into the date type expected by egui_extras.
+fn to_civil_date(date: NaiveDate) -> CivilDate {
+    CivilDate::new(date.year() as i16, date.month() as i8, date.day() as i8)
+        .unwrap_or_else(|_| CivilDate::new(1970, 1, 1).expect("valid fallback date"))
+}
+
+/// Convert the egui_extras civil date back into the app model representation.
+fn from_civil_date(date: CivilDate) -> NaiveDate {
+    NaiveDate::from_ymd_opt(
+        i32::from(date.year()),
+        u32::try_from(date.month()).expect("month is positive"),
+        u32::try_from(date.day()).expect("day is positive"),
+    )
+    .expect("jiff civil dates are always valid chrono dates in the supported range")
 }
 
 #[cfg(test)]

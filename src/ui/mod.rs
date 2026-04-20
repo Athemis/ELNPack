@@ -53,28 +53,90 @@ impl Default for ElnPackApp {
 }
 
 impl eframe::App for ElnPackApp {
-    /// Main application update loop: processes worker messages, applies MVU updates, and renders the UI.
+    /// Main application logic pass: processes worker messages and applies MVU updates.
     ///
     /// This method:
     /// - Drains messages produced by background command workers and enqueues them for processing.
     /// - Processes pending messages, converting decoded thumbnails into UI textures and applying MVU updates which may produce new commands sent to workers.
-    /// - Renders the top bar, error modal, bottom status panel, and the central scrolling content (title, meta group, description, keywords, extra fields, and attachments).
     ///
     /// # Parameters
     ///
     /// - `ctx` - The egui context used to build and render UI components.
     /// - `_frame` - The eframe frame provided by the runtime (unused by this implementation).
     ///
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.ensure_spacing(ctx);
+        self.process_pending_messages(ctx);
+    }
 
-        // Pull messages produced by the command worker.
+    /// Main application UI pass for the root viewport.
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        egui::Panel::top("top_bar").show_inside(ui, |ui| {
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.heading("ELN Entry");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    self.render_theme_controls(ui);
+                    ui.separator();
+                    self.render_help_button(ui);
+                    ui.separator();
+                    self.render_save_button(ui);
+                    ui.separator();
+                    self.render_body_format_toggle(ui);
+                });
+            });
+            ui.add_space(4.0);
+        });
+
+        self.render_error_modal(ui.ctx());
+
+        egui::Panel::bottom("status_panel")
+            .resizable(false)
+            .show_inside(ui, |ui| {
+                self.render_status(ui);
+            });
+
+        egui::CentralPanel::default().show_inside(ui, |ui| {
+            ui.add_space(8.0);
+
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                self.render_title_input(ui);
+                ui.add_space(12.0);
+
+                self.render_meta_group(ui);
+                ui.add_space(12.0);
+
+                self.render_description_input(ui);
+                ui.add_space(12.0);
+
+                let ctx = ui.ctx().clone();
+                let kw_msgs = keywords::view(ui, &ctx, &self.model.keywords);
+                self.inbox.extend(kw_msgs.into_iter().map(Msg::Keywords));
+                ui.add_space(12.0);
+
+                self.render_extra_fields_section(ui);
+                ui.add_space(12.0);
+
+                self.render_attachments_section(ui);
+                ui.add_space(8.0);
+            });
+        });
+    }
+}
+
+impl ElnPackApp {
+    fn ensure_spacing(&self, ctx: &egui::Context) {
+        ctx.global_style_mut(|style| {
+            style.spacing.item_spacing = egui::vec2(6.0, 6.0);
+        });
+    }
+
+    fn process_pending_messages(&mut self, ctx: &egui::Context) {
         while let Ok(msg) = self.msg_rx.try_recv() {
             self.model.pending_commands = self.model.pending_commands.saturating_sub(1);
             self.inbox.push(msg);
         }
 
-        // Process pending messages until exhausted.
         let mut msgs = std::mem::take(&mut self.inbox);
         while let Some(msg) = msgs.pop() {
             match msg {
@@ -98,64 +160,6 @@ impl eframe::App for ElnPackApp {
             }
         }
         self.inbox = msgs;
-
-        egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
-            ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                ui.heading("ELN Entry");
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    self.render_theme_controls(ui);
-                    ui.separator();
-                    self.render_help_button(ui);
-                    ui.separator();
-                    self.render_save_button(ui);
-                    ui.separator();
-                    self.render_body_format_toggle(ui);
-                });
-            });
-            ui.add_space(4.0);
-        });
-
-        self.render_error_modal(ctx);
-
-        egui::TopBottomPanel::bottom("status_panel")
-            .resizable(false)
-            .show(ctx, |ui| {
-                self.render_status(ui);
-            });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.add_space(8.0);
-
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                self.render_title_input(ui);
-                ui.add_space(12.0);
-
-                self.render_meta_group(ui);
-                ui.add_space(12.0);
-
-                self.render_description_input(ui);
-                ui.add_space(12.0);
-
-                let kw_msgs = keywords::view(ui, ctx, &self.model.keywords);
-                self.inbox.extend(kw_msgs.into_iter().map(Msg::Keywords));
-                ui.add_space(12.0);
-
-                self.render_extra_fields_section(ui);
-                ui.add_space(12.0);
-
-                self.render_attachments_section(ui, ctx);
-                ui.add_space(8.0);
-            });
-        });
-    }
-}
-
-impl ElnPackApp {
-    fn ensure_spacing(&self, ctx: &egui::Context) {
-        ctx.style_mut(|style| {
-            style.spacing.item_spacing = egui::vec2(6.0, 6.0);
-        });
     }
 
     /// Render the global theme preference control with a small vertical gap.
@@ -295,7 +299,7 @@ impl ElnPackApp {
     }
 
     /// Render attachments as a collapsible section in the main column.
-    fn render_attachments_section(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
+    fn render_attachments_section(&mut self, ui: &mut egui::Ui) {
         egui::CollapsingHeader::new("Attachments")
             .default_open(true)
             .show(ui, |ui| {
