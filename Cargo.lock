@@ -1110,7 +1110,7 @@ dependencies = [
  "crossbeam-channel",
  "deunicode",
  "eframe",
- "egui 0.34.3",
+ "egui 0.35.0",
  "egui-phosphor",
  "egui_extras",
  "email_address",
@@ -1212,7 +1212,6 @@ dependencies = [
  "ahash",
  "ecolor 0.34.3",
  "emath 0.34.3",
- "epaint_default_fonts 0.34.3",
  "font-types",
  "log",
  "nohash-hasher",
@@ -1234,7 +1233,7 @@ dependencies = [
  "bytemuck",
  "ecolor 0.35.0",
  "emath 0.35.0",
- "epaint_default_fonts 0.35.0",
+ "epaint_default_fonts",
  "font-types",
  "harfrust",
  "log",
@@ -1248,12 +1247,6 @@ dependencies = [
  "unicode-segmentation",
  "vello_cpu 0.0.9",
 ]
-
-[[package]]
-name = "epaint_default_fonts"
-version = "0.34.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8970033a4282a7bcf899b38b5ed3a58b732fe093d03785d58648515d8d309da"
 
 [[package]]
 name = "epaint_default_fonts"
