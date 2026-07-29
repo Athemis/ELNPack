@@ -1,10 +1,37 @@
-# Changelog
+## [unreleased]
 
-All notable changes to this project will be documented in this file.
+### 🐛 Bug Fixes
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+- *(markdown)* Adapt cursor range index to CharIndex for egui 0.35
+- *(ui)* Replace deprecated show_inside with show for egui 0.35
 
+### ⚙️ Miscellaneous Tasks
+
+- Add tokensave artifacts to gitignore
+## [0.1.4] - 2026-04-20
+
+### 🚀 Features
+
+- *(release)* Add full changelog generation to release script
+
+### 🐛 Bug Fixes
+
+- Adapt app to updated egui and sha2 dependencies (#100)
+
+### 🚜 Refactor
+
+- Move thumbnail textures into ui state (#101)
+
+### 📚 Documentation
+
+- Update changelog
+- Update README.md (#40)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add clippy configuration file (#56)
+- Set MSRV to 1.92.0 (#58)
+- Bump version to 0.1.4 (#102)
 ## [0.1.3] - 2025-12-12
 
 ### 🚀 Features
@@ -18,17 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ⚙️ Miscellaneous Tasks
 
 - Release v0.1.2 (#30)
-- _(ci)_ Switch to tag-based releases with git-cliff notes (#34)
+- *(ci)* Switch to tag-based releases with git-cliff notes (#34)
 - Use --pathspec-file-nul with git add to avoid parsing issues
 - Improve version bump commit to filter pathspecs correctly
 - Improve version bump commit staging in create_release.sh
 - Improve file staging logic in create_release.sh script
-- _(release)_ Bump version to 0.1.3-test
+- *(release)* Bump version to 0.1.3-test
 - Update git-cliff-action to v4 with verbose changelog generation and header stripping
 - Add step to collect release files in release workflow
 - Only show latest changes in release
-- _(release)_ Bump version to 0.1.3
-
+- *(release)* Bump version to 0.1.3
 ## [0.1.2] - 2025-12-10
 
 ### 🚀 Features
@@ -38,8 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🐛 Bug Fixes
 
-- _(ui)_ Replace keyword editor unicode buttons with phosphor icons (#24)
-- _(ci)_ Use semver notation for mdbook
+- *(ui)* Replace keyword editor unicode buttons with phosphor icons (#24)
+- *(ci)* Use semver notation for mdbook
 - Only check new commits in pre-push hook
 
 ### 📚 Documentation
@@ -68,7 +94,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump version to 0.1.1
 - Release v0.1.1 (#29)
 - Bump version to 0.1.2
-
 ## [0.1.0] - 2025-12-03
 
 ### 🚀 Features
@@ -107,10 +132,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Show empty metadata groups and support add-group/add-field flow
 - Add fields from group context and default section
 - Auto-create default group when adding first metadata field
-- _(ui)_ Hide empty default section; only show when ungrouped fields exist
+- *(ui)* Hide empty default section; only show when ungrouped fields exist
 - Allow choosing field type when creating extra fields
-- _(ui)_ Prevent deleting the last extra-field group
-- _(ui)_ Make extra-field groups collapsible
+- *(ui)* Prevent deleting the last extra-field group
+- *(ui)* Make extra-field groups collapsible
 - Enforce unique extra-field names with inline warning
 - Block save on empty required extra fields and highlight them
 - Disable save until required extra fields are filled
@@ -126,8 +151,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Sanitize html and filenames
 - Tighten archive name sanitization
-- _(datetime)_ Align default picker with local time and clarify ui
-- _(editor)_ Fix styling of text selections
+- *(datetime)* Align default picker with local time and clarify ui
+- *(editor)* Fix styling of text selections
 - Keep file extensions; improve filename sanitation
 - Always reassign fields to a Default group when removing groups
 - Reuse existing group when adding fields and simplify group picker
@@ -144,12 +169,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unify markdown style application helpers
 - Simplify attachments panel layout
 - Simplify attachments and fix all clippy warnings
-- _(ui)_ Extract keywords and datetime picker components
+- *(ui)* Extract keywords and datetime picker components
 - Align project layout with MVU structure
 - Extract shared validation logic for git hooks
-- _(ui)_ Reuse a shared toggle switch and separate multi-select control
-- _(ui)_ Streamline metadata field layout and unit handling
-- _(ui)_ Refactor group header rendering with improved layout
+- *(ui)* Reuse a shared toggle switch and separate multi-select control
+- *(ui)* Streamline metadata field layout and unit handling
+- *(ui)* Refactor group header rendering with improved layout
 - Centralize extra field validation for ui and save paths
 - Deduplicate extra field trimming helpers
 - Centralize extra field group helpers
@@ -184,7 +209,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use phosphor icons for heading selection
 - Drop RichText for icon display
 - Add icon to save button
-- _(ui)_ Modify extra fields metadata import UI labels
+- *(ui)* Modify extra fields metadata import UI labels
 - Add missing newlines at end of files
 - Fix clippy warnings
 - Rename test to clarify group display name fallback behavior
@@ -212,7 +237,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update AGENTS.md
 - Rename LICENSE.md to LICENSE
 - Update copyright statement in LICENSE
-- _(license)_ Add SPDX headers and fix copyright holder
+- *(license)* Add SPDX headers and fix copyright holder
 - Update README
 - Remove outdated docs
 - Add CI workflow and GitHub project templates
