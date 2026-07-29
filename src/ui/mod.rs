@@ -85,7 +85,7 @@ impl eframe::App for ElnPackApp {
         self.realize_pending_thumbnail_textures(ui.ctx());
         self.process_runtime_messages();
 
-        egui::Panel::top("top_bar").show_inside(ui, |ui| {
+        egui::Panel::top("top_bar").show(ui, |ui| {
             ui.add_space(6.0);
             ui.horizontal(|ui| {
                 ui.heading("ELN Entry");
@@ -106,11 +106,11 @@ impl eframe::App for ElnPackApp {
 
         egui::Panel::bottom("status_panel")
             .resizable(false)
-            .show_inside(ui, |ui| {
+            .show(ui, |ui| {
                 self.render_status(ui);
             });
 
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             ui.add_space(8.0);
 
             egui::ScrollArea::vertical().show(ui, |ui| {

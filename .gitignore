@@ -63,3 +63,6 @@ ehthumbs.db
 
 # SSH Keys
 id_ed25519*
+
+# tokensave
+.tokensave/
