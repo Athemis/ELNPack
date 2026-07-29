@@ -572,7 +572,7 @@ fn insert_table_at_cursor(model: &mut MarkdownModel, rows: u8, cols: u8) {
 fn selection(model: &MarkdownModel) -> (usize, usize, String) {
     let (start_char, end_char) = if let Some(range) = &model.cursor {
         let (a, b) = (range.primary.index, range.secondary.index);
-        (a.min(b), a.max(b))
+        (a.min(b).0, a.max(b).0)
     } else {
         let len = model.text.chars().count();
         (len, len)
